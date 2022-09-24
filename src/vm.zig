@@ -1,8 +1,13 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 
 const Chunk = @import("chunk.zig").Chunk;
 const OpCode = @import("chunk.zig").OpCode;
+const Compiler = @import("compiler.zig").Compiler;
+const Parser = @import("compiler.zig").Parser;
 const debug = @import("debug.zig");
+const Lexer = @import("lexer.zig").Lexer;
+const GcAllocator = @import("memory.zig").GcAllocater;
 const value_lib = @import("value.zig");
 const Value = value_lib.Value;
 
@@ -17,12 +22,23 @@ pub const Vm = struct {
 
     const stack_max = 256;
 
+    parent_allocator: Allocator,
+    gc: GcAllocator,
+    allocator: Allocator,
+
     chunk: *Chunk,
     ip: [*]u8,
     stack: [stack_max]Value,
     stack_top: [*]Value,
 
-    pub fn init(self: *Self) void {
+    lexer: Lexer,
+    parser: Parser,
+    compilingChunk: *Chunk,
+
+    pub fn init(self: *Self, allocator: Allocator) void {
+        self.parent_allocator = allocator;
+        self.gc = GcAllocator.init(allocator);
+        self.allocator = self.gc.allocator();
         self.resetStack();
     }
 
@@ -44,10 +60,37 @@ pub const Vm = struct {
         return self.stack_top[0];
     }
 
-    pub fn interpret(self: *Self, chunk: *Chunk) InterpretResult {
-        self.chunk = chunk;
-        self.ip = chunk.code.items.ptr;
-        return self.run();
+    pub fn currentChunk(self: *Self) *Chunk {
+        return self.compilingChunk;
+    }
+
+    pub fn emitByte(self: *Self, byte: u8) void {
+        self.currentChunk().write(byte, self.parser.previous.line);
+    }
+
+    pub fn emitOp(self: *Self, op: OpCode) void {
+        self.currentChunk().writeOp(op, self.parser.previous.line);
+    }
+
+    pub fn emitOpByte(self: *Self, op: OpCode, byte: u8) void {
+        self.emitOp(op);
+        self.emitByte(byte);
+    }
+
+    pub fn interpret(self: *Self, source: [:0]const u8) InterpretResult {
+        var chunk = Chunk.init(self.allocator);
+        defer chunk.deinit();
+
+        if (!Compiler.compile(self, source, &chunk)) {
+            return .compile_error;
+        }
+
+        self.chunk = &chunk;
+        self.ip = self.chunk.code.items.ptr;
+
+        const result = self.run();
+
+        return result;
     }
 
     const BinaryOpFn = *const fn (Value, Value) Value;
@@ -123,9 +166,9 @@ pub const Vm = struct {
                 .return_ => {
                     value_lib.printValue(self.pop());
                     std.debug.print("\n", .{});
-                    return InterpretResult.ok;
+                    return .ok;
                 },
-                else => return InterpretResult.runtime_error,
+                else => return .runtime_error,
             }
         }
     }

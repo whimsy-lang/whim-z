@@ -1,36 +1,69 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 
-const Chunk = @import("chunk.zig").Chunk;
-const debug = @import("debug.zig");
-const OpCode = @import("chunk.zig").OpCode;
-const GcAllocator = @import("memory.zig").GcAllocater;
 const Vm = @import("vm.zig").Vm;
 
-pub fn main() void {
+pub fn main() !void {
     std.debug.print("Whimsy v0.1\n", .{});
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    var gc = GcAllocator.init(gpa.allocator());
+    var allocator = gpa.allocator();
+
+    var args = try std.process.argsWithAllocator(allocator);
+    defer args.deinit();
+
+    var argList = std.ArrayList([]const u8).init(allocator);
+    defer argList.deinit();
+
+    while (args.next()) |arg| try argList.append(arg);
 
     var vm: Vm = undefined;
-    vm.init();
-    var chunk = Chunk.init(gc.allocator());
+    vm.init(allocator);
+    defer vm.deinit();
 
-    const constant = chunk.addConstant(8);
-    chunk.writeOp(OpCode.constant, 123);
-    chunk.write(@intCast(u8, constant), 123);
-
-    const c2 = chunk.addConstant(3);
-    chunk.writeOp(OpCode.constant, 124);
-    chunk.write(@intCast(u8, c2), 124);
-
-    chunk.writeOp(OpCode.subtract, 124);
-
-    chunk.writeOp(OpCode.return_, 125);
-    debug.disassembleChunk(&chunk, "test chunk");
-    _ = vm.interpret(&chunk);
-    vm.deinit();
-    chunk.deinit();
+    if (argList.items.len == 1) {
+        try repl(&vm);
+    } else if (argList.items.len == 2) {
+        try runFile(allocator, &vm, argList.items[1]);
+    } else {
+        std.debug.print("Usage: whim [path]\n", .{});
+        std.process.exit(64);
+    }
 
     std.process.exit(0);
+}
+
+fn repl(vm: *Vm) !void {
+    const stdout_file = std.io.getStdOut().writer();
+    var writer = std.io.bufferedWriter(stdout_file);
+    const stdout = writer.writer();
+
+    const stdin_file = std.io.getStdIn().reader();
+    var reader = std.io.bufferedReader(stdin_file);
+    const stdin = reader.reader();
+
+    var buffer: [1024]u8 = undefined;
+
+    while (true) {
+        try stdout.print("> ", .{});
+        try writer.flush();
+
+        if (try stdin.readUntilDelimiterOrEof(&buffer, '\n')) |line| {
+            buffer[line.len] = 0;
+            _ = vm.interpret(buffer[0..line.len :0]);
+        }
+    }
+}
+
+fn runFile(allocator: Allocator, vm: *Vm, path: []const u8) !void {
+    var file = try std.fs.cwd().openFile(path, .{});
+    defer file.close();
+
+    const source = try file.readToEndAllocOptions(allocator, std.math.maxInt(usize), null, @alignOf(u8), 0);
+    defer allocator.free(source);
+
+    const result = vm.interpret(source);
+
+    if (result == .compile_error) std.process.exit(65);
+    if (result == .runtime_error) std.process.exit(70);
 }
