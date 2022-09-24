@@ -4,6 +4,7 @@ const Chunk = @import("chunk.zig").Chunk;
 const OpCode = @import("chunk.zig").OpCode;
 const value = @import("value.zig");
 
+pub const trace_execution = true;
 pub const stress_gc = false;
 
 pub fn disassembleChunk(chunk: *Chunk, name: []const u8) void {
@@ -15,7 +16,7 @@ pub fn disassembleChunk(chunk: *Chunk, name: []const u8) void {
     }
 }
 
-fn disassembleInstruction(chunk: *Chunk, offset: usize) usize {
+pub fn disassembleInstruction(chunk: *Chunk, offset: usize) usize {
     std.debug.print("{d:0>4} ", .{offset});
     if (offset > 0 and chunk.lines.items[offset] == chunk.lines.items[offset - 1]) {
         std.debug.print("   | ", .{});
@@ -25,8 +26,14 @@ fn disassembleInstruction(chunk: *Chunk, offset: usize) usize {
 
     const instruction = chunk.code.items[offset];
     return switch (@intToEnum(OpCode, instruction)) {
-        OpCode.constant => constantInstruction("constant", chunk, offset),
-        OpCode.return_ => simpleInstruction("return", offset),
+        .constant => constantInstruction("constant", chunk, offset),
+        .add => simpleInstruction("add", offset),
+        .subtract => simpleInstruction("subtract", offset),
+        .multiply => simpleInstruction("multiply", offset),
+        .divide => simpleInstruction("divide", offset),
+        .modulus => simpleInstruction("modulus", offset),
+        .negate => simpleInstruction("negate", offset),
+        .return_ => simpleInstruction("return", offset),
         else => offset + 1,
     };
 }
