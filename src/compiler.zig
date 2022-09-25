@@ -32,8 +32,10 @@ const Precedence = enum {
     unary,
     // . () []
     call,
-    primary,
 };
+
+const PrimaryParseFn = *const fn (*Vm) bool;
+const ParseFn = *const fn (*Vm) void;
 
 pub const Compiler = struct {
     fn errorAt(vm: *Vm, token: *Token, message: []const u8) void {
@@ -99,6 +101,77 @@ pub const Compiler = struct {
 
     fn endCompiler(vm: *Vm) void {
         emitReturn(vm);
+    }
+
+    fn getPrefixPrimary(tok_type: TokenType) ?PrimaryParseFn {
+        return switch (tok_type) {
+            // .left_paren => groupingPrimary,
+            // .identifier => variablePrimary,
+            else => null,
+        };
+    }
+
+    fn getInfixPrimary(tok_type: TokenType) ?PrimaryParseFn {
+        return switch (tok_type) {
+            // .left_paren => callPrimary,
+            // .dot => dotPrimary,
+            else => null,
+        };
+    }
+
+    fn getPrefix(tok_type: TokenType) ?ParseFn {
+        return switch (tok_type) {
+            .left_paren => grouping,
+            .bang, .minus => unary,
+            // .identifier => variable,
+            // .string => string,
+            .number => number,
+            // .class => class,
+            // .false, .nil, .true => literal,
+            // .fn_ => function,
+            else => null,
+        };
+    }
+
+    fn getInfix(tok_type: TokenType) ?ParseFn {
+        return switch (tok_type) {
+            // .left_paren => call,
+            // .dot => dot,
+            .bang_equal, .equal_equal => binary,
+            .less, .less_equal, .greater, .greater_equal => binary,
+            .plus, .minus, .star, .slash, .percent => binary,
+            // .and_ => andOp,
+            // .or_ => orOp,
+            else => null,
+        };
+    }
+
+    fn getPrecedence(tok_type: TokenType) u8 {
+        return switch (tok_type) {
+            .left_paren, .dot => .call,
+            .bang_equal, .equal_equal => .equality,
+            .less, .less_equal, .greater, .greater_equal => .comparison,
+            .plus, .minus => .term,
+            .star, .slash, .percent => .factor,
+            .and_ => .and_,
+            .or_ => .or_,
+            else => .none,
+        };
+    }
+
+    fn binary(vm: *Vm) void {
+        const op_type = vm.parser.previous.type;
+        const precedence = getPrecedence(op_type);
+        parsePrecedence(vm, @intToEnum(Precedence, @enumToInt(precedence) + 1));
+
+        switch (op_type) {
+            .plus => vm.emitOp(.add),
+            .minus => vm.emitOp(.subtract),
+            .star => vm.emitOp(.multiply),
+            .slash => vm.emitOp(.divide),
+            .percent => vm.emitOp(.modulus),
+            else => unreachable,
+        }
     }
 
     fn expression(vm: *Vm) void {

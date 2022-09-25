@@ -69,7 +69,7 @@ pub const Vm = struct {
     }
 
     pub fn emitOp(self: *Self, op: OpCode) void {
-        self.currentChunk().writeOp(op, self.parser.previous.line);
+        self.currentChunk().write(@enumToInt(op), self.parser.previous.line);
     }
 
     pub fn emitOpByte(self: *Self, op: OpCode, byte: u8) void {

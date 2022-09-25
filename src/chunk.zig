@@ -103,10 +103,6 @@ pub const Chunk = struct {
         };
     }
 
-    pub fn writeOp(self: *Self, op: OpCode, line: usize) void {
-        self.write(@enumToInt(op), line);
-    }
-
     pub fn addConstant(self: *Self, value: Value) usize {
         self.constants.append(value) catch {
             std.debug.print("Could not add constant to chunk.", .{});
