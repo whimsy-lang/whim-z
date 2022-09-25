@@ -8,8 +8,7 @@ const Parser = @import("compiler.zig").Parser;
 const debug = @import("debug.zig");
 const Lexer = @import("lexer.zig").Lexer;
 const GcAllocator = @import("memory.zig").GcAllocater;
-const value_lib = @import("value.zig");
-const Value = value_lib.Value;
+const Value = @import("value.zig").Value;
 
 pub const InterpretResult = enum {
     ok,
@@ -48,6 +47,24 @@ pub const Vm = struct {
 
     fn resetStack(self: *Self) void {
         self.stack_top = &self.stack;
+    }
+
+    fn runtimeError(self: *Self, comptime fmt: []const u8, args: anytype) void {
+        std.debug.print(fmt, args);
+        std.debug.print("\n", .{});
+
+        const instruction = @ptrToInt(self.ip) - @ptrToInt(self.chunk.code.items.ptr) - 1;
+        const line = self.chunk.lines.items[instruction];
+        std.debug.print("[line {d}] in script\n", .{line});
+        self.resetStack();
+    }
+
+    fn isFalsey(value: Value) bool {
+        return value.is(.nil) or (value.is(.bool) and !value.as.bool);
+    }
+
+    fn peek(self: *Self, offset: usize) Value {
+        return (self.stack_top - (offset + 1))[0];
     }
 
     pub fn push(self: *Self, value: Value) void {
@@ -93,36 +110,6 @@ pub const Vm = struct {
         return result;
     }
 
-    const BinaryOpFn = *const fn (Value, Value) Value;
-
-    fn binaryOp(self: *Self, binary_op: BinaryOpFn) void {
-        const b = self.pop();
-        const a = self.pop();
-        self.push(binary_op(a, b));
-    }
-
-    const BinOps = struct {
-        fn add(a: Value, b: Value) Value {
-            return a + b;
-        }
-
-        fn subtract(a: Value, b: Value) Value {
-            return a - b;
-        }
-
-        fn multiply(a: Value, b: Value) Value {
-            return a * b;
-        }
-
-        fn divide(a: Value, b: Value) Value {
-            return a / b;
-        }
-
-        fn modulus(a: Value, b: Value) Value {
-            return @mod(a, b);
-        }
-    };
-
     // todo - compare performance to increment and then returning self.ip[-1]
     fn readByte(self: *Self) u8 {
         const value = self.ip[0];
@@ -141,7 +128,7 @@ pub const Vm = struct {
                 var slot: [*]Value = &self.stack;
                 while (@ptrToInt(slot) < @ptrToInt(self.stack_top)) : (slot += 1) {
                     std.debug.print("[ ", .{});
-                    value_lib.printValue(slot[0]);
+                    slot[0].print();
                     std.debug.print(" ]", .{});
                 }
                 std.debug.print("\n", .{});
@@ -154,17 +141,111 @@ pub const Vm = struct {
                     const constant = self.readConstant();
                     self.push(constant);
                 },
-                .add => self.binaryOp(BinOps.add),
-                .subtract => self.binaryOp(BinOps.subtract),
-                .multiply => self.binaryOp(BinOps.multiply),
-                .divide => self.binaryOp(BinOps.divide),
-                .modulus => self.binaryOp(BinOps.modulus),
-                .negate => {
-                    const top = self.stack_top - 1;
-                    top[0] = -top[0];
+                .nil => self.push(Value.nil()),
+                .true => self.push(Value.boolean(true)),
+                .false => self.push(Value.boolean(false)),
+                .equal => {
+                    const b = self.pop();
+                    const a = self.pop();
+                    self.push(Value.boolean(a.equal(b)));
                 },
+                .not_equal => {
+                    const b = self.pop();
+                    const a = self.pop();
+                    self.push(Value.boolean(!a.equal(b)));
+                },
+                .greater => {
+                    if (!self.peek(0).is(.number) or !self.peek(1).is(.number)) {
+                        self.runtimeError("Operands must be numbers.", .{});
+                        return .runtime_error;
+                    }
+                    const b = self.pop().as.number;
+                    const a = self.pop().as.number;
+                    self.push(Value.boolean(a > b));
+                },
+                .greater_equal => {
+                    if (!self.peek(0).is(.number) or !self.peek(1).is(.number)) {
+                        self.runtimeError("Operands must be numbers.", .{});
+                        return .runtime_error;
+                    }
+                    const b = self.pop().as.number;
+                    const a = self.pop().as.number;
+                    self.push(Value.boolean(a >= b));
+                },
+                .less => {
+                    if (!self.peek(0).is(.number) or !self.peek(1).is(.number)) {
+                        self.runtimeError("Operands must be numbers.", .{});
+                        return .runtime_error;
+                    }
+                    const b = self.pop().as.number;
+                    const a = self.pop().as.number;
+                    self.push(Value.boolean(a < b));
+                },
+                .less_equal => {
+                    if (!self.peek(0).is(.number) or !self.peek(1).is(.number)) {
+                        self.runtimeError("Operands must be numbers.", .{});
+                        return .runtime_error;
+                    }
+                    const b = self.pop().as.number;
+                    const a = self.pop().as.number;
+                    self.push(Value.boolean(a <= b));
+                },
+                .add => {
+                    if (!self.peek(0).is(.number) or !self.peek(1).is(.number)) {
+                        self.runtimeError("Operands must be numbers.", .{});
+                        return .runtime_error;
+                    }
+                    const b = self.pop().as.number;
+                    const a = self.pop().as.number;
+                    self.push(Value.number(a + b));
+                },
+                .subtract => {
+                    if (!self.peek(0).is(.number) or !self.peek(1).is(.number)) {
+                        self.runtimeError("Operands must be numbers.", .{});
+                        return .runtime_error;
+                    }
+                    const b = self.pop().as.number;
+                    const a = self.pop().as.number;
+                    self.push(Value.number(a - b));
+                },
+                .multiply => {
+                    if (!self.peek(0).is(.number) or !self.peek(1).is(.number)) {
+                        self.runtimeError("Operands must be numbers.", .{});
+                        return .runtime_error;
+                    }
+                    const b = self.pop().as.number;
+                    const a = self.pop().as.number;
+                    self.push(Value.number(a * b));
+                },
+                .divide => {
+                    if (!self.peek(0).is(.number) or !self.peek(1).is(.number)) {
+                        self.runtimeError("Operands must be numbers.", .{});
+                        return .runtime_error;
+                    }
+                    const b = self.pop().as.number;
+                    const a = self.pop().as.number;
+                    self.push(Value.number(a / b));
+                },
+                .modulus => {
+                    if (!self.peek(0).is(.number) or !self.peek(1).is(.number)) {
+                        self.runtimeError("Operands must be numbers.", .{});
+                        return .runtime_error;
+                    }
+                    const b = self.pop().as.number;
+                    const a = self.pop().as.number;
+                    self.push(Value.number(@mod(a, b)));
+                },
+                .negate => {
+                    if (!self.peek(0).is(.number)) {
+                        self.runtimeError("Operand must be a number.", .{});
+                        return .runtime_error;
+                    }
+                    const top = self.stack_top - 1;
+                    top[0].as.number = -top[0].as.number;
+                },
+                .not => self.push(Value.boolean(isFalsey(self.pop()))),
                 .return_ => {
-                    value_lib.printValue(self.pop());
+                    self.pop().print();
                     std.debug.print("\n", .{});
                     return .ok;
                 },

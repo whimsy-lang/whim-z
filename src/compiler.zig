@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const Chunk = @import("chunk.zig").Chunk;
+const debug = @import("debug.zig");
 const Lexer = @import("lexer.zig").Lexer;
 const Token = @import("lexer.zig").Token;
 const TokenType = @import("lexer.zig").TokenType;
@@ -92,7 +93,7 @@ pub const Compiler = struct {
             error_(vm, "Too many constants in one chunk.");
             return 0;
         }
-        return @as(u8, constant);
+        return @intCast(u8, constant);
     }
 
     fn emitConstant(vm: *Vm, value: Value) void {
@@ -101,6 +102,9 @@ pub const Compiler = struct {
 
     fn endCompiler(vm: *Vm) void {
         emitReturn(vm);
+        if (debug.print_code and !vm.parser.had_error) {
+            debug.disassembleChunk(vm.currentChunk(), "code");
+        }
     }
 
     fn getPrefixPrimary(tok_type: TokenType) ?PrimaryParseFn {
@@ -127,7 +131,7 @@ pub const Compiler = struct {
             // .string => string,
             .number => number,
             // .class => class,
-            // .false, .nil, .true => literal,
+            .false, .nil, .true => literal,
             // .fn_ => function,
             else => null,
         };
@@ -146,7 +150,7 @@ pub const Compiler = struct {
         };
     }
 
-    fn getPrecedence(tok_type: TokenType) u8 {
+    fn getPrecedence(tok_type: TokenType) Precedence {
         return switch (tok_type) {
             .left_paren, .dot => .call,
             .bang_equal, .equal_equal => .equality,
@@ -165,6 +169,12 @@ pub const Compiler = struct {
         parsePrecedence(vm, @intToEnum(Precedence, @enumToInt(precedence) + 1));
 
         switch (op_type) {
+            .bang_equal => vm.emitOp(.not_equal),
+            .equal_equal => vm.emitOp(.equal),
+            .greater => vm.emitOp(.greater),
+            .greater_equal => vm.emitOp(.greater_equal),
+            .less => vm.emitOp(.less),
+            .less_equal => vm.emitOp(.less_equal),
             .plus => vm.emitOp(.add),
             .minus => vm.emitOp(.subtract),
             .star => vm.emitOp(.multiply),
@@ -183,9 +193,18 @@ pub const Compiler = struct {
         consume(vm, .right_paren, "Expect ')' after expression.");
     }
 
+    fn literal(vm: *Vm) void {
+        switch (vm.parser.previous.type) {
+            .false => vm.emitOp(.false),
+            .nil => vm.emitOp(.nil),
+            .true => vm.emitOp(.true),
+            else => unreachable,
+        }
+    }
+
     fn number(vm: *Vm) void {
         const value = std.fmt.parseFloat(f64, vm.parser.previous.value) catch 0;
-        emitConstant(vm, value);
+        emitConstant(vm, Value.number(value));
     }
 
     fn unary(vm: *Vm) void {
@@ -196,14 +215,28 @@ pub const Compiler = struct {
 
         // emit the operator instruction
         switch (op_type) {
+            .bang => vm.emitOp(.not),
             .minus => vm.emitOp(.negate),
             else => unreachable,
         }
     }
 
     fn parsePrecedence(vm: *Vm, precedence: Precedence) void {
-        _ = vm;
-        _ = precedence;
+        advance(vm);
+
+        const prefix = getPrefix(vm.parser.previous.type);
+        if (prefix == null) {
+            error_(vm, "Expect expression.");
+            return;
+        }
+
+        prefix.?(vm);
+
+        while (@enumToInt(precedence) <= @enumToInt(getPrecedence(vm.parser.current.type))) {
+            advance(vm);
+            const infix = getInfix(vm.parser.previous.type);
+            infix.?(vm);
+        }
     }
 
     pub fn compile(vm: *Vm, source: [:0]const u8, chunk: *Chunk) bool {
