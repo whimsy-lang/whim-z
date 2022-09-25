@@ -59,10 +59,6 @@ pub const Vm = struct {
         self.resetStack();
     }
 
-    fn isFalsey(value: Value) bool {
-        return value.is(.nil) or (value.is(.bool) and !value.as.bool);
-    }
-
     fn peek(self: *Self, offset: usize) Value {
         return (self.stack_top - (offset + 1))[0];
     }
@@ -93,6 +89,53 @@ pub const Vm = struct {
         self.emitOp(op);
         self.emitByte(byte);
     }
+
+    const NumBinaryOp = struct {
+        const NumBinaryOpFn = *const fn (f64, f64) Value;
+
+        fn run(vm: *Vm, op_fn: NumBinaryOpFn) bool {
+            if (!vm.peek(0).is(.number) or !vm.peek(1).is(.number)) {
+                vm.runtimeError("Operands must be numbers.", .{});
+                return false;
+            }
+            const b = vm.pop().asNum();
+            const a = vm.pop().asNum();
+            vm.push(op_fn(a, b));
+            return true;
+        }
+
+        fn greater(a: f64, b: f64) Value {
+            return Value.boolean(a > b);
+        }
+
+        fn greaterEqual(a: f64, b: f64) Value {
+            return Value.boolean(a >= b);
+        }
+
+        fn less(a: f64, b: f64) Value {
+            return Value.boolean(a < b);
+        }
+
+        fn lessEqual(a: f64, b: f64) Value {
+            return Value.boolean(a <= b);
+        }
+
+        fn subtract(a: f64, b: f64) Value {
+            return Value.number(a - b);
+        }
+
+        fn multiply(a: f64, b: f64) Value {
+            return Value.number(a * b);
+        }
+
+        fn divide(a: f64, b: f64) Value {
+            return Value.number(a / b);
+        }
+
+        fn modulus(a: f64, b: f64) Value {
+            return Value.number(@mod(a, b));
+        }
+    };
 
     pub fn interpret(self: *Self, source: [:0]const u8) InterpretResult {
         var chunk = Chunk.init(self.allocator);
@@ -154,96 +197,31 @@ pub const Vm = struct {
                     const a = self.pop();
                     self.push(Value.boolean(!a.equal(b)));
                 },
-                .greater => {
-                    if (!self.peek(0).is(.number) or !self.peek(1).is(.number)) {
-                        self.runtimeError("Operands must be numbers.", .{});
-                        return .runtime_error;
-                    }
-                    const b = self.pop().as.number;
-                    const a = self.pop().as.number;
-                    self.push(Value.boolean(a > b));
-                },
-                .greater_equal => {
-                    if (!self.peek(0).is(.number) or !self.peek(1).is(.number)) {
-                        self.runtimeError("Operands must be numbers.", .{});
-                        return .runtime_error;
-                    }
-                    const b = self.pop().as.number;
-                    const a = self.pop().as.number;
-                    self.push(Value.boolean(a >= b));
-                },
-                .less => {
-                    if (!self.peek(0).is(.number) or !self.peek(1).is(.number)) {
-                        self.runtimeError("Operands must be numbers.", .{});
-                        return .runtime_error;
-                    }
-                    const b = self.pop().as.number;
-                    const a = self.pop().as.number;
-                    self.push(Value.boolean(a < b));
-                },
-                .less_equal => {
-                    if (!self.peek(0).is(.number) or !self.peek(1).is(.number)) {
-                        self.runtimeError("Operands must be numbers.", .{});
-                        return .runtime_error;
-                    }
-                    const b = self.pop().as.number;
-                    const a = self.pop().as.number;
-                    self.push(Value.boolean(a <= b));
-                },
+                .greater => if (!NumBinaryOp.run(self, NumBinaryOp.greater)) return .runtime_error,
+                .greater_equal => if (!NumBinaryOp.run(self, NumBinaryOp.greaterEqual)) return .runtime_error,
+                .less => if (!NumBinaryOp.run(self, NumBinaryOp.less)) return .runtime_error,
+                .less_equal => if (!NumBinaryOp.run(self, NumBinaryOp.lessEqual)) return .runtime_error,
                 .add => {
                     if (!self.peek(0).is(.number) or !self.peek(1).is(.number)) {
                         self.runtimeError("Operands must be numbers.", .{});
                         return .runtime_error;
                     }
-                    const b = self.pop().as.number;
-                    const a = self.pop().as.number;
+                    const b = self.pop().asNum();
+                    const a = self.pop().asNum();
                     self.push(Value.number(a + b));
                 },
-                .subtract => {
-                    if (!self.peek(0).is(.number) or !self.peek(1).is(.number)) {
-                        self.runtimeError("Operands must be numbers.", .{});
-                        return .runtime_error;
-                    }
-                    const b = self.pop().as.number;
-                    const a = self.pop().as.number;
-                    self.push(Value.number(a - b));
-                },
-                .multiply => {
-                    if (!self.peek(0).is(.number) or !self.peek(1).is(.number)) {
-                        self.runtimeError("Operands must be numbers.", .{});
-                        return .runtime_error;
-                    }
-                    const b = self.pop().as.number;
-                    const a = self.pop().as.number;
-                    self.push(Value.number(a * b));
-                },
-                .divide => {
-                    if (!self.peek(0).is(.number) or !self.peek(1).is(.number)) {
-                        self.runtimeError("Operands must be numbers.", .{});
-                        return .runtime_error;
-                    }
-                    const b = self.pop().as.number;
-                    const a = self.pop().as.number;
-                    self.push(Value.number(a / b));
-                },
-                .modulus => {
-                    if (!self.peek(0).is(.number) or !self.peek(1).is(.number)) {
-                        self.runtimeError("Operands must be numbers.", .{});
-                        return .runtime_error;
-                    }
-                    const b = self.pop().as.number;
-                    const a = self.pop().as.number;
-                    self.push(Value.number(@mod(a, b)));
-                },
+                .subtract => if (!NumBinaryOp.run(self, NumBinaryOp.subtract)) return .runtime_error,
+                .multiply => if (!NumBinaryOp.run(self, NumBinaryOp.multiply)) return .runtime_error,
+                .divide => if (!NumBinaryOp.run(self, NumBinaryOp.divide)) return .runtime_error,
+                .modulus => if (!NumBinaryOp.run(self, NumBinaryOp.modulus)) return .runtime_error,
                 .negate => {
                     if (!self.peek(0).is(.number)) {
                         self.runtimeError("Operand must be a number.", .{});
                         return .runtime_error;
                     }
-                    const top = self.stack_top - 1;
-                    top[0].as.number = -top[0].as.number;
+                    self.push(Value.number(-self.pop().asNum()));
                 },
-                .not => self.push(Value.boolean(isFalsey(self.pop()))),
+                .not => self.push(Value.boolean(self.pop().isFalsey())),
                 .return_ => {
                     self.pop().print();
                     std.debug.print("\n", .{});

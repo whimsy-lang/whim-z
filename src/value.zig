@@ -14,6 +14,10 @@ pub const Value = struct {
     },
     constant: bool = false,
 
+    pub fn getType(self: Value) ValueType {
+        return self.as;
+    }
+
     pub fn boolean(value: bool) Value {
         return .{ .as = .{ .bool = value } };
     }
@@ -27,23 +31,39 @@ pub const Value = struct {
     }
 
     pub fn is(self: Value, val_type: ValueType) bool {
-        return self.as == val_type;
+        return self.getType() == val_type;
+    }
+
+    pub fn isConst(self: Value) bool {
+        return self.constant;
+    }
+
+    pub fn asBool(self: Value) bool {
+        return self.as.bool;
+    }
+
+    pub fn asNum(self: Value) f64 {
+        return self.as.number;
+    }
+
+    pub fn isFalsey(self: Value) bool {
+        return self.is(.nil) or (self.is(.bool) and !self.asBool());
     }
 
     pub fn equal(self: Value, other: Value) bool {
-        if (@enumToInt(self.as) != @enumToInt(other.as)) return false;
-        return switch (self.as) {
-            .bool => self.as.bool == other.as.bool,
+        if (!self.is(other.getType())) return false;
+        return switch (self.getType()) {
+            .bool => self.asBool() == other.asBool(),
             .nil => true,
-            .number => self.as.number == other.as.number,
+            .number => self.asNum() == other.asNum(),
         };
     }
 
     pub fn print(self: Value) void {
-        switch (self.as) {
-            .bool => std.debug.print("{s}", .{if (self.as.bool) "true" else "false"}),
+        switch (self.getType()) {
+            .bool => std.debug.print("{s}", .{if (self.asBool()) "true" else "false"}),
             .nil => std.debug.print("nil", .{}),
-            .number => std.debug.print("{d}", .{self.as.number}),
+            .number => std.debug.print("{d}", .{self.asNum()}),
         }
     }
 };
