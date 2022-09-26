@@ -12,7 +12,6 @@ pub const Value = struct {
         nil: void,
         number: f64,
     },
-    constant: bool = false,
 
     pub fn getType(self: Value) ValueType {
         return self.as;
@@ -32,10 +31,6 @@ pub const Value = struct {
 
     pub fn is(self: Value, val_type: ValueType) bool {
         return self.getType() == val_type;
-    }
-
-    pub fn isConst(self: Value) bool {
-        return self.constant;
     }
 
     pub fn asBool(self: Value) bool {
