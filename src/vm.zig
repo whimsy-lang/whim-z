@@ -8,6 +8,7 @@ const Parser = @import("compiler.zig").Parser;
 const debug = @import("debug.zig");
 const Lexer = @import("lexer.zig").Lexer;
 const GcAllocator = @import("memory.zig").GcAllocater;
+const ObjString = @import("object.zig").ObjString;
 const Value = @import("value.zig").Value;
 
 pub const InterpretResult = enum {
@@ -24,6 +25,7 @@ pub const Vm = struct {
     parent_allocator: Allocator,
     gc: GcAllocator,
     allocator: Allocator,
+    objects: std.ArrayList(Value),
 
     chunk: *Chunk,
     ip: [*]u8,
@@ -36,13 +38,21 @@ pub const Vm = struct {
 
     pub fn init(self: *Self, allocator: Allocator) void {
         self.parent_allocator = allocator;
-        self.gc = GcAllocator.init(allocator);
+        self.gc = GcAllocator.init(self.parent_allocator);
         self.allocator = self.gc.allocator();
+        self.objects = std.ArrayList(Value).init(self.parent_allocator);
         self.resetStack();
     }
 
     pub fn deinit(self: *Self) void {
-        _ = self;
+        GcAllocator.freeObjects(self);
+    }
+
+    pub fn registerObject(self: *Self, object: Value) void {
+        self.objects.append(object) catch {
+            std.debug.print("Could not allocate memory to track object.", .{});
+            std.process.exit(1);
+        };
     }
 
     fn resetStack(self: *Self) void {
@@ -93,6 +103,7 @@ pub const Vm = struct {
     const NumBinaryOp = struct {
         const NumBinaryOpFn = *const fn (f64, f64) Value;
 
+        // todo - test if inlining or comptime for op_fn makes a difference
         fn run(vm: *Vm, op_fn: NumBinaryOpFn) bool {
             if (!vm.peek(0).is(.number) or !vm.peek(1).is(.number)) {
                 vm.runtimeError("Operands must be numbers.", .{});
@@ -136,6 +147,21 @@ pub const Vm = struct {
             return Value.number(@mod(a, b));
         }
     };
+
+    fn concatenate(self: *Self) void {
+        const b = self.pop().asString();
+        const a = self.pop().asString();
+
+        const strings = [_][]const u8{ a.chars, b.chars };
+
+        const heap_chars = std.mem.concat(self.allocator, u8, &strings) catch {
+            std.debug.print("Could not allocate memory for string.", .{});
+            std.process.exit(1);
+        };
+
+        const result = ObjString.take(self, heap_chars);
+        self.push(Value.string(result));
+    }
 
     pub fn interpret(self: *Self, source: [:0]const u8) InterpretResult {
         var chunk = Chunk.init(self.allocator);
@@ -202,13 +228,16 @@ pub const Vm = struct {
                 .less => if (!NumBinaryOp.run(self, NumBinaryOp.less)) return .runtime_error,
                 .less_equal => if (!NumBinaryOp.run(self, NumBinaryOp.lessEqual)) return .runtime_error,
                 .add => {
-                    if (!self.peek(0).is(.number) or !self.peek(1).is(.number)) {
-                        self.runtimeError("Operands must be numbers.", .{});
+                    if (self.peek(0).is(.string) and self.peek(1).is(.string)) {
+                        self.concatenate();
+                    } else if (self.peek(0).is(.number) and self.peek(1).is(.number)) {
+                        const b = self.pop().asNum();
+                        const a = self.pop().asNum();
+                        self.push(Value.number(a + b));
+                    } else {
+                        self.runtimeError("Operands must both be numbers or strings.", .{});
                         return .runtime_error;
                     }
-                    const b = self.pop().asNum();
-                    const a = self.pop().asNum();
-                    self.push(Value.number(a + b));
                 },
                 .subtract => if (!NumBinaryOp.run(self, NumBinaryOp.subtract)) return .runtime_error,
                 .multiply => if (!NumBinaryOp.run(self, NumBinaryOp.multiply)) return .runtime_error,

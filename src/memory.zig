@@ -2,6 +2,8 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 const debug = @import("debug.zig");
+const Value = @import("value.zig").Value;
+const Vm = @import("vm.zig").Vm;
 
 pub const GcAllocater = struct {
     const Self = @This();
@@ -59,5 +61,22 @@ pub const GcAllocater = struct {
 
     fn collectGarbage(self: *Self) !void {
         _ = self;
+    }
+
+    pub fn freeObjects(vm: *Vm) void {
+        for (vm.objects.items) |object| {
+            freeObject(vm, object);
+        }
+    }
+
+    fn freeObject(vm: *Vm, object: Value) void {
+        switch (object.getType()) {
+            .string => {
+                const string = object.asString();
+                string.deinit(vm.allocator);
+                vm.allocator.destroy(string);
+            },
+            else => unreachable,
+        }
     }
 };

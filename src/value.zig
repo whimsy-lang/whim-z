@@ -1,9 +1,13 @@
 const std = @import("std");
 
+const ObjString = @import("object.zig").ObjString;
+
 pub const ValueType = enum {
     bool,
     nil,
     number,
+
+    string,
 };
 
 pub const Value = struct {
@@ -11,6 +15,8 @@ pub const Value = struct {
         bool: bool,
         nil: void,
         number: f64,
+
+        string: *ObjString,
     },
 
     pub fn getType(self: Value) ValueType {
@@ -29,6 +35,10 @@ pub const Value = struct {
         return .{ .as = .{ .number = value } };
     }
 
+    pub fn string(value: *ObjString) Value {
+        return .{ .as = .{ .string = value } };
+    }
+
     pub fn is(self: Value, val_type: ValueType) bool {
         return self.getType() == val_type;
     }
@@ -41,6 +51,10 @@ pub const Value = struct {
         return self.as.number;
     }
 
+    pub fn asString(self: Value) *ObjString {
+        return self.as.string;
+    }
+
     pub fn isFalsey(self: Value) bool {
         return self.is(.nil) or (self.is(.bool) and !self.asBool());
     }
@@ -51,6 +65,8 @@ pub const Value = struct {
             .bool => self.asBool() == other.asBool(),
             .nil => true,
             .number => self.asNum() == other.asNum(),
+
+            .string => self.asString() == other.asString(),
         };
     }
 
@@ -59,6 +75,8 @@ pub const Value = struct {
             .bool => std.debug.print("{s}", .{if (self.asBool()) "true" else "false"}),
             .nil => std.debug.print("nil", .{}),
             .number => std.debug.print("{d}", .{self.asNum()}),
+
+            .string => std.debug.print("{s}", .{self.asString().chars}),
         }
     }
 };

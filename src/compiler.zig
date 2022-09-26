@@ -5,6 +5,7 @@ const debug = @import("debug.zig");
 const Lexer = @import("lexer.zig").Lexer;
 const Token = @import("lexer.zig").Token;
 const TokenType = @import("lexer.zig").TokenType;
+const ObjString = @import("object.zig").ObjString;
 const Value = @import("value.zig").Value;
 const Vm = @import("vm.zig").Vm;
 
@@ -128,7 +129,7 @@ pub const Compiler = struct {
             .left_paren => grouping,
             .bang, .minus => unary,
             // .identifier => variable,
-            // .string => string,
+            .string => string,
             .number => number,
             // .class => class,
             .false, .nil, .true => literal,
@@ -205,6 +206,11 @@ pub const Compiler = struct {
     fn number(vm: *Vm) void {
         const value = std.fmt.parseFloat(f64, vm.parser.previous.value) catch 0;
         emitConstant(vm, Value.number(value));
+    }
+
+    fn string(vm:*Vm) void {
+        const value = vm.parser.previous.value;
+        emitConstant(vm, Value.string(ObjString.copyEscape(vm, value[1..(value.len - 1)])));
     }
 
     fn unary(vm: *Vm) void {
