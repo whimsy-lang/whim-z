@@ -7,6 +7,7 @@ const Compiler = @import("compiler.zig").Compiler;
 const Parser = @import("compiler.zig").Parser;
 const debug = @import("debug.zig");
 const Lexer = @import("lexer.zig").Lexer;
+const Map = @import("map.zig").Map;
 const GcAllocator = @import("memory.zig").GcAllocater;
 const ObjString = @import("object.zig").ObjString;
 const Value = @import("value.zig").Value;
@@ -25,6 +26,7 @@ pub const Vm = struct {
     parent_allocator: Allocator,
     gc: GcAllocator,
     allocator: Allocator,
+    strings: Map,
     objects: std.ArrayList(Value),
 
     chunk: *Chunk,
@@ -41,10 +43,12 @@ pub const Vm = struct {
         self.gc = GcAllocator.init(self.parent_allocator);
         self.allocator = self.gc.allocator();
         self.objects = std.ArrayList(Value).init(self.parent_allocator);
+        self.strings = Map.init(self.allocator);
         self.resetStack();
     }
 
     pub fn deinit(self: *Self) void {
+        self.strings.deinit();
         GcAllocator.freeObjects(self);
     }
 
