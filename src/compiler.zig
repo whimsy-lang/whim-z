@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const Chunk = @import("chunk.zig").Chunk;
+const OpCode = @import("chunk.zig").OpCode;
 const debug = @import("debug.zig");
 const Lexer = @import("lexer.zig").Lexer;
 const Token = @import("lexer.zig").Token;
@@ -40,6 +41,8 @@ const PrimaryParseFn = *const fn (*Vm) bool;
 const ParseFn = *const fn (*Vm) void;
 
 pub const Compiler = struct {
+    encountered_identifier: ?[]const u8,
+
     fn errorAt(vm: *Vm, token: *Token, message: []const u8) void {
         if (vm.parser.panic_mode) return;
         vm.parser.panic_mode = true;
@@ -84,6 +87,16 @@ pub const Compiler = struct {
         errorAtCurrent(vm, message);
     }
 
+    fn check(vm: *Vm, expected: TokenType) bool {
+        return vm.parser.current.type == expected;
+    }
+
+    fn match(vm: *Vm, expected: TokenType) bool {
+        if (!check(vm, expected)) return false;
+        advance(vm);
+        return true;
+    }
+
     fn emitReturn(vm: *Vm) void {
         vm.emitOp(.return_);
     }
@@ -108,10 +121,18 @@ pub const Compiler = struct {
         }
     }
 
+    fn identifierConstant(vm: *Vm, name: *Token) u8 {
+        return makeConstant(vm, Value.string(ObjString.copy(vm, name.value)));
+    }
+
+    fn defineGlobal(vm: *Vm, global: u8, constant: bool) void {
+        vm.emitOpByte(if (constant) .define_global_const else .define_global_var, global);
+    }
+
     fn getPrefixPrimary(tok_type: TokenType) ?PrimaryParseFn {
         return switch (tok_type) {
-            // .left_paren => groupingPrimary,
-            // .identifier => variablePrimary,
+            .left_paren => groupingPrimary,
+            .identifier => variablePrimary,
             else => null,
         };
     }
@@ -128,7 +149,7 @@ pub const Compiler = struct {
         return switch (tok_type) {
             .left_paren => grouping,
             .bang, .minus => unary,
-            // .identifier => variable,
+            .identifier => variable,
             .string => string,
             .number => number,
             // .class => class,
@@ -185,8 +206,9 @@ pub const Compiler = struct {
         }
     }
 
-    fn expression(vm: *Vm) void {
-        parsePrecedence(vm, .or_);
+    fn groupingPrimary(vm: *Vm) bool {
+        grouping(vm);
+        return false;
     }
 
     fn grouping(vm: *Vm) void {
@@ -208,7 +230,7 @@ pub const Compiler = struct {
         emitConstant(vm, Value.number(value));
     }
 
-    fn string(vm:*Vm) void {
+    fn string(vm: *Vm) void {
         const value = vm.parser.previous.value;
         emitConstant(vm, Value.string(ObjString.copyEscape(vm, value[1..(value.len - 1)])));
     }
@@ -227,9 +249,66 @@ pub const Compiler = struct {
         }
     }
 
-    fn parsePrecedence(vm: *Vm, precedence: Precedence) void {
-        advance(vm);
+    fn variablePrimary(vm: *Vm) bool {
+        switch (vm.parser.current.type) {
+            .colon_colon, .colon_equal => {
+                // declaration
 
+                const constant = vm.parser.current.type == .colon_colon;
+
+                vm.compiler.encountered_identifier = vm.parser.previous.value;
+
+                const arg = identifierConstant(vm, &vm.parser.previous);
+                advance(vm); // accept :: :=
+                expression(vm);
+                defineGlobal(vm, arg, constant);
+
+                return true;
+            },
+            .equal, .plus_equal, .minus_equal, .star_equal, .slash_equal, .percent_equal => {
+                // assignment
+
+                vm.compiler.encountered_identifier = vm.parser.previous.value;
+
+                // global
+                const arg = identifierConstant(vm, &vm.parser.previous);
+
+                const op: OpCode = switch (vm.parser.current.type) {
+                    .plus_equal => .add_set_global,
+                    .minus_equal => .subtract_set_global,
+                    .star_equal => .multiply_set_global,
+                    .slash_equal => .divide_set_global,
+                    .percent_equal => .modulus_set_global,
+                    else => .set_global,
+                };
+
+                advance(vm); // accept = += -= *= /= %=
+                expression(vm);
+                vm.emitOpByte(op, arg);
+                return true;
+            },
+            else => {},
+        }
+        // not an assignment, continue parsing the expression
+        variable(vm);
+        return false;
+    }
+
+    fn variable(vm: *Vm) void {
+        var name = vm.parser.previous;
+        const arg = identifierConstant(vm, &name);
+        vm.emitOpByte(.get_global, arg);
+    }
+
+    fn parseInfixPrecedence(vm: *Vm, precedence: Precedence) void {
+        while (@enumToInt(precedence) <= @enumToInt(getPrecedence(vm.parser.current.type))) {
+            advance(vm);
+            const infix = getInfix(vm.parser.previous.type);
+            infix.?(vm);
+        }
+    }
+
+    fn parsePrecedenceFromPrevious(vm: *Vm, precedence: Precedence) void {
         const prefix = getPrefix(vm.parser.previous.type);
         if (prefix == null) {
             error_(vm, "Expect expression.");
@@ -238,10 +317,74 @@ pub const Compiler = struct {
 
         prefix.?(vm);
 
-        while (@enumToInt(precedence) <= @enumToInt(getPrecedence(vm.parser.current.type))) {
+        parseInfixPrecedence(vm, precedence);
+    }
+
+    fn parsePrecedence(vm: *Vm, precedence: Precedence) void {
+        advance(vm);
+        parsePrecedenceFromPrevious(vm, precedence);
+    }
+
+    fn expression(vm: *Vm) void {
+        parsePrecedence(vm, .or_);
+    }
+
+    fn expressionFromPrevious(vm: *Vm) void {
+        parsePrecedenceFromPrevious(vm, .or_);
+    }
+
+    fn expressionStatement(vm: *Vm) void {
+        advance(vm);
+        const primary_prefix = getPrefixPrimary(vm.parser.previous.type);
+        if (primary_prefix == null) {
+            expressionFromPrevious(vm);
+            vm.emitOp(.pop);
+            return;
+        }
+
+        var done = primary_prefix.?(vm);
+
+        // parse the primary expression, checking for assignment
+        while (!done and @enumToInt(Precedence.call) <= @enumToInt(getPrecedence(vm.parser.current.type))) {
             advance(vm);
-            const infix = getInfix(vm.parser.previous.type);
-            infix.?(vm);
+            const primary_infix = getInfixPrimary(vm.parser.previous.type);
+            done = primary_infix.?(vm);
+        }
+
+        // parse any other parts of the expression
+        if (!done) {
+            parseInfixPrecedence(vm, .or_);
+            vm.emitOp(.pop);
+        }
+    }
+
+    fn statement(vm: *Vm) void {
+        vm.compiler.encountered_identifier = null;
+
+        if (match(vm, .semicolon)) {
+            // empty statement
+        } else {
+            expressionStatement(vm);
+        }
+
+        if (vm.parser.panic_mode) synchronize(vm);
+    }
+
+    fn synchronize(vm: *Vm) void {
+        vm.parser.panic_mode = false;
+
+        while (vm.parser.current.type != .eof) {
+            switch (vm.parser.previous.type) {
+                .class_end, .do_end, .fn_end, .for_end, .if_end, .loop_end, .semicolon => return,
+                else => {},
+            }
+
+            switch (vm.parser.current.type) {
+                .break_, .class, .continue_, .do, .fn_, .for_, .if_, .loop, .return_ => return,
+                else => {},
+            }
+
+            advance(vm);
         }
     }
 
@@ -253,8 +396,11 @@ pub const Compiler = struct {
         vm.parser.panic_mode = false;
 
         advance(vm);
-        expression(vm);
-        consume(vm, .eof, "Expect end of expression.");
+
+        while (!match(vm, .eof)) {
+            statement(vm);
+        }
+
         endCompiler(vm);
         return !vm.parser.had_error;
     }

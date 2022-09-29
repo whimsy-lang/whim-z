@@ -102,6 +102,29 @@ pub const Map = struct {
         }
     }
 
+    fn ensureCapacity(self: *Self) void {
+        if (@intToFloat(f64, self.count + 1) > @intToFloat(f64, self.entries.len) * max_load) {
+            const capacity = growCapacity(self.entries.len);
+            self.adjustCapacity(capacity);
+        }
+    }
+
+    // adds an item if it doesn't already exist, and returns whether the add succeeded
+    pub fn add(self: *Self, key: *ObjString, value: Value) bool {
+        self.ensureCapacity();
+
+        const entry = findEntry(self.entries, key);
+        const is_new_key = entry.key == null;
+        if (is_new_key) {
+            // only increment if it's a new key and not a tombstone
+            if (entry.value.is(.nil)) self.count += 1;
+            entry.key = key;
+            entry.value = value;
+        }
+
+        return is_new_key;
+    }
+
     pub fn get(self: *Self, key: *ObjString, value: *Value) bool {
         if (self.count == 0) return false;
 
@@ -113,10 +136,7 @@ pub const Map = struct {
     }
 
     pub fn set(self: *Self, key: *ObjString, value: Value) bool {
-        if (@intToFloat(f64, self.count + 1) > @intToFloat(f64, self.entries.len) * max_load) {
-            const capacity = growCapacity(self.entries.len);
-            self.adjustCapacity(capacity);
-        }
+        self.ensureCapacity();
 
         const entry = findEntry(self.entries, key);
         const is_new_key = entry.key == null;

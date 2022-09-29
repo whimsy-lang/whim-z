@@ -26,8 +26,9 @@ pub const Vm = struct {
     parent_allocator: Allocator,
     gc: GcAllocator,
     allocator: Allocator,
-    strings: Map,
     objects: std.ArrayList(Value),
+    globals: Map,
+    strings: Map,
 
     chunk: *Chunk,
     ip: [*]u8,
@@ -36,6 +37,7 @@ pub const Vm = struct {
 
     lexer: Lexer,
     parser: Parser,
+    compiler: Compiler,
     compilingChunk: *Chunk,
 
     pub fn init(self: *Self, allocator: Allocator) void {
@@ -43,13 +45,15 @@ pub const Vm = struct {
         self.gc = GcAllocator.init(self.parent_allocator);
         self.allocator = self.gc.allocator();
         self.objects = std.ArrayList(Value).init(self.parent_allocator);
+        self.globals = Map.init(self.allocator);
         self.strings = Map.init(self.allocator);
         self.resetStack();
     }
 
     pub fn deinit(self: *Self) void {
-        self.strings.deinit();
         GcAllocator.freeObjects(self);
+        self.globals.deinit();
+        self.strings.deinit();
     }
 
     pub fn registerObject(self: *Self, object: Value) void {
@@ -194,6 +198,10 @@ pub const Vm = struct {
         return self.chunk.constants.items[self.readByte()];
     }
 
+    fn readString(self: *Self) *ObjString {
+        return self.readConstant().asString();
+    }
+
     fn run(self: *Self) InterpretResult {
         while (true) {
             if (debug.trace_execution) {
@@ -217,6 +225,40 @@ pub const Vm = struct {
                 .nil => self.push(Value.nil()),
                 .true => self.push(Value.boolean(true)),
                 .false => self.push(Value.boolean(false)),
+                .pop => _ = self.pop(),
+                .define_global_const => {
+                    // todo - constant
+                    const name = self.readString();
+                    if (!self.globals.add(name, self.peek(0))) {
+                        self.runtimeError("Global '{s}' already exists.", .{name.chars});
+                        return .runtime_error;
+                    }
+                    _ = self.pop();
+                },
+                .define_global_var => {
+                    // todo - mutable
+                    const name = self.readString();
+                    if (!self.globals.add(name, self.peek(0))) {
+                        self.runtimeError("Global '{s}' already exists.", .{name.chars});
+                        return .runtime_error;
+                    }
+                    _ = self.pop();
+                },
+                .get_global => {
+                    const name = self.readString();
+                    var value: Value = undefined;
+                    if (!self.globals.get(name, &value)) {
+                        self.runtimeError("Undefined variable '{s}'.", .{name.chars});
+                        return .runtime_error;
+                    }
+                    self.push(value);
+                },
+                .set_global => {},
+                .add_set_global => {},
+                .subtract_set_global => {},
+                .multiply_set_global => {},
+                .divide_set_global => {},
+                .modulus_set_global => {},
                 .equal => {
                     const b = self.pop();
                     const a = self.pop();
@@ -256,8 +298,7 @@ pub const Vm = struct {
                 },
                 .not => self.push(Value.boolean(self.pop().isFalsey())),
                 .return_ => {
-                    self.pop().print();
-                    std.debug.print("\n", .{});
+                    // exit interpreter
                     return .ok;
                 },
                 else => return .runtime_error,
