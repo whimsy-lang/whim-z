@@ -4,13 +4,18 @@ const Allocator = std.mem.Allocator;
 const ObjString = @import("object.zig").ObjString;
 const Value = @import("value.zig").Value;
 
-const Entry = struct {
-    key: ?*ObjString,
+pub const ValueContainer = struct {
     value: Value,
+    constant: bool = false,
 };
 
 pub const Map = struct {
     const Self = @This();
+
+    const Entry = struct {
+        key: ?*ObjString,
+        value: ValueContainer,
+    };
 
     const max_load = 0.75;
 
@@ -44,7 +49,7 @@ pub const Map = struct {
         };
         for (entries) |*entry| {
             entry.key = null;
-            entry.value = Value.nil();
+            entry.value = .{ .value = Value.nil() };
         }
 
         self.count = 0;
@@ -68,7 +73,7 @@ pub const Map = struct {
         while (true) {
             const entry = &entries[index];
             if (entry.key == null) {
-                if (entry.value.is(.nil)) {
+                if (entry.value.value.is(.nil)) {
                     // empty entry
                     return if (tombstone != null) tombstone.? else entry;
                 } else {
@@ -92,7 +97,7 @@ pub const Map = struct {
             const entry = &self.entries[index];
             if (entry.key == null) {
                 // stop if we find an empty non-tombstone entry
-                if (entry.value.is(.nil)) return null;
+                if (entry.value.value.is(.nil)) return null;
             } else if (entry.key.?.hash == hash and std.mem.eql(u8, entry.key.?.chars, chars)) {
                 // found string
                 return entry.key;
@@ -110,16 +115,17 @@ pub const Map = struct {
     }
 
     // adds an item if it doesn't already exist, and returns whether the add succeeded
-    pub fn add(self: *Self, key: *ObjString, value: Value) bool {
+    pub fn add(self: *Self, key: *ObjString, value: Value, constant: bool) bool {
         self.ensureCapacity();
 
         const entry = findEntry(self.entries, key);
         const is_new_key = entry.key == null;
         if (is_new_key) {
             // only increment if it's a new key and not a tombstone
-            if (entry.value.is(.nil)) self.count += 1;
+            if (entry.value.value.is(.nil)) self.count += 1;
             entry.key = key;
-            entry.value = value;
+            entry.value.value = value;
+            entry.value.constant = constant;
         }
 
         return is_new_key;
@@ -131,7 +137,17 @@ pub const Map = struct {
         const entry = findEntry(self.entries, key);
         if (entry.key == null) return false;
 
-        value.* = entry.value;
+        value.* = entry.value.value;
+        return true;
+    }
+
+    pub fn getPtr(self: *Self, key: *ObjString, value: **ValueContainer) bool {
+        if (self.count == 0) return false;
+
+        const entry = findEntry(self.entries, key);
+        if (entry.key == null) return false;
+
+        value.* = &entry.value;
         return true;
     }
 
@@ -141,10 +157,10 @@ pub const Map = struct {
         const entry = findEntry(self.entries, key);
         const is_new_key = entry.key == null;
         // only increment if it's a new key and not a tombstone
-        if (is_new_key and entry.value.is(.nil)) self.count += 1;
+        if (is_new_key and entry.value.value.is(.nil)) self.count += 1;
 
         entry.key = key;
-        entry.value = value;
+        entry.value.value = value;
         return is_new_key;
     }
 
@@ -157,7 +173,7 @@ pub const Map = struct {
 
         // tombstone
         entry.key = null;
-        entry.value = Value.boolean(true);
+        entry.value.value = Value.boolean(true);
         return true;
     }
 };

@@ -8,6 +8,7 @@ const Parser = @import("compiler.zig").Parser;
 const debug = @import("debug.zig");
 const Lexer = @import("lexer.zig").Lexer;
 const Map = @import("map.zig").Map;
+const ValueContainer = @import("map.zig").ValueContainer;
 const GcAllocator = @import("memory.zig").GcAllocater;
 const ObjString = @import("object.zig").ObjString;
 const Value = @import("value.zig").Value;
@@ -152,13 +153,53 @@ pub const Vm = struct {
         }
 
         fn modulus(a: f64, b: f64) Value {
-            return Value.number(@mod(a, b));
+            return Value.number(@rem(a, b));
+        }
+    };
+
+    const NumAssignBinaryOp = struct {
+        const NumAssignBinaryOpFn = *const fn (*ValueContainer, f64) void;
+
+        // todo - test if inlining or comptime for op_fn makes a difference
+        fn run(vm: *Vm, op_fn: NumAssignBinaryOpFn) bool {
+            const name = vm.readString();
+            var value: *ValueContainer = undefined;
+            if (!vm.globals.getPtr(name, &value)) {
+                vm.runtimeError("Undefined variable '{s}'.", .{name.chars});
+                return false;
+            }
+            if (value.constant) {
+                vm.runtimeError("Global '{s}' is constant.", .{name.chars});
+                return false;
+            }
+            if (!value.value.is(.number) or !vm.peek(0).is(.number)) {
+                vm.runtimeError("Operands must be numbers.", .{});
+                return false;
+            }
+            op_fn(value, vm.pop().asNum());
+            return true;
+        }
+
+        fn subtract(a: *ValueContainer, b: f64) void {
+            a.value.as.number -= b;
+        }
+
+        fn multiply(a: *ValueContainer, b: f64) void {
+            a.value.as.number *= b;
+        }
+
+        fn divide(a: *ValueContainer, b: f64) void {
+            a.value.as.number /= b;
+        }
+
+        fn modulus(a: *ValueContainer, b: f64) void {
+            a.value.as.number = @rem(a.value.asNum(), b);
         }
     };
 
     fn concatenate(self: *Self) void {
-        const b = self.pop().asString();
-        const a = self.pop().asString();
+        const b = self.peek(0).asString();
+        const a = self.peek(1).asString();
 
         const strings = [_][]const u8{ a.chars, b.chars };
 
@@ -168,7 +209,26 @@ pub const Vm = struct {
         };
 
         const result = ObjString.take(self, heap_chars);
+
+        _ = self.pop();
+        _ = self.pop();
         self.push(Value.string(result));
+    }
+
+    fn concatValue(self: *Self, a: *ObjString) *ObjString {
+        const b = self.peek(0).asString();
+
+        const strings = [_][]const u8{ a.chars, b.chars };
+
+        const heap_chars = std.mem.concat(self.allocator, u8, &strings) catch {
+            std.debug.print("Could not allocate memory for string.", .{});
+            std.process.exit(1);
+        };
+
+        const result = ObjString.take(self, heap_chars);
+
+        _ = self.pop();
+        return result;
     }
 
     pub fn interpret(self: *Self, source: [:0]const u8) InterpretResult {
@@ -227,18 +287,16 @@ pub const Vm = struct {
                 .false => self.push(Value.boolean(false)),
                 .pop => _ = self.pop(),
                 .define_global_const => {
-                    // todo - constant
                     const name = self.readString();
-                    if (!self.globals.add(name, self.peek(0))) {
+                    if (!self.globals.add(name, self.peek(0), true)) {
                         self.runtimeError("Global '{s}' already exists.", .{name.chars});
                         return .runtime_error;
                     }
                     _ = self.pop();
                 },
                 .define_global_var => {
-                    // todo - mutable
                     const name = self.readString();
-                    if (!self.globals.add(name, self.peek(0))) {
+                    if (!self.globals.add(name, self.peek(0), false)) {
                         self.runtimeError("Global '{s}' already exists.", .{name.chars});
                         return .runtime_error;
                     }
@@ -253,12 +311,43 @@ pub const Vm = struct {
                     }
                     self.push(value);
                 },
-                .set_global => {},
-                .add_set_global => {},
-                .subtract_set_global => {},
-                .multiply_set_global => {},
-                .divide_set_global => {},
-                .modulus_set_global => {},
+                .set_global => {
+                    const name = self.readString();
+                    var value: *ValueContainer = undefined;
+                    if (!self.globals.getPtr(name, &value)) {
+                        self.runtimeError("Undefined variable '{s}'.", .{name.chars});
+                        return .runtime_error;
+                    }
+                    if (value.constant) {
+                        self.runtimeError("Global '{s}' is constant.", .{name.chars});
+                        return .runtime_error;
+                    }
+                    value.value = self.pop();
+                },
+                .add_set_global => {
+                    const name = self.readString();
+                    var value: *ValueContainer = undefined;
+                    if (!self.globals.getPtr(name, &value)) {
+                        self.runtimeError("Undefined variable '{s}'.", .{name.chars});
+                        return .runtime_error;
+                    }
+                    if (value.constant) {
+                        self.runtimeError("Global '{s}' is constant.", .{name.chars});
+                        return .runtime_error;
+                    }
+                    if (value.value.is(.number) and self.peek(0).is(.number)) {
+                        value.value.as.number += self.pop().asNum();
+                    } else if (value.value.is(.string) and self.peek(0).is(.string)) {
+                        value.value.as.string = self.concatValue(value.value.asString());
+                    } else {
+                        self.runtimeError("Operands must both be numbers or strings.", .{});
+                        return .runtime_error;
+                    }
+                },
+                .subtract_set_global => if (!NumAssignBinaryOp.run(self, NumAssignBinaryOp.subtract)) return .runtime_error,
+                .multiply_set_global => if (!NumAssignBinaryOp.run(self, NumAssignBinaryOp.multiply)) return .runtime_error,
+                .divide_set_global => if (!NumAssignBinaryOp.run(self, NumAssignBinaryOp.divide)) return .runtime_error,
+                .modulus_set_global => if (!NumAssignBinaryOp.run(self, NumAssignBinaryOp.modulus)) return .runtime_error,
                 .equal => {
                     const b = self.pop();
                     const a = self.pop();
@@ -274,12 +363,12 @@ pub const Vm = struct {
                 .less => if (!NumBinaryOp.run(self, NumBinaryOp.less)) return .runtime_error,
                 .less_equal => if (!NumBinaryOp.run(self, NumBinaryOp.lessEqual)) return .runtime_error,
                 .add => {
-                    if (self.peek(0).is(.string) and self.peek(1).is(.string)) {
-                        self.concatenate();
-                    } else if (self.peek(0).is(.number) and self.peek(1).is(.number)) {
+                    if (self.peek(0).is(.number) and self.peek(1).is(.number)) {
                         const b = self.pop().asNum();
                         const a = self.pop().asNum();
                         self.push(Value.number(a + b));
+                    } else if (self.peek(0).is(.string) and self.peek(1).is(.string)) {
+                        self.concatenate();
                     } else {
                         self.runtimeError("Operands must both be numbers or strings.", .{});
                         return .runtime_error;
