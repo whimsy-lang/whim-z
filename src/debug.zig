@@ -41,6 +41,13 @@ pub fn disassembleInstruction(chunk: *Chunk, offset: usize) usize {
         .multiply_set_global => constantInstruction("mul set global", chunk, offset),
         .divide_set_global => constantInstruction("div set global", chunk, offset),
         .modulus_set_global => constantInstruction("mod set global", chunk, offset),
+        .get_local => byteInstruction("get local", chunk, offset),
+        .set_local => byteInstruction("set local", chunk, offset),
+        .add_set_local => byteInstruction("add set local", chunk, offset),
+        .subtract_set_local => byteInstruction("sub set local", chunk, offset),
+        .multiply_set_local => byteInstruction("mul set local", chunk, offset),
+        .divide_set_local => byteInstruction("div set local", chunk, offset),
+        .modulus_set_local => byteInstruction("mod set local", chunk, offset),
         .equal => simpleInstruction("equal", offset),
         .not_equal => simpleInstruction("not equal", offset),
         .greater => simpleInstruction("greater", offset),
@@ -57,6 +64,12 @@ pub fn disassembleInstruction(chunk: *Chunk, offset: usize) usize {
         .return_ => simpleInstruction("return", offset),
         else => offset + 1,
     };
+}
+
+fn byteInstruction(name: []const u8, chunk: *Chunk, offset: usize) usize {
+    const index = chunk.code.items[offset + 1];
+    std.debug.print("{s: <20} {d:4}\n", .{ name, index });
+    return offset + 2;
 }
 
 fn constantInstruction(name: []const u8, chunk: *Chunk, offset: usize) usize {

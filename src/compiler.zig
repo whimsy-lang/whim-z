@@ -40,8 +40,29 @@ const Precedence = enum {
 const PrimaryParseFn = *const fn (*Vm) bool;
 const ParseFn = *const fn (*Vm) void;
 
+const u8_count = std.math.maxInt(u8) + 1;
+
 pub const Compiler = struct {
+    const Self = @This();
+
+    const Local = struct {
+        name: Token,
+        constant: bool,
+        depth: isize,
+    };
+
+    locals: [u8_count]Local,
+    local_count: usize,
+    scope_depth: isize,
+
     encountered_identifier: ?[]const u8,
+
+    pub fn init(self: *Self, vm: *Vm) void {
+        self.local_count = 0;
+        self.scope_depth = 0;
+
+        vm.compiler = self;
+    }
 
     fn errorAt(vm: *Vm, token: *Token, message: []const u8) void {
         if (vm.parser.panic_mode) return;
@@ -121,8 +142,60 @@ pub const Compiler = struct {
         }
     }
 
+    fn beginScope(vm: *Vm) void {
+        vm.compiler.scope_depth += 1;
+    }
+
+    fn endScope(vm: *Vm) void {
+        var comp = vm.compiler;
+        comp.scope_depth -= 1;
+
+        while (comp.local_count > 0 and comp.locals[comp.local_count - 1].depth > comp.scope_depth) {
+            vm.emitOp(.pop);
+            comp.local_count -= 1;
+        }
+    }
+
     fn identifierConstant(vm: *Vm, name: *Token) u8 {
         return makeConstant(vm, Value.string(ObjString.copy(vm, name.value)));
+    }
+
+    fn addLocal(vm: *Vm, identifier: Token, constant: bool) void {
+        var comp = vm.compiler;
+        if (comp.local_count == u8_count) {
+            error_(vm, "Too many local variables in block.");
+            return;
+        }
+
+        var local = &comp.locals[comp.local_count];
+        comp.local_count += 1;
+        local.name = identifier;
+        local.constant = constant;
+        local.depth = -1;
+    }
+
+    fn markInitialized(vm: *Vm) void {
+        var comp = vm.compiler;
+        comp.locals[comp.local_count - 1].depth = comp.scope_depth;
+    }
+
+    fn declareLocal(vm: *Vm, identifier: *Token, constant: bool) void {
+        if (vm.compiler.resolveLocal(identifier) != -1) {
+            error_(vm, "A variable with this name already exists.");
+        }
+
+        addLocal(vm, identifier.*, constant);
+    }
+
+    fn resolveLocal(self: *Self, identifier: *Token) isize {
+        var i = @intCast(isize, self.local_count) - 1;
+        while (i >= 0) : (i -= 1) {
+            const local = &self.locals[@intCast(usize, i)];
+            if (std.mem.eql(u8, identifier.value, local.name.value)) {
+                return if (local.depth == -1) -1 else i;
+            }
+        }
+        return -1;
     }
 
     fn defineGlobal(vm: *Vm, global: u8, constant: bool) void {
@@ -258,10 +331,25 @@ pub const Compiler = struct {
 
                 vm.compiler.encountered_identifier = vm.parser.previous.value;
 
-                const arg = identifierConstant(vm, &vm.parser.previous);
-                advance(vm); // accept :: :=
-                expression(vm);
-                defineGlobal(vm, arg, constant);
+                if (vm.compiler.scope_depth > 0) {
+                    // local
+                    declareLocal(vm, &vm.parser.previous, constant);
+                    advance(vm); // accept :: :=
+
+                    // mark initialized if it's a function or class so it can reference itself
+                    if (vm.parser.current.type == .fn_ or vm.parser.current.type == .class) {
+                        markInitialized(vm);
+                    }
+
+                    expression(vm);
+                    markInitialized(vm);
+                } else {
+                    // global
+                    const arg = identifierConstant(vm, &vm.parser.previous);
+                    advance(vm); // accept :: :=
+                    expression(vm);
+                    defineGlobal(vm, arg, constant);
+                }
 
                 return true;
             },
@@ -270,21 +358,41 @@ pub const Compiler = struct {
 
                 vm.compiler.encountered_identifier = vm.parser.previous.value;
 
-                // global
-                const arg = identifierConstant(vm, &vm.parser.previous);
+                var arg = vm.compiler.resolveLocal(&vm.parser.previous);
 
-                const op: OpCode = switch (vm.parser.current.type) {
-                    .plus_equal => .add_set_global,
-                    .minus_equal => .subtract_set_global,
-                    .star_equal => .multiply_set_global,
-                    .slash_equal => .divide_set_global,
-                    .percent_equal => .modulus_set_global,
-                    else => .set_global,
-                };
+                var op: OpCode = undefined;
+
+                if (arg != -1) {
+                    // local
+                    if (vm.compiler.locals[@intCast(usize, arg)].constant) {
+                        error_(vm, "Local is constant.");
+                    }
+
+                    op = switch (vm.parser.current.type) {
+                        .plus_equal => .add_set_local,
+                        .minus_equal => .subtract_set_local,
+                        .star_equal => .multiply_set_local,
+                        .slash_equal => .divide_set_local,
+                        .percent_equal => .modulus_set_local,
+                        else => .set_local,
+                    };
+                } else {
+                    // global
+                    arg = identifierConstant(vm, &vm.parser.previous);
+
+                    op = switch (vm.parser.current.type) {
+                        .plus_equal => .add_set_global,
+                        .minus_equal => .subtract_set_global,
+                        .star_equal => .multiply_set_global,
+                        .slash_equal => .divide_set_global,
+                        .percent_equal => .modulus_set_global,
+                        else => .set_global,
+                    };
+                }
 
                 advance(vm); // accept = += -= *= /= %=
                 expression(vm);
-                vm.emitOpByte(op, arg);
+                vm.emitOpByte(op, @intCast(u8, arg));
                 return true;
             },
             else => {},
@@ -296,8 +404,15 @@ pub const Compiler = struct {
 
     fn variable(vm: *Vm) void {
         var name = vm.parser.previous;
-        const arg = identifierConstant(vm, &name);
-        vm.emitOpByte(.get_global, arg);
+        var op: OpCode = undefined;
+        var arg = vm.compiler.resolveLocal(&name);
+        if (arg != -1) {
+            op = .get_local;
+        } else {
+            arg = identifierConstant(vm, &name);
+            op = .get_global;
+        }
+        vm.emitOpByte(op, @intCast(u8, arg));
     }
 
     fn parseInfixPrecedence(vm: *Vm, precedence: Precedence) void {
@@ -333,6 +448,13 @@ pub const Compiler = struct {
         parsePrecedenceFromPrevious(vm, .or_);
     }
 
+    fn block(vm: *Vm, end: TokenType, message: []const u8) void {
+        while (!check(vm, end) and !check(vm, .eof)) {
+            statement(vm);
+        }
+        consume(vm, end, message);
+    }
+
     fn expressionStatement(vm: *Vm) void {
         advance(vm);
         const primary_prefix = getPrefixPrimary(vm.parser.previous.type);
@@ -363,6 +485,10 @@ pub const Compiler = struct {
 
         if (match(vm, .semicolon)) {
             // empty statement
+        } else if (match(vm, .do)) {
+            beginScope(vm);
+            block(vm, .do_end, "Expect '/do' after block.");
+            endScope(vm);
         } else {
             expressionStatement(vm);
         }
@@ -394,6 +520,9 @@ pub const Compiler = struct {
 
         vm.parser.had_error = false;
         vm.parser.panic_mode = false;
+
+        var compiler: Compiler = undefined;
+        compiler.init(vm);
 
         advance(vm);
 

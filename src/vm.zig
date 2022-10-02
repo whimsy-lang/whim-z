@@ -38,7 +38,7 @@ pub const Vm = struct {
 
     lexer: Lexer,
     parser: Parser,
-    compiler: Compiler,
+    compiler: *Compiler,
     compilingChunk: *Chunk,
 
     pub fn init(self: *Self, allocator: Allocator) void {
@@ -157,11 +157,11 @@ pub const Vm = struct {
         }
     };
 
-    const NumAssignBinaryOp = struct {
-        const NumAssignBinaryOpFn = *const fn (*ValueContainer, f64) void;
+    const GlobalNumAssignBinaryOp = struct {
+        const GlobalNumAssignBinaryOpFn = *const fn (*ValueContainer, f64) void;
 
         // todo - test if inlining or comptime for op_fn makes a difference
-        fn run(vm: *Vm, op_fn: NumAssignBinaryOpFn) bool {
+        fn run(vm: *Vm, op_fn: GlobalNumAssignBinaryOpFn) bool {
             const name = vm.readString();
             var value: *ValueContainer = undefined;
             if (!vm.globals.getPtr(name, &value)) {
@@ -194,6 +194,38 @@ pub const Vm = struct {
 
         fn modulus(a: *ValueContainer, b: f64) void {
             a.value.as.number = @rem(a.value.asNum(), b);
+        }
+    };
+
+    const LocalNumAssignBinaryOp = struct {
+        const LocalNumAssignBinaryOpFn = *const fn (*Value, f64) void;
+
+        // todo - compare performance with inlining and comptime
+        fn run(vm: *Vm, op_fn: LocalNumAssignBinaryOpFn) bool {
+            const index = vm.readByte();
+            const value = &vm.stack[index];
+            if (!value.is(.number) or !vm.peek(0).is(.number)) {
+                vm.runtimeError("Operands must be numbers.", .{});
+                return false;
+            }
+            op_fn(value, vm.pop().asNum());
+            return true;
+        }
+
+        fn subtract(a: *Value, b: f64) void {
+            a.as.number -= b;
+        }
+
+        fn multiply(a: *Value, b: f64) void {
+            a.as.number *= b;
+        }
+
+        fn divide(a: *Value, b: f64) void {
+            a.as.number /= b;
+        }
+
+        fn modulus(a: *Value, b: f64) void {
+            a.as.number = @rem(a.asNum(), b);
         }
     };
 
@@ -344,10 +376,34 @@ pub const Vm = struct {
                         return .runtime_error;
                     }
                 },
-                .subtract_set_global => if (!NumAssignBinaryOp.run(self, NumAssignBinaryOp.subtract)) return .runtime_error,
-                .multiply_set_global => if (!NumAssignBinaryOp.run(self, NumAssignBinaryOp.multiply)) return .runtime_error,
-                .divide_set_global => if (!NumAssignBinaryOp.run(self, NumAssignBinaryOp.divide)) return .runtime_error,
-                .modulus_set_global => if (!NumAssignBinaryOp.run(self, NumAssignBinaryOp.modulus)) return .runtime_error,
+                .subtract_set_global => if (!GlobalNumAssignBinaryOp.run(self, GlobalNumAssignBinaryOp.subtract)) return .runtime_error,
+                .multiply_set_global => if (!GlobalNumAssignBinaryOp.run(self, GlobalNumAssignBinaryOp.multiply)) return .runtime_error,
+                .divide_set_global => if (!GlobalNumAssignBinaryOp.run(self, GlobalNumAssignBinaryOp.divide)) return .runtime_error,
+                .modulus_set_global => if (!GlobalNumAssignBinaryOp.run(self, GlobalNumAssignBinaryOp.modulus)) return .runtime_error,
+                .get_local => {
+                    const index = self.readByte();
+                    self.push(self.stack[index]);
+                },
+                .set_local => {
+                    const index = self.readByte();
+                    self.stack[index] = self.pop();
+                },
+                .add_set_local => {
+                    const index = self.readByte();
+                    const value = &self.stack[index];
+                    if (value.is(.number) and self.peek(0).is(.number)) {
+                        value.as.number += self.pop().asNum();
+                    } else if (value.is(.string) and self.peek(0).is(.string)) {
+                        value.as.string = self.concatValue(value.asString());
+                    } else {
+                        self.runtimeError("Operands must both be numbers or strings.", .{});
+                        return .runtime_error;
+                    }
+                },
+                .subtract_set_local => if (!LocalNumAssignBinaryOp.run(self, LocalNumAssignBinaryOp.subtract)) return .runtime_error,
+                .multiply_set_local => if (!LocalNumAssignBinaryOp.run(self, LocalNumAssignBinaryOp.multiply)) return .runtime_error,
+                .divide_set_local => if (!LocalNumAssignBinaryOp.run(self, LocalNumAssignBinaryOp.divide)) return .runtime_error,
+                .modulus_set_local => if (!LocalNumAssignBinaryOp.run(self, LocalNumAssignBinaryOp.modulus)) return .runtime_error,
                 .equal => {
                     const b = self.pop();
                     const a = self.pop();
