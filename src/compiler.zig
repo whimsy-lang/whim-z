@@ -118,6 +118,25 @@ pub const Compiler = struct {
         return true;
     }
 
+    fn emitJump(vm: *Vm, instruction: OpCode) usize {
+        vm.emitOp(instruction);
+        vm.emitByte(0xff);
+        vm.emitByte(0xff);
+        return vm.currentChunk().code.items.len - 2;
+    }
+
+    fn patchJump(vm: *Vm, offset: usize) void {
+        // -2 to adjust for the bytecode for the jump offset itself
+        const jump = vm.currentChunk().code.items.len - offset - 2;
+
+        if (jump > std.math.maxInt(u16)) {
+            error_(vm, "Too much code to jump over.");
+        }
+
+        vm.currentChunk().code.items[offset] = @intCast(u8, (jump >> 8) & 0xff);
+        vm.currentChunk().code.items[offset + 1] = @intCast(u8, jump & 0xff);
+    }
+
     fn emitReturn(vm: *Vm) void {
         vm.emitOp(.return_);
     }
@@ -239,8 +258,8 @@ pub const Compiler = struct {
             .bang_equal, .equal_equal => binary,
             .less, .less_equal, .greater, .greater_equal => binary,
             .plus, .minus, .star, .slash, .percent => binary,
-            // .and_ => andOp,
-            // .or_ => orOp,
+            .and_ => andOp,
+            .or_ => orOp,
             else => null,
         };
     }
@@ -256,6 +275,15 @@ pub const Compiler = struct {
             .or_ => .or_,
             else => .none,
         };
+    }
+
+    fn andOp(vm: *Vm) void {
+        const end_jump = emitJump(vm, .jump_if_false);
+
+        vm.emitOp(.pop);
+        parsePrecedence(vm, .and_);
+
+        patchJump(vm, end_jump);
     }
 
     fn binary(vm: *Vm) void {
@@ -301,6 +329,15 @@ pub const Compiler = struct {
     fn number(vm: *Vm) void {
         const value = std.fmt.parseFloat(f64, vm.parser.previous.value) catch 0;
         emitConstant(vm, Value.number(value));
+    }
+
+    fn orOp(vm: *Vm) void {
+        const end_jump = emitJump(vm, .jump_if_true);
+
+        vm.emitOp(.pop);
+        parsePrecedence(vm, .or_);
+
+        patchJump(vm, end_jump);
     }
 
     fn string(vm: *Vm) void {
@@ -480,15 +517,84 @@ pub const Compiler = struct {
         }
     }
 
+    fn ifStatement(vm: *Vm) void {
+        expression(vm);
+
+        var then_jump = emitJump(vm, .jump_if_false_pop);
+
+        beginScope(vm);
+        while (vm.parser.current.type != .if_end and
+            vm.parser.current.type != .elif and
+            vm.parser.current.type != .else_ and
+            vm.parser.current.type != .eof)
+        {
+            statement(vm);
+        }
+        endScope(vm);
+
+        var else_jump = emitJump(vm, .jump);
+
+        patchJump(vm, then_jump);
+
+        while (match(vm, .elif)) {
+            expression(vm);
+
+            then_jump = emitJump(vm, .jump_if_false_pop);
+
+            beginScope(vm);
+            while (vm.parser.current.type != .if_end and
+                vm.parser.current.type != .elif and
+                vm.parser.current.type != .else_ and
+                vm.parser.current.type != .eof)
+            {
+                statement(vm);
+            }
+            endScope(vm);
+
+            patchJump(vm, else_jump);
+            else_jump = emitJump(vm, .jump);
+            patchJump(vm, then_jump);
+        }
+
+        if (match(vm, .else_)) {
+            beginScope(vm);
+            while (vm.parser.current.type != .if_end and
+                vm.parser.current.type != .eof)
+            {
+                statement(vm);
+            }
+            endScope(vm);
+        }
+
+        patchJump(vm, else_jump);
+
+        consume(vm, .if_end, "Expect '/if' after block.");
+    }
+
+    fn loopStatement(vm: *Vm) void {
+        _ = vm;
+        // todo
+    }
+
     fn statement(vm: *Vm) void {
         vm.compiler.encountered_identifier = null;
 
         if (match(vm, .semicolon)) {
             // empty statement
+        } else if (match(vm, .break_)) {
+            // todo
+        } else if (match(vm, .continue_)) {
+            // todo
         } else if (match(vm, .do)) {
             beginScope(vm);
             block(vm, .do_end, "Expect '/do' after block.");
             endScope(vm);
+        } else if (match(vm, .for_)) {
+            // todo
+        } else if (match(vm, .if_)) {
+            ifStatement(vm);
+        } else if (match(vm, .loop)) {
+            loopStatement(vm);
         } else {
             expressionStatement(vm);
         }

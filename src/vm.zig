@@ -286,6 +286,12 @@ pub const Vm = struct {
         return value;
     }
 
+    fn readShort(self: *Self) u16 {
+        const value = (@as(u16, self.ip[0]) << 8) | (self.ip[1]);
+        self.ip += 2;
+        return value;
+    }
+
     fn readConstant(self: *Self) Value {
         return self.chunk.constants.items[self.readByte()];
     }
@@ -442,6 +448,30 @@ pub const Vm = struct {
                     self.push(Value.number(-self.pop().asNum()));
                 },
                 .not => self.push(Value.boolean(self.pop().isFalsey())),
+                .jump => {
+                    const offset = self.readShort();
+                    self.ip += offset;
+                },
+                .jump_back => {
+                    const offset = self.readShort();
+                    self.ip -= offset;
+                },
+                .jump_if_true => {
+                    const offset = self.readShort();
+                    if (!self.peek(0).isFalsey()) self.ip += offset;
+                },
+                .jump_if_false => {
+                    const offset = self.readShort();
+                    if (self.peek(0).isFalsey()) self.ip += offset;
+                },
+                .jump_if_true_pop => {
+                    const offset = self.readShort();
+                    if (!self.pop().isFalsey()) self.ip += offset;
+                },
+                .jump_if_false_pop => {
+                    const offset = self.readShort();
+                    if (self.pop().isFalsey()) self.ip += offset;
+                },
                 .return_ => {
                     // exit interpreter
                     return .ok;

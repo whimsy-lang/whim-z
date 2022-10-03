@@ -61,6 +61,12 @@ pub fn disassembleInstruction(chunk: *Chunk, offset: usize) usize {
         .modulus => simpleInstruction("modulus", offset),
         .negate => simpleInstruction("negate", offset),
         .not => simpleInstruction("not", offset),
+        .jump => jumpInstruction("jump", 1, chunk, offset),
+        .jump_back => jumpInstruction("jump back", -1, chunk, offset),
+        .jump_if_true => jumpInstruction("jump if true", 1, chunk, offset),
+        .jump_if_false => jumpInstruction("jump if false", 1, chunk, offset),
+        .jump_if_true_pop => jumpInstruction("jump if true (pop)", 1, chunk, offset),
+        .jump_if_false_pop => jumpInstruction("jump if false (pop)", 1, chunk, offset),
         .return_ => simpleInstruction("return", offset),
         else => offset + 1,
     };
@@ -78,6 +84,13 @@ fn constantInstruction(name: []const u8, chunk: *Chunk, offset: usize) usize {
     chunk.constants.items[constant].print();
     std.debug.print("'\n", .{});
     return offset + 2;
+}
+
+fn jumpInstruction(name: []const u8, sign: isize, chunk: *Chunk, offset: usize) usize {
+    var jump = @as(u16, chunk.code.items[offset + 1]) << 8;
+    jump |= chunk.code.items[offset + 2];
+    std.debug.print("{s: <20} {d:4} -> {d}\n", .{ name, offset, @intCast(isize, offset) + 3 + sign * jump });
+    return offset + 3;
 }
 
 fn simpleInstruction(name: []const u8, offset: usize) usize {
