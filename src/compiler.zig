@@ -40,10 +40,10 @@ const Precedence = enum {
 const PrimaryParseFn = *const fn (*Vm) bool;
 const ParseFn = *const fn (*Vm) void;
 
-const u8_count = std.math.maxInt(u8) + 1;
-
 pub const Compiler = struct {
     const Self = @This();
+    const u8_count = std.math.maxInt(u8) + 1;
+    const max_loop = 32;
 
     const Local = struct {
         name: Token,
@@ -51,14 +51,23 @@ pub const Compiler = struct {
         depth: isize,
     };
 
+    const Loop = struct {
+        start: usize,
+        exit: isize,
+        depth: isize,
+    };
+
     locals: [u8_count]Local,
     local_count: usize,
+    loops: [max_loop]Loop,
+    loop_count: usize,
     scope_depth: isize,
 
     encountered_identifier: ?[]const u8,
 
     pub fn init(self: *Self, vm: *Vm) void {
         self.local_count = 0;
+        self.loop_count = 0;
         self.scope_depth = 0;
 
         vm.compiler = self;
@@ -137,6 +146,16 @@ pub const Compiler = struct {
         vm.currentChunk().code.items[offset + 1] = @intCast(u8, jump & 0xff);
     }
 
+    fn emitLoop(vm: *Vm, loop_start: usize) void {
+        vm.emitOp(.jump_back);
+
+        const offset = vm.currentChunk().code.items.len - loop_start + 2;
+        if (offset > std.math.maxInt(u16)) error_(vm, "Loop body too large.");
+
+        vm.emitByte(@intCast(u8, (offset >> 8) & 0xff));
+        vm.emitByte(@intCast(u8, offset & 0xff));
+    }
+
     fn emitReturn(vm: *Vm) void {
         vm.emitOp(.return_);
     }
@@ -172,6 +191,14 @@ pub const Compiler = struct {
         while (comp.local_count > 0 and comp.locals[comp.local_count - 1].depth > comp.scope_depth) {
             vm.emitOp(.pop);
             comp.local_count -= 1;
+        }
+    }
+
+    fn scopePop(vm: *Vm, depth: isize) void {
+        var i = @intCast(isize, vm.compiler.local_count) - 1;
+        while (i >= 0) : (i -= 1) {
+            if (vm.compiler.locals[@intCast(usize, i)].depth < depth) return;
+            vm.emitOp(.pop);
         }
     }
 
@@ -492,6 +519,41 @@ pub const Compiler = struct {
         consume(vm, end, message);
     }
 
+    fn breakStatement(vm: *Vm) void {
+        if (vm.compiler.loop_count == 0) {
+            error_(vm, "Cannot break, not in a loop.");
+            return;
+        }
+
+        expression(vm);
+
+        const skip_jump = emitJump(vm, .jump_if_false_pop);
+
+        const loop = &vm.compiler.loops[vm.compiler.loop_count - 1];
+        scopePop(vm, loop.depth);
+        if (loop.exit != -1) patchJump(vm, @intCast(usize, loop.exit));
+        loop.exit = @intCast(isize, emitJump(vm, .jump));
+
+        patchJump(vm, skip_jump);
+    }
+
+    fn continueStatement(vm: *Vm) void {
+        if (vm.compiler.loop_count == 0) {
+            error_(vm, "Cannot continue, not in a loop.");
+            return;
+        }
+
+        expression(vm);
+
+        const skip_jump = emitJump(vm, .jump_if_false_pop);
+
+        const loop = &vm.compiler.loops[vm.compiler.loop_count - 1];
+        scopePop(vm, loop.depth);
+        emitLoop(vm, loop.start);
+
+        patchJump(vm, skip_jump);
+    }
+
     fn expressionStatement(vm: *Vm) void {
         advance(vm);
         const primary_prefix = getPrefixPrimary(vm.parser.previous.type);
@@ -572,8 +634,32 @@ pub const Compiler = struct {
     }
 
     fn loopStatement(vm: *Vm) void {
-        _ = vm;
-        // todo
+        if (vm.compiler.loop_count == max_loop) {
+            error_(vm, "Too many nested loops.");
+            return;
+        }
+
+        beginScope(vm);
+
+        var loop = &vm.compiler.loops[vm.compiler.loop_count];
+        vm.compiler.loop_count += 1;
+        loop.start = vm.currentChunk().code.items.len;
+        loop.exit = -1;
+        loop.depth = vm.compiler.scope_depth;
+
+        while (vm.parser.current.type != .loop_end and vm.parser.current.type != .eof) {
+            statement(vm);
+        }
+
+        endScope(vm);
+
+        emitLoop(vm, loop.start);
+
+        if (loop.exit != -1) patchJump(vm, @intCast(usize, loop.exit));
+
+        consume(vm, .loop_end, "Expect '/loop' after block.");
+
+        vm.compiler.loop_count -= 1;
     }
 
     fn statement(vm: *Vm) void {
@@ -582,9 +668,9 @@ pub const Compiler = struct {
         if (match(vm, .semicolon)) {
             // empty statement
         } else if (match(vm, .break_)) {
-            // todo
+            breakStatement(vm);
         } else if (match(vm, .continue_)) {
-            // todo
+            continueStatement(vm);
         } else if (match(vm, .do)) {
             beginScope(vm);
             block(vm, .do_end, "Expect '/do' after block.");
