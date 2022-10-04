@@ -1,8 +1,40 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
+const Chunk = @import("chunk.zig").Chunk;
 const Value = @import("value.zig").Value;
 const Vm = @import("vm.zig").Vm;
+
+pub const ObjFunction = struct {
+    arity: usize,
+    chunk: Chunk,
+    name: ?*ObjString,
+
+    pub fn init(vm: *Vm) *ObjFunction {
+        const function = vm.allocator.create(ObjFunction) catch {
+            std.debug.print("Could not allocate memory for function.", .{});
+            std.process.exit(1);
+        };
+        vm.registerObject(Value.function(function));
+
+        function.arity = 0;
+        function.name = null;
+        function.chunk = Chunk.init(vm.allocator);
+        return function;
+    }
+
+    pub fn deinit(self: *ObjFunction) void {
+        self.chunk.deinit();
+    }
+
+    pub fn print(self: *ObjFunction) void {
+        if (self.name != null) {
+            std.debug.print("<fn {s}>", .{self.name.?.chars});
+        } else {
+            std.debug.print("<script>", .{});
+        }
+    }
+};
 
 pub const ObjString = struct {
     chars: []const u8,

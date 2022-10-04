@@ -71,6 +71,11 @@ pub const GcAllocater = struct {
 
     fn freeObject(vm: *Vm, object: Value) void {
         switch (object.getType()) {
+            .function => {
+                const function = object.asFunction();
+                function.deinit();
+                vm.allocator.destroy(function);
+            },
             .string => {
                 const string = object.asString();
                 string.deinit(vm.allocator);

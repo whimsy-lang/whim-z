@@ -6,6 +6,7 @@ const debug = @import("debug.zig");
 const Lexer = @import("lexer.zig").Lexer;
 const Token = @import("lexer.zig").Token;
 const TokenType = @import("lexer.zig").TokenType;
+const ObjFunction = @import("object.zig").ObjFunction;
 const ObjString = @import("object.zig").ObjString;
 const Value = @import("value.zig").Value;
 const Vm = @import("vm.zig").Vm;
@@ -57,6 +58,14 @@ pub const Compiler = struct {
         depth: isize,
     };
 
+    const FunctionType = enum {
+        function,
+        script,
+    };
+
+    function: ?*ObjFunction,
+    fn_type: FunctionType,
+
     locals: [u8_count]Local,
     local_count: usize,
     loops: [max_loop]Loop,
@@ -65,10 +74,14 @@ pub const Compiler = struct {
 
     encountered_identifier: ?[]const u8,
 
-    pub fn init(self: *Self, vm: *Vm) void {
+    pub fn init(self: *Self, vm: *Vm, fn_type: FunctionType) void {
+        self.function = null;
+        self.fn_type = fn_type;
+
         self.local_count = 0;
         self.loop_count = 0;
         self.scope_depth = 0;
+        self.function = ObjFunction.init(vm);
 
         vm.compiler = self;
     }
@@ -173,11 +186,15 @@ pub const Compiler = struct {
         vm.emitOpByte(.constant, makeConstant(vm, value));
     }
 
-    fn endCompiler(vm: *Vm) void {
+    fn endCompiler(vm: *Vm) *ObjFunction {
         emitReturn(vm);
+        const function = vm.compiler.function.?;
+
         if (debug.print_code and !vm.parser.had_error) {
-            debug.disassembleChunk(vm.currentChunk(), "code");
+            debug.disassembleChunk(vm.currentChunk(), if (function.name != null) function.name.?.chars else "<script>");
         }
+
+        return function;
     }
 
     fn beginScope(vm: *Vm) void {
@@ -706,15 +723,14 @@ pub const Compiler = struct {
         }
     }
 
-    pub fn compile(vm: *Vm, source: [:0]const u8, chunk: *Chunk) bool {
+    pub fn compile(vm: *Vm, source: [:0]const u8) ?*ObjFunction {
         vm.lexer = Lexer.init(source);
-        vm.compilingChunk = chunk;
 
         vm.parser.had_error = false;
         vm.parser.panic_mode = false;
 
         var compiler: Compiler = undefined;
-        compiler.init(vm);
+        compiler.init(vm, .script);
 
         advance(vm);
 
@@ -722,7 +738,7 @@ pub const Compiler = struct {
             statement(vm);
         }
 
-        endCompiler(vm);
-        return !vm.parser.had_error;
+        const function = endCompiler(vm);
+        return if (vm.parser.had_error) null else function;
     }
 };

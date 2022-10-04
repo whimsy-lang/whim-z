@@ -10,6 +10,7 @@ const Lexer = @import("lexer.zig").Lexer;
 const Map = @import("map.zig").Map;
 const ValueContainer = @import("map.zig").ValueContainer;
 const GcAllocator = @import("memory.zig").GcAllocater;
+const ObjFunction = @import("object.zig").ObjFunction;
 const ObjString = @import("object.zig").ObjString;
 const Value = @import("value.zig").Value;
 
@@ -21,8 +22,36 @@ pub const InterpretResult = enum {
 
 pub const Vm = struct {
     const Self = @This();
+    const u8_count = std.math.maxInt(u8) + 1;
+    const frames_max = 64;
+    const stack_max = frames_max * u8_count;
 
-    const stack_max = 256;
+    const CallFrame = struct {
+        function: *ObjFunction,
+        ip: [*]u8,
+        slots: [*]Value,
+
+        // todo - compare performance to increment and then returning self.ip[-1]
+        fn readByte(self: *CallFrame) u8 {
+            const value = self.ip[0];
+            self.ip += 1;
+            return value;
+        }
+
+        fn readShort(self: *CallFrame) u16 {
+            const value = (@as(u16, self.ip[0]) << 8) | (self.ip[1]);
+            self.ip += 2;
+            return value;
+        }
+
+        fn readConstant(self: *CallFrame) Value {
+            return self.function.chunk.constants.items[self.readByte()];
+        }
+
+        fn readString(self: *CallFrame) *ObjString {
+            return self.readConstant().asString();
+        }
+    };
 
     parent_allocator: Allocator,
     gc: GcAllocator,
@@ -31,15 +60,14 @@ pub const Vm = struct {
     globals: Map,
     strings: Map,
 
-    chunk: *Chunk,
-    ip: [*]u8,
+    frames: [frames_max]CallFrame,
+    frame_count: usize,
     stack: [stack_max]Value,
     stack_top: [*]Value,
 
     lexer: Lexer,
     parser: Parser,
     compiler: *Compiler,
-    compilingChunk: *Chunk,
 
     pub fn init(self: *Self, allocator: Allocator) void {
         self.parent_allocator = allocator;
@@ -66,14 +94,16 @@ pub const Vm = struct {
 
     fn resetStack(self: *Self) void {
         self.stack_top = &self.stack;
+        self.frame_count = 0;
     }
 
     fn runtimeError(self: *Self, comptime fmt: []const u8, args: anytype) void {
         std.debug.print(fmt, args);
         std.debug.print("\n", .{});
 
-        const instruction = @ptrToInt(self.ip) - @ptrToInt(self.chunk.code.items.ptr) - 1;
-        const line = self.chunk.lines.items[instruction];
+        const frame = &self.frames[self.frame_count - 1];
+        const instruction = @ptrToInt(frame.ip) - @ptrToInt(frame.function.chunk.code.items.ptr) - 1;
+        const line = frame.function.chunk.lines.items[instruction];
         std.debug.print("[line {d}] in script\n", .{line});
         self.resetStack();
     }
@@ -93,7 +123,7 @@ pub const Vm = struct {
     }
 
     pub fn currentChunk(self: *Self) *Chunk {
-        return self.compilingChunk;
+        return &self.compiler.function.?.chunk;
     }
 
     pub fn emitByte(self: *Self, byte: u8) void {
@@ -118,8 +148,8 @@ pub const Vm = struct {
                 vm.runtimeError("Operands must be numbers.", .{});
                 return false;
             }
-            const b = vm.pop().asNum();
-            const a = vm.pop().asNum();
+            const b = vm.pop().asNumber();
+            const a = vm.pop().asNumber();
             vm.push(op_fn(a, b));
             return true;
         }
@@ -161,8 +191,8 @@ pub const Vm = struct {
         const GlobalNumAssignBinaryOpFn = *const fn (*ValueContainer, f64) void;
 
         // todo - test if inlining or comptime for op_fn makes a difference
-        fn run(vm: *Vm, op_fn: GlobalNumAssignBinaryOpFn) bool {
-            const name = vm.readString();
+        fn run(vm: *Vm, frame: *CallFrame, op_fn: GlobalNumAssignBinaryOpFn) bool {
+            const name = frame.readString();
             var value: *ValueContainer = undefined;
             if (!vm.globals.getPtr(name, &value)) {
                 vm.runtimeError("Undefined variable '{s}'.", .{name.chars});
@@ -176,7 +206,7 @@ pub const Vm = struct {
                 vm.runtimeError("Operands must be numbers.", .{});
                 return false;
             }
-            op_fn(value, vm.pop().asNum());
+            op_fn(value, vm.pop().asNumber());
             return true;
         }
 
@@ -193,7 +223,7 @@ pub const Vm = struct {
         }
 
         fn modulus(a: *ValueContainer, b: f64) void {
-            a.value.as.number = @rem(a.value.asNum(), b);
+            a.value.as.number = @rem(a.value.asNumber(), b);
         }
     };
 
@@ -201,14 +231,14 @@ pub const Vm = struct {
         const LocalNumAssignBinaryOpFn = *const fn (*Value, f64) void;
 
         // todo - compare performance with inlining and comptime
-        fn run(vm: *Vm, op_fn: LocalNumAssignBinaryOpFn) bool {
-            const index = vm.readByte();
-            const value = &vm.stack[index];
+        fn run(vm: *Vm, frame: *CallFrame, op_fn: LocalNumAssignBinaryOpFn) bool {
+            const index = frame.readByte();
+            const value = &frame.slots[index];
             if (!value.is(.number) or !vm.peek(0).is(.number)) {
                 vm.runtimeError("Operands must be numbers.", .{});
                 return false;
             }
-            op_fn(value, vm.pop().asNum());
+            op_fn(value, vm.pop().asNumber());
             return true;
         }
 
@@ -225,7 +255,7 @@ pub const Vm = struct {
         }
 
         fn modulus(a: *Value, b: f64) void {
-            a.as.number = @rem(a.asNum(), b);
+            a.as.number = @rem(a.asNumber(), b);
         }
     };
 
@@ -264,43 +294,22 @@ pub const Vm = struct {
     }
 
     pub fn interpret(self: *Self, source: [:0]const u8) InterpretResult {
-        var chunk = Chunk.init(self.allocator);
-        defer chunk.deinit();
+        const function = Compiler.compile(self, source);
+        if (function == null) return .compile_error;
 
-        if (!Compiler.compile(self, source, &chunk)) {
-            return .compile_error;
-        }
+        self.push(Value.function(function.?));
+        const frame = &self.frames[self.frame_count];
+        self.frame_count += 1;
+        frame.function = function.?;
+        frame.ip = function.?.chunk.code.items.ptr;
+        frame.slots = self.stack_top;
 
-        self.chunk = &chunk;
-        self.ip = self.chunk.code.items.ptr;
-
-        const result = self.run();
-
-        return result;
-    }
-
-    // todo - compare performance to increment and then returning self.ip[-1]
-    fn readByte(self: *Self) u8 {
-        const value = self.ip[0];
-        self.ip += 1;
-        return value;
-    }
-
-    fn readShort(self: *Self) u16 {
-        const value = (@as(u16, self.ip[0]) << 8) | (self.ip[1]);
-        self.ip += 2;
-        return value;
-    }
-
-    fn readConstant(self: *Self) Value {
-        return self.chunk.constants.items[self.readByte()];
-    }
-
-    fn readString(self: *Self) *ObjString {
-        return self.readConstant().asString();
+        return self.run();
     }
 
     fn run(self: *Self) InterpretResult {
+        const frame = &self.frames[self.frame_count - 1];
+
         while (true) {
             if (debug.trace_execution) {
                 std.debug.print("          ", .{});
@@ -311,13 +320,13 @@ pub const Vm = struct {
                     std.debug.print(" ]", .{});
                 }
                 std.debug.print("\n", .{});
-                _ = debug.disassembleInstruction(self.chunk, @ptrToInt(self.ip) - @ptrToInt(self.chunk.code.items.ptr));
+                _ = debug.disassembleInstruction(&frame.function.chunk, @ptrToInt(frame.ip) - @ptrToInt(frame.function.chunk.code.items.ptr));
             }
 
-            const instruction = self.readByte();
+            const instruction = frame.readByte();
             switch (@intToEnum(OpCode, instruction)) {
                 .constant => {
-                    const constant = self.readConstant();
+                    const constant = frame.readConstant();
                     self.push(constant);
                 },
                 .nil => self.push(Value.nil()),
@@ -325,7 +334,7 @@ pub const Vm = struct {
                 .false => self.push(Value.boolean(false)),
                 .pop => _ = self.pop(),
                 .define_global_const => {
-                    const name = self.readString();
+                    const name = frame.readString();
                     if (!self.globals.add(name, self.peek(0), true)) {
                         self.runtimeError("Global '{s}' already exists.", .{name.chars});
                         return .runtime_error;
@@ -333,7 +342,7 @@ pub const Vm = struct {
                     _ = self.pop();
                 },
                 .define_global_var => {
-                    const name = self.readString();
+                    const name = frame.readString();
                     if (!self.globals.add(name, self.peek(0), false)) {
                         self.runtimeError("Global '{s}' already exists.", .{name.chars});
                         return .runtime_error;
@@ -341,7 +350,7 @@ pub const Vm = struct {
                     _ = self.pop();
                 },
                 .get_global => {
-                    const name = self.readString();
+                    const name = frame.readString();
                     var value: Value = undefined;
                     if (!self.globals.get(name, &value)) {
                         self.runtimeError("Undefined variable '{s}'.", .{name.chars});
@@ -350,7 +359,7 @@ pub const Vm = struct {
                     self.push(value);
                 },
                 .set_global => {
-                    const name = self.readString();
+                    const name = frame.readString();
                     var value: *ValueContainer = undefined;
                     if (!self.globals.getPtr(name, &value)) {
                         self.runtimeError("Undefined variable '{s}'.", .{name.chars});
@@ -363,7 +372,7 @@ pub const Vm = struct {
                     value.value = self.pop();
                 },
                 .add_set_global => {
-                    const name = self.readString();
+                    const name = frame.readString();
                     var value: *ValueContainer = undefined;
                     if (!self.globals.getPtr(name, &value)) {
                         self.runtimeError("Undefined variable '{s}'.", .{name.chars});
@@ -374,7 +383,7 @@ pub const Vm = struct {
                         return .runtime_error;
                     }
                     if (value.value.is(.number) and self.peek(0).is(.number)) {
-                        value.value.as.number += self.pop().asNum();
+                        value.value.as.number += self.pop().asNumber();
                     } else if (value.value.is(.string) and self.peek(0).is(.string)) {
                         value.value.as.string = self.concatValue(value.value.asString());
                     } else {
@@ -382,23 +391,23 @@ pub const Vm = struct {
                         return .runtime_error;
                     }
                 },
-                .subtract_set_global => if (!GlobalNumAssignBinaryOp.run(self, GlobalNumAssignBinaryOp.subtract)) return .runtime_error,
-                .multiply_set_global => if (!GlobalNumAssignBinaryOp.run(self, GlobalNumAssignBinaryOp.multiply)) return .runtime_error,
-                .divide_set_global => if (!GlobalNumAssignBinaryOp.run(self, GlobalNumAssignBinaryOp.divide)) return .runtime_error,
-                .modulus_set_global => if (!GlobalNumAssignBinaryOp.run(self, GlobalNumAssignBinaryOp.modulus)) return .runtime_error,
+                .subtract_set_global => if (!GlobalNumAssignBinaryOp.run(self, frame, GlobalNumAssignBinaryOp.subtract)) return .runtime_error,
+                .multiply_set_global => if (!GlobalNumAssignBinaryOp.run(self, frame, GlobalNumAssignBinaryOp.multiply)) return .runtime_error,
+                .divide_set_global => if (!GlobalNumAssignBinaryOp.run(self, frame, GlobalNumAssignBinaryOp.divide)) return .runtime_error,
+                .modulus_set_global => if (!GlobalNumAssignBinaryOp.run(self, frame, GlobalNumAssignBinaryOp.modulus)) return .runtime_error,
                 .get_local => {
-                    const index = self.readByte();
-                    self.push(self.stack[index]);
+                    const index = frame.readByte();
+                    self.push(frame.slots[index]);
                 },
                 .set_local => {
-                    const index = self.readByte();
-                    self.stack[index] = self.pop();
+                    const index = frame.readByte();
+                    frame.slots[index] = self.pop();
                 },
                 .add_set_local => {
-                    const index = self.readByte();
-                    const value = &self.stack[index];
+                    const index = frame.readByte();
+                    const value = &frame.slots[index];
                     if (value.is(.number) and self.peek(0).is(.number)) {
-                        value.as.number += self.pop().asNum();
+                        value.as.number += self.pop().asNumber();
                     } else if (value.is(.string) and self.peek(0).is(.string)) {
                         value.as.string = self.concatValue(value.asString());
                     } else {
@@ -406,10 +415,10 @@ pub const Vm = struct {
                         return .runtime_error;
                     }
                 },
-                .subtract_set_local => if (!LocalNumAssignBinaryOp.run(self, LocalNumAssignBinaryOp.subtract)) return .runtime_error,
-                .multiply_set_local => if (!LocalNumAssignBinaryOp.run(self, LocalNumAssignBinaryOp.multiply)) return .runtime_error,
-                .divide_set_local => if (!LocalNumAssignBinaryOp.run(self, LocalNumAssignBinaryOp.divide)) return .runtime_error,
-                .modulus_set_local => if (!LocalNumAssignBinaryOp.run(self, LocalNumAssignBinaryOp.modulus)) return .runtime_error,
+                .subtract_set_local => if (!LocalNumAssignBinaryOp.run(self, frame, LocalNumAssignBinaryOp.subtract)) return .runtime_error,
+                .multiply_set_local => if (!LocalNumAssignBinaryOp.run(self, frame, LocalNumAssignBinaryOp.multiply)) return .runtime_error,
+                .divide_set_local => if (!LocalNumAssignBinaryOp.run(self, frame, LocalNumAssignBinaryOp.divide)) return .runtime_error,
+                .modulus_set_local => if (!LocalNumAssignBinaryOp.run(self, frame, LocalNumAssignBinaryOp.modulus)) return .runtime_error,
                 .equal => {
                     const b = self.pop();
                     const a = self.pop();
@@ -426,8 +435,8 @@ pub const Vm = struct {
                 .less_equal => if (!NumBinaryOp.run(self, NumBinaryOp.lessEqual)) return .runtime_error,
                 .add => {
                     if (self.peek(0).is(.number) and self.peek(1).is(.number)) {
-                        const b = self.pop().asNum();
-                        const a = self.pop().asNum();
+                        const b = self.pop().asNumber();
+                        const a = self.pop().asNumber();
                         self.push(Value.number(a + b));
                     } else if (self.peek(0).is(.string) and self.peek(1).is(.string)) {
                         self.concatenate();
@@ -445,32 +454,32 @@ pub const Vm = struct {
                         self.runtimeError("Operand must be a number.", .{});
                         return .runtime_error;
                     }
-                    self.push(Value.number(-self.pop().asNum()));
+                    self.push(Value.number(-self.pop().asNumber()));
                 },
                 .not => self.push(Value.boolean(self.pop().isFalsey())),
                 .jump => {
-                    const offset = self.readShort();
-                    self.ip += offset;
+                    const offset = frame.readShort();
+                    frame.ip += offset;
                 },
                 .jump_back => {
-                    const offset = self.readShort();
-                    self.ip -= offset;
+                    const offset = frame.readShort();
+                    frame.ip -= offset;
                 },
                 .jump_if_true => {
-                    const offset = self.readShort();
-                    if (!self.peek(0).isFalsey()) self.ip += offset;
+                    const offset = frame.readShort();
+                    if (!self.peek(0).isFalsey()) frame.ip += offset;
                 },
                 .jump_if_false => {
-                    const offset = self.readShort();
-                    if (self.peek(0).isFalsey()) self.ip += offset;
+                    const offset = frame.readShort();
+                    if (self.peek(0).isFalsey()) frame.ip += offset;
                 },
                 .jump_if_true_pop => {
-                    const offset = self.readShort();
-                    if (!self.pop().isFalsey()) self.ip += offset;
+                    const offset = frame.readShort();
+                    if (!self.pop().isFalsey()) frame.ip += offset;
                 },
                 .jump_if_false_pop => {
-                    const offset = self.readShort();
-                    if (self.pop().isFalsey()) self.ip += offset;
+                    const offset = frame.readShort();
+                    if (self.pop().isFalsey()) frame.ip += offset;
                 },
                 .return_ => {
                     // exit interpreter
