@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const ObjFunction = @import("object.zig").ObjFunction;
+const ObjNative = @import("object.zig").ObjNative;
 const ObjString = @import("object.zig").ObjString;
 
 pub const ValueType = enum {
@@ -9,6 +10,7 @@ pub const ValueType = enum {
     number,
 
     function,
+    native,
     string,
 };
 
@@ -19,6 +21,7 @@ pub const Value = struct {
         number: f64,
 
         function: *ObjFunction,
+        native: *ObjNative,
         string: *ObjString,
     },
 
@@ -32,6 +35,10 @@ pub const Value = struct {
 
     pub fn function(value: *ObjFunction) Value {
         return .{ .as = .{ .function = value } };
+    }
+
+    pub fn native(value: *ObjNative) Value {
+        return .{ .as = .{ .native = value } };
     }
 
     pub fn nil() Value {
@@ -58,6 +65,10 @@ pub const Value = struct {
         return self.as.function;
     }
 
+    pub fn asNative(self: Value) *ObjNative {
+        return self.as.native;
+    }
+
     pub fn asNumber(self: Value) f64 {
         return self.as.number;
     }
@@ -78,6 +89,7 @@ pub const Value = struct {
             .number => self.asNumber() == other.asNumber(),
 
             .function => self.asFunction() == other.asFunction(),
+            .native => self.asNative() == other.asNative(),
             .string => self.asString() == other.asString(),
         };
     }
@@ -89,6 +101,7 @@ pub const Value = struct {
             .number => std.debug.print("{d}", .{self.asNumber()}),
 
             .function => self.asFunction().print(),
+            .native => std.debug.print("<native fn>", .{}),
             .string => std.debug.print("{s}", .{self.asString().chars}),
         }
     }

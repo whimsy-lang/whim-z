@@ -36,6 +36,23 @@ pub const ObjFunction = struct {
     }
 };
 
+pub const NativeFn = *const fn ([]Value) Value;
+
+pub const ObjNative = struct {
+    function: NativeFn,
+
+    pub fn init(vm: *Vm, native_fn: NativeFn) *ObjNative {
+        const func = vm.allocator.create(ObjNative) catch {
+            std.debug.print("Could not allocate memory for function.", .{});
+            std.process.exit(1);
+        };
+        vm.registerObject(Value.native(func));
+
+        func.function = native_fn;
+        return func;
+    }
+};
+
 pub const ObjString = struct {
     chars: []const u8,
     hash: u32,

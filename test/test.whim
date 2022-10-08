@@ -1,12 +1,10 @@
 // simple test file
 
-return nil
-
-test :: fn(a, b)
-    x := 1
-    x += a
-    x *= b
-    return x
+fib :: fn(n)
+    if n < 2 return n /if
+    return fib(n - 2) + fib(n - 1)
 /fn
 
-test(2, 3)
+start :: time()
+print('fib: ', fib(4))
+print('elapsed: ', time() - start)

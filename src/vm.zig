@@ -10,7 +10,9 @@ const Lexer = @import("lexer.zig").Lexer;
 const Map = @import("map.zig").Map;
 const ValueContainer = @import("map.zig").ValueContainer;
 const GcAllocator = @import("memory.zig").GcAllocater;
+const NativeFn = @import("object.zig").NativeFn;
 const ObjFunction = @import("object.zig").ObjFunction;
+const ObjNative = @import("object.zig").ObjNative;
 const ObjString = @import("object.zig").ObjString;
 const Value = @import("value.zig").Value;
 
@@ -78,12 +80,29 @@ pub const Vm = struct {
         self.globals = Map.init(self.allocator);
         self.strings = Map.init(self.allocator);
         self.resetStack();
+
+        self.defineNative("print", nativePrint);
+        self.defineNative("time", nativeTime);
     }
 
     pub fn deinit(self: *Self) void {
         GcAllocator.freeObjects(self);
         self.globals.deinit();
         self.strings.deinit();
+    }
+
+    fn nativePrint(values: []Value) Value {
+        for (values) |value| {
+            value.print();
+        }
+        std.debug.print("\n", .{});
+        return Value.nil();
+    }
+
+    fn nativeTime(values: []Value) Value {
+        _ = values;
+        const time = @intToFloat(f64, std.time.milliTimestamp()) / std.time.ms_per_s;
+        return Value.number(time);
     }
 
     pub fn registerObject(self: *Self, object: Value) void {
@@ -116,6 +135,14 @@ pub const Vm = struct {
         }
 
         self.resetStack();
+    }
+
+    fn defineNative(self: *Self, name: []const u8, native_fn: NativeFn) void {
+        self.push(Value.string(ObjString.copy(self, name)));
+        self.push(Value.native(ObjNative.init(self, native_fn)));
+        _ = self.globals.set(self.stack[0].asString(), self.stack[1]);
+        _ = self.pop();
+        _ = self.pop();
     }
 
     fn peek(self: *Self, offset: usize) Value {
@@ -172,6 +199,13 @@ pub const Vm = struct {
     fn callValue(self: *Self, callee: Value, arg_count: u8) bool {
         switch (callee.getType()) {
             .function => return self.call(callee.asFunction(), arg_count, true),
+            .native => {
+                const native = callee.asNative().function;
+                const result = native((self.stack_top - arg_count)[0..arg_count]);
+                self.stack_top -= arg_count + 1;
+                self.push(result);
+                return true;
+            },
             else => {},
         }
         self.runtimeError("Can only call functions and classes.", .{});

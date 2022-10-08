@@ -76,6 +76,7 @@ pub const GcAllocater = struct {
                 function.deinit();
                 vm.allocator.destroy(function);
             },
+            .native => vm.allocator.destroy(object.asNative()),
             .string => {
                 const string = object.asString();
                 string.deinit(vm.allocator);
