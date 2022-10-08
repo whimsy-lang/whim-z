@@ -30,6 +30,7 @@ pub const Vm = struct {
         function: *ObjFunction,
         ip: [*]u8,
         slots: [*]Value,
+        pop_one: bool,
 
         // todo - compare performance to increment and then returning self.ip[-1]
         fn readByte(self: *CallFrame) u8 {
@@ -101,10 +102,19 @@ pub const Vm = struct {
         std.debug.print(fmt, args);
         std.debug.print("\n", .{});
 
-        const frame = &self.frames[self.frame_count - 1];
-        const instruction = @ptrToInt(frame.ip) - @ptrToInt(frame.function.chunk.code.items.ptr) - 1;
-        const line = frame.function.chunk.lines.items[instruction];
-        std.debug.print("[line {d}] in script\n", .{line});
+        var i: isize = @intCast(isize, self.frame_count) - 1;
+        while (i >= 0) : (i -= 1) {
+            const frame = &self.frames[@intCast(usize, i)];
+            const function = frame.function;
+            const instruction = @ptrToInt(frame.ip) - @ptrToInt(function.chunk.code.items.ptr) - 1;
+            std.debug.print("[line {d}] in ", .{function.chunk.lines.items[instruction]});
+            if (function.name == null) {
+                std.debug.print("script\n", .{});
+            } else {
+                std.debug.print("{s}()\n", .{function.name.?.chars});
+            }
+        }
+
         self.resetStack();
     }
 
@@ -137,6 +147,35 @@ pub const Vm = struct {
     pub fn emitOpByte(self: *Self, op: OpCode, byte: u8) void {
         self.emitOp(op);
         self.emitByte(byte);
+    }
+
+    fn call(self: *Self, function: *ObjFunction, arg_count: u8, pop_one: bool) bool {
+        if (arg_count != function.arity) {
+            self.runtimeError("Expected {d} arguments but got {d}.", .{ function.arity, arg_count });
+            return false;
+        }
+
+        if (self.frame_count == frames_max) {
+            self.runtimeError("Stack overflow.", .{});
+            return false;
+        }
+
+        const frame = &self.frames[self.frame_count];
+        self.frame_count += 1;
+        frame.function = function;
+        frame.ip = function.chunk.code.items.ptr;
+        frame.slots = self.stack_top - arg_count;
+        frame.pop_one = pop_one;
+        return true;
+    }
+
+    fn callValue(self: *Self, callee: Value, arg_count: u8) bool {
+        switch (callee.getType()) {
+            .function => return self.call(callee.asFunction(), arg_count, true),
+            else => {},
+        }
+        self.runtimeError("Can only call functions and classes.", .{});
+        return false;
     }
 
     const NumBinaryOp = struct {
@@ -298,17 +337,13 @@ pub const Vm = struct {
         if (function == null) return .compile_error;
 
         self.push(Value.function(function.?));
-        const frame = &self.frames[self.frame_count];
-        self.frame_count += 1;
-        frame.function = function.?;
-        frame.ip = function.?.chunk.code.items.ptr;
-        frame.slots = self.stack_top;
+        _ = self.call(function.?, 0, true);
 
         return self.run();
     }
 
     fn run(self: *Self) InterpretResult {
-        const frame = &self.frames[self.frame_count - 1];
+        var frame = &self.frames[self.frame_count - 1];
 
         while (true) {
             if (debug.trace_execution) {
@@ -481,9 +516,27 @@ pub const Vm = struct {
                     const offset = frame.readShort();
                     if (self.pop().isFalsey()) frame.ip += offset;
                 },
+                .call => {
+                    const arg_count = frame.readByte();
+                    if (!self.callValue(self.peek(arg_count), arg_count)) {
+                        return .runtime_error;
+                    }
+                    frame = &self.frames[self.frame_count - 1];
+                },
                 .return_ => {
-                    // exit interpreter
-                    return .ok;
+                    var new_top = frame.slots;
+                    if (frame.pop_one) new_top -= 1;
+
+                    const result = self.pop();
+                    self.frame_count -= 1;
+                    if (self.frame_count == 0) {
+                        _ = self.pop();
+                        return .ok;
+                    }
+
+                    self.stack_top = new_top;
+                    self.push(result);
+                    frame = &self.frames[self.frame_count - 1];
                 },
                 else => return .runtime_error,
             }

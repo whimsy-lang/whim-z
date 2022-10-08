@@ -63,6 +63,7 @@ pub const Compiler = struct {
         script,
     };
 
+    enclosing: *Compiler,
     function: ?*ObjFunction,
     fn_type: FunctionType,
 
@@ -75,6 +76,7 @@ pub const Compiler = struct {
     encountered_identifier: ?[]const u8,
 
     pub fn init(self: *Self, vm: *Vm, fn_type: FunctionType) void {
+        self.enclosing = vm.compiler;
         self.function = null;
         self.fn_type = fn_type;
 
@@ -170,6 +172,7 @@ pub const Compiler = struct {
     }
 
     fn emitReturn(vm: *Vm) void {
+        vm.emitOp(.nil);
         vm.emitOp(.return_);
     }
 
@@ -188,13 +191,14 @@ pub const Compiler = struct {
 
     fn endCompiler(vm: *Vm) *ObjFunction {
         emitReturn(vm);
-        const function = vm.compiler.function.?;
+        const func = vm.compiler.function.?;
 
         if (debug.print_code and !vm.parser.had_error) {
-            debug.disassembleChunk(vm.currentChunk(), if (function.name != null) function.name.?.chars else "<script>");
+            debug.disassembleChunk(vm.currentChunk(), if (func.name != null) func.name.?.chars else "<script>");
         }
 
-        return function;
+        vm.compiler = vm.compiler.enclosing;
+        return func;
     }
 
     fn beginScope(vm: *Vm) void {
@@ -275,7 +279,7 @@ pub const Compiler = struct {
 
     fn getInfixPrimary(tok_type: TokenType) ?PrimaryParseFn {
         return switch (tok_type) {
-            // .left_paren => callPrimary,
+            .left_paren => callPrimary,
             // .dot => dotPrimary,
             else => null,
         };
@@ -290,14 +294,14 @@ pub const Compiler = struct {
             .number => number,
             // .class => class,
             .false, .nil, .true => literal,
-            // .fn_ => function,
+            .fn_ => function,
             else => null,
         };
     }
 
     fn getInfix(tok_type: TokenType) ?ParseFn {
         return switch (tok_type) {
-            // .left_paren => call,
+            .left_paren => call,
             // .dot => dot,
             .bang_equal, .equal_equal => binary,
             .less, .less_equal, .greater, .greater_equal => binary,
@@ -319,6 +323,22 @@ pub const Compiler = struct {
             .or_ => .or_,
             else => .none,
         };
+    }
+
+    fn argumentList(vm: *Vm) u8 {
+        var arg_count: u8 = 0;
+        if (!check(vm, .right_paren)) {
+            while (true) {
+                expression(vm);
+                if (arg_count == std.math.maxInt(u8)) {
+                    error_(vm, "Can't have more than 255 arguments.");
+                }
+                arg_count += 1;
+                if (!(match(vm, .comma) and !check(vm, .right_paren))) break;
+            }
+        }
+        consume(vm, .right_paren, "Expect ')' after arguments.");
+        return arg_count;
     }
 
     fn andOp(vm: *Vm) void {
@@ -349,6 +369,44 @@ pub const Compiler = struct {
             .percent => vm.emitOp(.modulus),
             else => unreachable,
         }
+    }
+
+    fn callPrimary(vm: *Vm) bool {
+        call(vm);
+        return false;
+    }
+
+    fn call(vm: *Vm) void {
+        const arg_count = argumentList(vm);
+        vm.emitOpByte(.call, arg_count);
+    }
+
+    fn function(vm: *Vm) void {
+        var compiler: Compiler = undefined;
+        compiler.init(vm, .function);
+        if (vm.compiler.enclosing.encountered_identifier) |name| {
+            compiler.function.?.name = ObjString.copy(vm, name);
+        }
+        beginScope(vm);
+
+        consume(vm, .left_paren, "Expect '(' after fn.");
+        if (!check(vm, .right_paren)) {
+            while (true) {
+                vm.compiler.function.?.arity += 1;
+                if (vm.compiler.function.?.arity > std.math.maxInt(u8)) {
+                    errorAtCurrent(vm, "Can't have more than 255 parameters.");
+                }
+                consume(vm, .identifier, "Expect parameter name.");
+                declareLocal(vm, &vm.parser.previous, true);
+                markInitialized(vm);
+                if (!(match(vm, .comma) and !check(vm, .right_paren))) break;
+            }
+        }
+        consume(vm, .right_paren, "Expect ')' after parameters.");
+        block(vm, .fn_end, "Expect '/fn' after block.");
+
+        const new_func = endCompiler(vm);
+        vm.emitOpByte(.constant, makeConstant(vm, Value.function(new_func)));
     }
 
     fn groupingPrimary(vm: *Vm) bool {
@@ -679,6 +737,11 @@ pub const Compiler = struct {
         vm.compiler.loop_count -= 1;
     }
 
+    fn returnStatement(vm: *Vm) void {
+        expression(vm);
+        vm.emitOp(.return_);
+    }
+
     fn statement(vm: *Vm) void {
         vm.compiler.encountered_identifier = null;
 
@@ -698,6 +761,8 @@ pub const Compiler = struct {
             ifStatement(vm);
         } else if (match(vm, .loop)) {
             loopStatement(vm);
+        } else if (match(vm, .return_)) {
+            returnStatement(vm);
         } else {
             expressionStatement(vm);
         }
@@ -738,7 +803,7 @@ pub const Compiler = struct {
             statement(vm);
         }
 
-        const function = endCompiler(vm);
-        return if (vm.parser.had_error) null else function;
+        const script_func = endCompiler(vm);
+        return if (vm.parser.had_error) null else script_func;
     }
 };

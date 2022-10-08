@@ -230,20 +230,6 @@ compiled: *.whir
 
 ## TODO
 
-### Zig Version
-
-* [ ] chunk
-* [ ] common
-* [ ] compiler
-* [ ] debug
-* [ ] main
-* [ ] memory
-* [ ] object
-* [ ] scanner -> lexer
-* [ ] table -> map
-* [ ] value
-* [ ] vm
-
 ### General
 
 * better line number encoding
@@ -270,3 +256,4 @@ compiled: *.whir
 * setting a property by string with a class or function value should set the name if it is null
 * negate op with a number as the next token should resolve to a single negative constant
 * NaN boxing
+* optional `then` after `if` and `elif` conditions
