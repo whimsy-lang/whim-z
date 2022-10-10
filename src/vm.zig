@@ -101,7 +101,7 @@ pub const Vm = struct {
 
     fn nativeTime(values: []Value) Value {
         _ = values;
-        const time = @intToFloat(f64, std.time.milliTimestamp()) / std.time.ms_per_s;
+        const time = @intToFloat(f64, std.time.nanoTimestamp()) / std.time.ns_per_s;
         return Value.number(time);
     }
 
