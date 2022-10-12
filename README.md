@@ -254,6 +254,5 @@ compiled: *.whir
 * generational gc
 * properties by string
 * setting a property by string with a class or function value should set the name if it is null
-* negate op with a number as the next token should resolve to a single negative constant
 * NaN boxing
 * optional `then` after `if` and `elif` conditions

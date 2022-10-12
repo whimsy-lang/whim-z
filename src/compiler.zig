@@ -20,22 +20,14 @@ pub const Parser = struct {
 
 const Precedence = enum {
     none,
-    // or
-    or_,
-    // and
-    and_,
-    // == !=
-    equality,
-    // < > <= >=
-    comparison,
-    // + -
-    term,
-    // * / %
-    factor,
-    // ! -
-    unary,
-    // . () []
-    call,
+    or_, // or
+    and_, // and
+    equality, // == !=
+    comparison, // < > <= >=
+    term, // + -
+    factor, // * / %
+    unary, // ! -
+    call, // . () []
 };
 
 const PrimaryParseFn = *const fn (*Vm) bool;
@@ -288,7 +280,8 @@ pub const Compiler = struct {
     fn getPrefix(tok_type: TokenType) ?ParseFn {
         return switch (tok_type) {
             .left_paren => grouping,
-            .bang, .minus => unary,
+            .bang => not,
+            .minus => negate,
             .identifier => variable,
             .string => string,
             .number => number,
@@ -428,6 +421,23 @@ pub const Compiler = struct {
         }
     }
 
+    fn negate(vm: *Vm) void {
+        if (match(vm, .number)) {
+            const value = std.fmt.parseFloat(f64, vm.parser.previous.value) catch 0;
+            emitConstant(vm, Value.number(-value));
+        } else {
+            // compile the operand
+            parsePrecedence(vm, .unary);
+            vm.emitOp(.negate);
+        }
+    }
+
+    fn not(vm: *Vm) void {
+        // compile the operand
+        parsePrecedence(vm, .unary);
+        vm.emitOp(.not);
+    }
+
     fn number(vm: *Vm) void {
         const value = std.fmt.parseFloat(f64, vm.parser.previous.value) catch 0;
         emitConstant(vm, Value.number(value));
@@ -445,20 +455,6 @@ pub const Compiler = struct {
     fn string(vm: *Vm) void {
         const value = vm.parser.previous.value;
         emitConstant(vm, Value.string(ObjString.copyEscape(vm, value[1..(value.len - 1)])));
-    }
-
-    fn unary(vm: *Vm) void {
-        const op_type = vm.parser.previous.type;
-
-        // compile the operand
-        parsePrecedence(vm, .unary);
-
-        // emit the operator instruction
-        switch (op_type) {
-            .bang => vm.emitOp(.not),
-            .minus => vm.emitOp(.negate),
-            else => unreachable,
-        }
     }
 
     fn variablePrimary(vm: *Vm) bool {
