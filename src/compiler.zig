@@ -458,11 +458,12 @@ pub const Compiler = struct {
     }
 
     fn variablePrimary(vm: *Vm) bool {
-        switch (vm.parser.current.type) {
+        const op_type = vm.parser.current.type;
+        switch (op_type) {
             .colon_colon, .colon_equal => {
                 // declaration
 
-                const constant = vm.parser.current.type == .colon_colon;
+                const constant = op_type == .colon_colon;
 
                 vm.compiler.encountered_identifier = vm.parser.previous.value;
 
@@ -494,40 +495,39 @@ pub const Compiler = struct {
                 vm.compiler.encountered_identifier = vm.parser.previous.value;
 
                 var arg = vm.compiler.resolveLocal(&vm.parser.previous);
-
-                var op: OpCode = undefined;
+                var get_op = OpCode.get_local_ptr;
+                var set_op = OpCode.set_local;
 
                 if (arg != -1) {
                     // local
                     if (vm.compiler.locals[@intCast(usize, arg)].constant) {
                         error_(vm, "Local is constant.");
                     }
-
-                    op = switch (vm.parser.current.type) {
-                        .plus_equal => .add_set_local,
-                        .minus_equal => .subtract_set_local,
-                        .star_equal => .multiply_set_local,
-                        .slash_equal => .divide_set_local,
-                        .percent_equal => .modulus_set_local,
-                        else => .set_local,
-                    };
                 } else {
                     // global
                     arg = identifierConstant(vm, &vm.parser.previous);
+                    get_op = .get_global_ptr;
+                    set_op = .set_global;
+                }
 
-                    op = switch (vm.parser.current.type) {
-                        .plus_equal => .add_set_global,
-                        .minus_equal => .subtract_set_global,
-                        .star_equal => .multiply_set_global,
-                        .slash_equal => .divide_set_global,
-                        .percent_equal => .modulus_set_global,
-                        else => .set_global,
-                    };
+                // emit get
+                if (op_type != .equal) {
+                    vm.emitOpByte(get_op, @intCast(u8, arg));
                 }
 
                 advance(vm); // accept = += -= *= /= %=
                 expression(vm);
-                vm.emitOpByte(op, @intCast(u8, arg));
+
+                // emit set
+                switch (op_type) {
+                    .plus_equal => vm.emitOp(.add_set),
+                    .minus_equal => vm.emitOp(.subtract_set),
+                    .star_equal => vm.emitOp(.multiply_set),
+                    .slash_equal => vm.emitOp(.divide_set),
+                    .percent_equal => vm.emitOp(.modulus_set),
+                    else => vm.emitOpByte(set_op, @intCast(u8, arg)),
+                }
+
                 return true;
             },
             else => {},

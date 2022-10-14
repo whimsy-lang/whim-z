@@ -260,58 +260,25 @@ pub const Vm = struct {
         }
     };
 
-    const GlobalNumAssignBinaryOp = struct {
-        const GlobalNumAssignBinaryOpFn = *const fn (*ValueContainer, f64) void;
+    const NumAssignBinaryOp = struct {
+        const NumAssignBinaryOpFn = *const fn (*Value, f64) void;
 
         // todo - test if inlining or comptime for op_fn makes a difference
-        fn run(vm: *Vm, frame: *CallFrame, op_fn: GlobalNumAssignBinaryOpFn) bool {
-            const name = frame.readString();
-            var value: *ValueContainer = undefined;
-            if (!vm.globals.getPtr(name, &value)) {
-                vm.runtimeError("Undefined variable '{s}'.", .{name.chars});
+        fn run(vm: *Vm, op_fn: NumAssignBinaryOpFn) bool {
+            const b = vm.pop();
+            const a = vm.pop();
+
+            if (!a.is(.pointer)) {
+                vm.runtimeError("Invalid command on a non-pointer value.", .{});
                 return false;
             }
-            if (value.constant) {
-                vm.runtimeError("Global '{s}' is constant.", .{name.chars});
-                return false;
-            }
-            if (!value.value.is(.number) or !vm.peek(0).is(.number)) {
+
+            if (!a.asPointer().is(.number) or !b.is(.number)) {
                 vm.runtimeError("Operands must be numbers.", .{});
                 return false;
             }
-            op_fn(value, vm.pop().asNumber());
-            return true;
-        }
 
-        fn subtract(a: *ValueContainer, b: f64) void {
-            a.value.as.number -= b;
-        }
-
-        fn multiply(a: *ValueContainer, b: f64) void {
-            a.value.as.number *= b;
-        }
-
-        fn divide(a: *ValueContainer, b: f64) void {
-            a.value.as.number /= b;
-        }
-
-        fn modulus(a: *ValueContainer, b: f64) void {
-            a.value.as.number = @rem(a.value.asNumber(), b);
-        }
-    };
-
-    const LocalNumAssignBinaryOp = struct {
-        const LocalNumAssignBinaryOpFn = *const fn (*Value, f64) void;
-
-        // todo - compare performance with inlining and comptime
-        fn run(vm: *Vm, frame: *CallFrame, op_fn: LocalNumAssignBinaryOpFn) bool {
-            const index = frame.readByte();
-            const value = &frame.slots[index];
-            if (!value.is(.number) or !vm.peek(0).is(.number)) {
-                vm.runtimeError("Operands must be numbers.", .{});
-                return false;
-            }
-            op_fn(value, vm.pop().asNumber());
+            op_fn(a.asPointer(), b.asNumber());
             return true;
         }
 
@@ -350,20 +317,19 @@ pub const Vm = struct {
         self.push(Value.string(result));
     }
 
-    fn concatValue(self: *Self, a: *ObjString) *ObjString {
+    fn concatPtr(self: *Self) void {
         const b = self.peek(0).asString();
+        const a = self.peek(1).asPointer();
+        const a_str = a.asString();
 
-        const strings = [_][]const u8{ a.chars, b.chars };
+        const strings = [_][]const u8{ a_str.chars, b.chars };
 
         const heap_chars = std.mem.concat(self.allocator, u8, &strings) catch {
             std.debug.print("Could not allocate memory for string.", .{});
             std.process.exit(1);
         };
 
-        const result = ObjString.take(self, heap_chars);
-
-        _ = self.pop();
-        return result;
+        a.as.string = ObjString.take(self, heap_chars);
     }
 
     pub fn interpret(self: *Self, source: [:0]const u8) InterpretResult {
@@ -427,6 +393,20 @@ pub const Vm = struct {
                     }
                     self.push(value);
                 },
+                .get_global_ptr => {
+                    const name = frame.readString();
+                    var value: *ValueContainer = undefined;
+                    if (!self.globals.getPtr(name, &value)) {
+                        self.runtimeError("Undefined variable '{s}'.", .{name.chars});
+                        return .runtime_error;
+                    }
+                    // pointers are only used to mutate, so a constant is an error
+                    if (value.constant) {
+                        self.runtimeError("Global '{s}' is constant.", .{name.chars});
+                        return .runtime_error;
+                    }
+                    self.push(Value.pointer(&value.value));
+                },
                 .set_global => {
                     const name = frame.readString();
                     var value: *ValueContainer = undefined;
@@ -440,54 +420,43 @@ pub const Vm = struct {
                     }
                     value.value = self.pop();
                 },
-                .add_set_global => {
-                    const name = frame.readString();
-                    var value: *ValueContainer = undefined;
-                    if (!self.globals.getPtr(name, &value)) {
-                        self.runtimeError("Undefined variable '{s}'.", .{name.chars});
-                        return .runtime_error;
-                    }
-                    if (value.constant) {
-                        self.runtimeError("Global '{s}' is constant.", .{name.chars});
-                        return .runtime_error;
-                    }
-                    if (value.value.is(.number) and self.peek(0).is(.number)) {
-                        value.value.as.number += self.pop().asNumber();
-                    } else if (value.value.is(.string) and self.peek(0).is(.string)) {
-                        value.value.as.string = self.concatValue(value.value.asString());
-                    } else {
-                        self.runtimeError("Operands must both be numbers or strings.", .{});
-                        return .runtime_error;
-                    }
-                },
-                .subtract_set_global => if (!GlobalNumAssignBinaryOp.run(self, frame, GlobalNumAssignBinaryOp.subtract)) return .runtime_error,
-                .multiply_set_global => if (!GlobalNumAssignBinaryOp.run(self, frame, GlobalNumAssignBinaryOp.multiply)) return .runtime_error,
-                .divide_set_global => if (!GlobalNumAssignBinaryOp.run(self, frame, GlobalNumAssignBinaryOp.divide)) return .runtime_error,
-                .modulus_set_global => if (!GlobalNumAssignBinaryOp.run(self, frame, GlobalNumAssignBinaryOp.modulus)) return .runtime_error,
                 .get_local => {
                     const index = frame.readByte();
                     self.push(frame.slots[index]);
+                },
+                .get_local_ptr => {
+                    const index = frame.readByte();
+                    self.push(Value.pointer(&frame.slots[index]));
                 },
                 .set_local => {
                     const index = frame.readByte();
                     frame.slots[index] = self.pop();
                 },
-                .add_set_local => {
-                    const index = frame.readByte();
-                    const value = &frame.slots[index];
-                    if (value.is(.number) and self.peek(0).is(.number)) {
-                        value.as.number += self.pop().asNumber();
-                    } else if (value.is(.string) and self.peek(0).is(.string)) {
-                        value.as.string = self.concatValue(value.asString());
+                .add_set => {
+                    const b = self.peek(0);
+                    const a = self.peek(1);
+
+                    if (!a.is(.pointer)) {
+                        self.runtimeError("Invalid command on a non-pointer value.", .{});
+                        return .runtime_error;
+                    }
+
+                    if (a.asPointer().is(.number) and b.is(.number)) {
+                        a.asPointer().as.number += b.asNumber();
+                    } else if (a.asPointer().is(.string) and b.is(.string)) {
+                        self.concatPtr();
                     } else {
                         self.runtimeError("Operands must both be numbers or strings.", .{});
                         return .runtime_error;
                     }
+
+                    _ = self.pop();
+                    _ = self.pop();
                 },
-                .subtract_set_local => if (!LocalNumAssignBinaryOp.run(self, frame, LocalNumAssignBinaryOp.subtract)) return .runtime_error,
-                .multiply_set_local => if (!LocalNumAssignBinaryOp.run(self, frame, LocalNumAssignBinaryOp.multiply)) return .runtime_error,
-                .divide_set_local => if (!LocalNumAssignBinaryOp.run(self, frame, LocalNumAssignBinaryOp.divide)) return .runtime_error,
-                .modulus_set_local => if (!LocalNumAssignBinaryOp.run(self, frame, LocalNumAssignBinaryOp.modulus)) return .runtime_error,
+                .subtract_set => if (!NumAssignBinaryOp.run(self, NumAssignBinaryOp.subtract)) return .runtime_error,
+                .multiply_set => if (!NumAssignBinaryOp.run(self, NumAssignBinaryOp.multiply)) return .runtime_error,
+                .divide_set => if (!NumAssignBinaryOp.run(self, NumAssignBinaryOp.divide)) return .runtime_error,
+                .modulus_set => if (!NumAssignBinaryOp.run(self, NumAssignBinaryOp.modulus)) return .runtime_error,
                 .equal => {
                     const b = self.pop();
                     const a = self.pop();

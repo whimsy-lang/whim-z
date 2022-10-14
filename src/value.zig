@@ -9,6 +9,8 @@ pub const ValueType = enum {
     nil,
     number,
 
+    pointer,
+
     function,
     native,
     string,
@@ -19,6 +21,8 @@ pub const Value = struct {
         bool: bool,
         nil: void,
         number: f64,
+
+        pointer: *Value,
 
         function: *ObjFunction,
         native: *ObjNative,
@@ -49,6 +53,10 @@ pub const Value = struct {
         return .{ .as = .{ .number = value } };
     }
 
+    pub fn pointer(value: *Value) Value {
+        return .{ .as = .{ .pointer = value } };
+    }
+
     pub fn string(value: *ObjString) Value {
         return .{ .as = .{ .string = value } };
     }
@@ -73,6 +81,10 @@ pub const Value = struct {
         return self.as.number;
     }
 
+    pub fn asPointer(self: Value) *Value {
+        return self.as.pointer;
+    }
+
     pub fn asString(self: Value) *ObjString {
         return self.as.string;
     }
@@ -88,6 +100,8 @@ pub const Value = struct {
             .nil => true,
             .number => self.asNumber() == other.asNumber(),
 
+            .pointer => self.asPointer() == other.asPointer(),
+
             .function => self.asFunction() == other.asFunction(),
             .native => self.asNative() == other.asNative(),
             .string => self.asString() == other.asString(),
@@ -99,6 +113,11 @@ pub const Value = struct {
             .bool => std.debug.print("{s}", .{if (self.asBool()) "true" else "false"}),
             .nil => std.debug.print("nil", .{}),
             .number => std.debug.print("{d}", .{self.asNumber()}),
+
+            .pointer => {
+                std.debug.print("*", .{});
+                self.asPointer().print();
+            },
 
             .function => self.asFunction().print(),
             .native => std.debug.print("<native fn>", .{}),
