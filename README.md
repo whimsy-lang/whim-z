@@ -58,15 +58,24 @@ std :: use Some.Standard.Library
 // or maybe with a function?
 lib :: std.import(Some.Standard.Library)
 
+// number literals
+12        // decimal
+0b10110   // binary
+0o71205   // octal
+0x8fa12   // hexadecimal
+
+// _ is allowed in number literals for ease of reading
+1_234_567_890 == 1234567890
+
 // function
 myFunc :: fn(x, y, z)
 /fn
 
 // all functions are static and require an explicit self
 
-// these are equivalent if first is an instance
+// these are equivalent if first is an instance of Class
 first.func(second)
-func(first, second)
+Class.func(first, second)
 
 // property access can be by identifier or string, with this setup:
 propName :: 'property'
