@@ -495,7 +495,7 @@ pub const Compiler = struct {
                 vm.compiler.encountered_identifier = vm.parser.previous.value;
 
                 var arg = vm.compiler.resolveLocal(&vm.parser.previous);
-                var get_op = OpCode.get_local_ptr;
+                var get_op = OpCode.get_local;
                 var set_op = OpCode.set_local;
 
                 if (arg != -1) {
@@ -506,28 +506,30 @@ pub const Compiler = struct {
                 } else {
                     // global
                     arg = identifierConstant(vm, &vm.parser.previous);
-                    get_op = .get_global_ptr;
+                    get_op = .get_global;
                     set_op = .set_global;
                 }
 
-                // emit get
                 if (op_type != .equal) {
+                    // emit get
                     vm.emitOpByte(get_op, @intCast(u8, arg));
                 }
 
                 advance(vm); // accept = += -= *= /= %=
                 expression(vm);
 
-                // emit set
+                // emit op
                 switch (op_type) {
-                    .plus_equal => vm.emitOp(.add_set),
-                    .minus_equal => vm.emitOp(.subtract_set),
-                    .star_equal => vm.emitOp(.multiply_set),
-                    .slash_equal => vm.emitOp(.divide_set),
-                    .percent_equal => vm.emitOp(.modulus_set),
-                    else => vm.emitOpByte(set_op, @intCast(u8, arg)),
+                    .plus_equal => vm.emitOp(.add),
+                    .minus_equal => vm.emitOp(.subtract),
+                    .star_equal => vm.emitOp(.multiply),
+                    .slash_equal => vm.emitOp(.divide),
+                    .percent_equal => vm.emitOp(.modulus),
+                    else => {},
                 }
 
+                // emit set
+                vm.emitOpByte(set_op, @intCast(u8, arg));
                 return true;
             },
             else => {},
