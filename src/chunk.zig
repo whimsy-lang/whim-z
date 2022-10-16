@@ -22,6 +22,7 @@ pub const OpCode = enum(u8) {
     define_property_var,
     define_property_var_pop,
     get_property,
+    get_property_pop,
     set_property,
     equal,
     not_equal,
