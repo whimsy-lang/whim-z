@@ -169,7 +169,7 @@ pub const Compiler = struct {
     }
 
     fn makeConstant(vm: *Vm, value: Value) u8 {
-        const constant = vm.currentChunk().addConstant(value);
+        const constant = vm.currentChunk().getAddConstant(value);
         if (constant > std.math.maxInt(u8)) {
             error_(vm, "Too many constants in one chunk.");
             return 0;

@@ -84,7 +84,10 @@ pub const Chunk = struct {
         };
     }
 
-    pub fn addConstant(self: *Self, value: Value) usize {
+    pub fn getAddConstant(self: *Self, value: Value) usize {
+        for (self.constants.items) |val, ind| {
+            if (value.equal(val)) return ind;
+        }
         self.constants.append(value) catch {
             std.debug.print("Could not add constant to chunk.", .{});
             std.process.exit(1);

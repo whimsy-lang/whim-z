@@ -252,7 +252,6 @@ compiled: *.whir
 * support other key types for hash tables
 * string hash set (instead of table with nil values) for interning
 * utf8
-* constant deduplication
 * separate sized jumps
 * have exit jumps jump straight to the end instead of chaining
 * don't emit (nil and return) if the last line is already a return
