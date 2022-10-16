@@ -55,6 +55,7 @@ pub const TokenType = enum {
     nil,
     or_,
     return_,
+    then,
     true,
     // ends
     class_end,
@@ -188,51 +189,49 @@ pub const Lexer = struct {
             '_' => if (cur.len == 1) return .underscore,
             'a' => return checkKeyword(cur[1..], "nd", .and_),
             'b' => return checkKeyword(cur[1..], "reak", .break_),
-            'c' => {
-                if (cur.len > 1) {
-                    switch (cur[1]) {
-                        'l' => return checkKeyword(cur[2..], "ass", .class),
-                        'o' => return checkKeyword(cur[2..], "ntinue", .continue_),
-                        else => {},
-                    }
+            'c' => if (cur.len > 1) {
+                switch (cur[1]) {
+                    'l' => return checkKeyword(cur[2..], "ass", .class),
+                    'o' => return checkKeyword(cur[2..], "ntinue", .continue_),
+                    else => {},
                 }
             },
             'd' => return checkKeyword(cur[1..], "o", .do),
-            'e' => {
-                if (cur.len == 4 and cur[1] == 'l') {
-                    switch (cur[2]) {
-                        'i' => return checkKeyword(cur[3..], "f", .elif),
-                        's' => return checkKeyword(cur[3..], "e", .else_),
-                        else => {},
-                    }
+            'e' => if (cur.len == 4 and cur[1] == 'l') {
+                switch (cur[2]) {
+                    'i' => return checkKeyword(cur[3..], "f", .elif),
+                    's' => return checkKeyword(cur[3..], "e", .else_),
+                    else => {},
                 }
             },
-            'f' => {
-                if (cur.len > 1) {
-                    switch (cur[1]) {
-                        'a' => return checkKeyword(cur[2..], "lse", .false),
-                        'n' => if (cur.len == 2) return .fn_,
-                        'o' => return checkKeyword(cur[2..], "r", .for_),
-                        'r' => return checkKeyword(cur[2..], "om", .from),
-                        else => {},
-                    }
+            'f' => if (cur.len > 1) {
+                switch (cur[1]) {
+                    'a' => return checkKeyword(cur[2..], "lse", .false),
+                    'n' => if (cur.len == 2) return .fn_,
+                    'o' => return checkKeyword(cur[2..], "r", .for_),
+                    'r' => return checkKeyword(cur[2..], "om", .from),
+                    else => {},
                 }
             },
-            'i' => {
-                if (cur.len == 2) {
-                    switch (cur[1]) {
-                        'f' => return .if_,
-                        'n' => return .in,
-                        's' => return .is,
-                        else => {},
-                    }
+            'i' => if (cur.len == 2) {
+                switch (cur[1]) {
+                    'f' => return .if_,
+                    'n' => return .in,
+                    's' => return .is,
+                    else => {},
                 }
             },
             'l' => return checkKeyword(cur[1..], "oop", .loop),
             'n' => return checkKeyword(cur[1..], "il", .nil),
             'o' => return checkKeyword(cur[1..], "r", .or_),
             'r' => return checkKeyword(cur[1..], "eturn", .return_),
-            't' => return checkKeyword(cur[1..], "rue", .true),
+            't' => if (cur.len == 4) {
+                switch (cur[1]) {
+                    'h' => return checkKeyword(cur[2..], "en", .then),
+                    'r' => return checkKeyword(cur[2..], "ue", .true),
+                    else => {},
+                }
+            },
             else => {},
         }
         return .identifier;
@@ -293,18 +292,16 @@ pub const Lexer = struct {
                 ',' => return self.token(.comma),
                 '.' => return self.token(.dot),
                 ';' => return self.token(.semicolon),
-                ':' => {
-                    switch (self.peek()) {
-                        ':' => {
-                            _ = self.advance();
-                            return self.token(.colon_colon);
-                        },
-                        '=' => {
-                            _ = self.advance();
-                            return self.token(.colon_equal);
-                        },
-                        else => return self.errorToken("Unexpected character."),
-                    }
+                ':' => switch (self.peek()) {
+                    ':' => {
+                        _ = self.advance();
+                        return self.token(.colon_colon);
+                    },
+                    '=' => {
+                        _ = self.advance();
+                        return self.token(.colon_equal);
+                    },
+                    else => return self.errorToken("Unexpected character."),
                 },
                 '!' => return self.token(if (self.match('=')) .bang_equal else .bang),
                 '=' => return self.token(if (self.match('=')) .equal_equal else .equal),
@@ -313,91 +310,87 @@ pub const Lexer = struct {
                 '+' => return self.token(if (self.match('=')) .plus_equal else .plus),
                 '-' => return self.token(if (self.match('=')) .minus_equal else .minus),
                 '%' => return self.token(if (self.match('=')) .percent_equal else .percent),
-                '*' => {
-                    switch (self.peek()) {
-                        '=' => {
-                            _ = self.advance();
-                            return self.token(.star_equal);
-                        },
-                        '/' => {
-                            _ = self.advance();
-                            self.resetLength();
-                        },
-                        else => return self.token(.star),
-                    }
+                '*' => switch (self.peek()) {
+                    '=' => {
+                        _ = self.advance();
+                        return self.token(.star_equal);
+                    },
+                    '/' => {
+                        _ = self.advance();
+                        self.resetLength();
+                    },
+                    else => return self.token(.star),
                 },
-                '/' => {
-                    switch (self.peek()) {
-                        '=' => {
-                            _ = self.advance();
-                            return self.token(.slash_equal);
-                        },
-                        '/' => {
-                            _ = self.advance();
-                            while (self.peek() != '\n' and !self.isAtEnd()) : (_ = self.advance()) {}
-                            self.resetLength();
-                        },
-                        '*' => {
-                            _ = self.advance();
-                            self.skipBlockComment();
-                        },
-                        'c' => {
-                            if (self.peekAt(1) == 'l' and
-                                self.peekAt(2) == 'a' and
-                                self.peekAt(3) == 's' and
-                                self.peekAt(4) == 's' and
-                                !isAlphaOrDigit(self.peekAt(5)))
-                            {
-                                self.advanceMulti(5);
-                                return self.token(.class_end);
-                            }
-                            return self.token(.slash);
-                        },
-                        'd' => {
-                            if (self.peekAt(1) == 'o' and !isAlphaOrDigit(self.peekAt(2))) {
-                                self.advanceMulti(2);
-                                return self.token(.do_end);
-                            }
-                            return self.token(.slash);
-                        },
-                        'f' => {
-                            switch (self.peekAt(1)) {
-                                'n' => {
-                                    if (!isAlphaOrDigit(self.peekAt(2))) {
-                                        self.advanceMulti(2);
-                                        return self.token(.fn_end);
-                                    }
-                                },
-                                'o' => {
-                                    if (self.peekAt(2) == 'r' and !isAlphaOrDigit(self.peekAt(3))) {
-                                        self.advanceMulti(3);
-                                        return self.token(.for_end);
-                                    }
-                                },
-                                else => {},
-                            }
-                            return self.token(.slash);
-                        },
-                        'i' => {
-                            if (self.peekAt(1) == 'f' and !isAlphaOrDigit(self.peekAt(2))) {
-                                self.advanceMulti(2);
-                                return self.token(.if_end);
-                            }
-                            return self.token(.slash);
-                        },
-                        'l' => {
-                            if (self.peekAt(1) == 'o' and
-                                self.peekAt(2) == 'o' and
-                                self.peekAt(3) == 'p' and
-                                !isAlphaOrDigit(self.peekAt(4)))
-                            {
-                                self.advanceMulti(4);
-                                return self.token(.loop_end);
-                            }
-                            return self.token(.slash);
-                        },
-                        else => return self.token(.slash),
-                    }
+                '/' => switch (self.peek()) {
+                    '=' => {
+                        _ = self.advance();
+                        return self.token(.slash_equal);
+                    },
+                    '/' => {
+                        _ = self.advance();
+                        while (self.peek() != '\n' and !self.isAtEnd()) : (_ = self.advance()) {}
+                        self.resetLength();
+                    },
+                    '*' => {
+                        _ = self.advance();
+                        self.skipBlockComment();
+                    },
+                    'c' => {
+                        if (self.peekAt(1) == 'l' and
+                            self.peekAt(2) == 'a' and
+                            self.peekAt(3) == 's' and
+                            self.peekAt(4) == 's' and
+                            !isAlphaOrDigit(self.peekAt(5)))
+                        {
+                            self.advanceMulti(5);
+                            return self.token(.class_end);
+                        }
+                        return self.token(.slash);
+                    },
+                    'd' => {
+                        if (self.peekAt(1) == 'o' and !isAlphaOrDigit(self.peekAt(2))) {
+                            self.advanceMulti(2);
+                            return self.token(.do_end);
+                        }
+                        return self.token(.slash);
+                    },
+                    'f' => {
+                        switch (self.peekAt(1)) {
+                            'n' => {
+                                if (!isAlphaOrDigit(self.peekAt(2))) {
+                                    self.advanceMulti(2);
+                                    return self.token(.fn_end);
+                                }
+                            },
+                            'o' => {
+                                if (self.peekAt(2) == 'r' and !isAlphaOrDigit(self.peekAt(3))) {
+                                    self.advanceMulti(3);
+                                    return self.token(.for_end);
+                                }
+                            },
+                            else => {},
+                        }
+                        return self.token(.slash);
+                    },
+                    'i' => {
+                        if (self.peekAt(1) == 'f' and !isAlphaOrDigit(self.peekAt(2))) {
+                            self.advanceMulti(2);
+                            return self.token(.if_end);
+                        }
+                        return self.token(.slash);
+                    },
+                    'l' => {
+                        if (self.peekAt(1) == 'o' and
+                            self.peekAt(2) == 'o' and
+                            self.peekAt(3) == 'p' and
+                            !isAlphaOrDigit(self.peekAt(4)))
+                        {
+                            self.advanceMulti(4);
+                            return self.token(.loop_end);
+                        }
+                        return self.token(.slash);
+                    },
+                    else => return self.token(.slash),
                 },
                 '\'', '"' => return self.string(c),
                 else => return self.errorToken("Unexpected character."),

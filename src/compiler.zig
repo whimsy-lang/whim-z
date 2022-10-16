@@ -655,6 +655,9 @@ pub const Compiler = struct {
     fn ifStatement(vm: *Vm) void {
         expression(vm);
 
+        // optional then
+        _ = match(vm, .then);
+
         var then_jump = emitJump(vm, .jump_if_false_pop);
 
         beginScope(vm);
@@ -673,6 +676,9 @@ pub const Compiler = struct {
 
         while (match(vm, .elif)) {
             expression(vm);
+
+            // optional then
+            _ = match(vm, .then);
 
             then_jump = emitJump(vm, .jump_if_false_pop);
 
