@@ -1,10 +1,18 @@
 // simple test file
 
-fib :: fn(n)
-    if n < 2 return n /if
-    return fib(n - 2) + fib(n - 1)
+outer :: fn()
+    x := 'outside'
+    inner :: fn()
+        x += ' ah'
+        moreInner :: fn()
+            x += ' hi'
+            print(x)
+        /fn
+
+        moreInner()
+    /fn
+
+    inner()
 /fn
 
-start :: time()
-print('fib: ', fib(4))
-print('elapsed: ', time() - start)
+outer()

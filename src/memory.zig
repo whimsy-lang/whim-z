@@ -71,6 +71,11 @@ pub const GcAllocater = struct {
 
     fn freeObject(vm: *Vm, object: Value) void {
         switch (object.getType()) {
+            .closure => {
+                const closure = object.asClosure();
+                vm.allocator.free(closure.upvalues);
+                vm.allocator.destroy(closure);
+            },
             .function => {
                 const function = object.asFunction();
                 function.deinit();
@@ -82,6 +87,7 @@ pub const GcAllocater = struct {
                 string.deinit(vm.allocator);
                 vm.allocator.destroy(string);
             },
+            .upvalue => vm.allocator.destroy(object.asUpvalue()),
             else => unreachable,
         }
     }

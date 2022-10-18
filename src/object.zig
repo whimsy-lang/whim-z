@@ -5,8 +5,35 @@ const Chunk = @import("chunk.zig").Chunk;
 const Value = @import("value.zig").Value;
 const Vm = @import("vm.zig").Vm;
 
+pub const ObjClosure = struct {
+    function: *ObjFunction,
+    upvalues: []?*ObjUpvalue,
+
+    pub fn init(vm: *Vm, func: *ObjFunction) *ObjClosure {
+        const upvalues = vm.allocator.alloc(?*ObjUpvalue, func.upvalue_count) catch {
+            std.debug.print("Could not allocate memory for closure.", .{});
+            std.process.exit(1);
+        };
+        var i: usize = 0;
+        while (i < func.upvalue_count) : (i += 1) {
+            upvalues[i] = null;
+        }
+
+        const closure = vm.allocator.create(ObjClosure) catch {
+            std.debug.print("Could not allocate memory for closure.", .{});
+            std.process.exit(1);
+        };
+        vm.registerObject(Value.closure(closure));
+
+        closure.function = func;
+        closure.upvalues = upvalues;
+        return closure;
+    }
+};
+
 pub const ObjFunction = struct {
     arity: usize,
+    upvalue_count: usize,
     chunk: Chunk,
     name: ?*ObjString,
 
@@ -18,6 +45,7 @@ pub const ObjFunction = struct {
         vm.registerObject(Value.function(function));
 
         function.arity = 0;
+        function.upvalue_count = 0;
         function.name = null;
         function.chunk = Chunk.init(vm.allocator);
         return function;
@@ -144,5 +172,20 @@ pub const ObjString = struct {
             hash *%= 16777619;
         }
         return hash;
+    }
+};
+
+pub const ObjUpvalue = struct {
+    location: *Value,
+
+    pub fn init(vm: *Vm, slot: *Value) *ObjUpvalue {
+        const upvalue = vm.allocator.create(ObjUpvalue) catch {
+            std.debug.print("Could not allocate memory for upvalue.", .{});
+            std.process.exit(1);
+        };
+        vm.registerObject(Value.upvalue(upvalue));
+
+        upvalue.location = slot;
+        return upvalue;
     }
 };

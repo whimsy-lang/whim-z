@@ -44,6 +44,11 @@ pub const Compiler = struct {
         depth: isize,
     };
 
+    const Upvalue = struct {
+        index: u8,
+        is_local: bool,
+    };
+
     const Loop = struct {
         start: usize,
         exit: isize,
@@ -55,12 +60,13 @@ pub const Compiler = struct {
         script,
     };
 
-    enclosing: *Compiler,
+    enclosing: ?*Compiler,
     function: ?*ObjFunction,
     fn_type: FunctionType,
 
     locals: [u8_count]Local,
     local_count: usize,
+    upvalues: [u8_count]Upvalue,
     loops: [max_loop]Loop,
     loop_count: usize,
     scope_depth: isize,
@@ -183,22 +189,22 @@ pub const Compiler = struct {
 
     fn endCompiler(vm: *Vm) *ObjFunction {
         emitReturn(vm);
-        const func = vm.compiler.function.?;
+        const func = vm.compiler.?.function.?;
 
         if (debug.print_code and !vm.parser.had_error) {
             debug.disassembleChunk(vm.currentChunk(), if (func.name != null) func.name.?.chars else "<script>");
         }
 
-        vm.compiler = vm.compiler.enclosing;
+        vm.compiler = vm.compiler.?.enclosing;
         return func;
     }
 
     fn beginScope(vm: *Vm) void {
-        vm.compiler.scope_depth += 1;
+        vm.compiler.?.scope_depth += 1;
     }
 
     fn endScope(vm: *Vm) void {
-        var comp = vm.compiler;
+        var comp = vm.compiler.?;
         comp.scope_depth -= 1;
 
         while (comp.local_count > 0 and comp.locals[comp.local_count - 1].depth > comp.scope_depth) {
@@ -208,9 +214,9 @@ pub const Compiler = struct {
     }
 
     fn scopePop(vm: *Vm, depth: isize) void {
-        var i = @intCast(isize, vm.compiler.local_count) - 1;
+        var i = @intCast(isize, vm.compiler.?.local_count) - 1;
         while (i >= 0) : (i -= 1) {
-            if (vm.compiler.locals[@intCast(usize, i)].depth < depth) return;
+            if (vm.compiler.?.locals[@intCast(usize, i)].depth < depth) return;
             vm.emitOp(.pop);
         }
     }
@@ -220,7 +226,7 @@ pub const Compiler = struct {
     }
 
     fn addLocal(vm: *Vm, identifier: Token, constant: bool) void {
-        var comp = vm.compiler;
+        var comp = vm.compiler.?;
         if (comp.local_count == u8_count) {
             error_(vm, "Too many local variables in block.");
             return;
@@ -234,12 +240,12 @@ pub const Compiler = struct {
     }
 
     fn markInitialized(vm: *Vm) void {
-        var comp = vm.compiler;
+        var comp = vm.compiler.?;
         comp.locals[comp.local_count - 1].depth = comp.scope_depth;
     }
 
     fn declareLocal(vm: *Vm, identifier: *Token, constant: bool) void {
-        if (vm.compiler.resolveLocal(identifier) != -1) {
+        if (vm.compiler.?.resolveLocal(identifier) != -1) {
             error_(vm, "A variable with this name already exists.");
         }
 
@@ -255,6 +261,54 @@ pub const Compiler = struct {
             }
         }
         return -1;
+    }
+
+    fn addUpvalue(self: *Self, vm: *Vm, index: u8, is_local: bool) usize {
+        const upvalue_count = self.function.?.upvalue_count;
+
+        var i: usize = 0;
+        while (i < upvalue_count) : (i += 1) {
+            const upvalue = &self.upvalues[i];
+            if (upvalue.index == index and upvalue.is_local == is_local) {
+                return i;
+            }
+        }
+
+        if (upvalue_count == u8_count) {
+            error_(vm, "Too many closure variables in function.");
+            return 0;
+        }
+
+        self.upvalues[upvalue_count].is_local = is_local;
+        self.upvalues[upvalue_count].index = index;
+        self.function.?.upvalue_count += 1;
+        return upvalue_count;
+    }
+
+    fn resolveUpvalue(self: *Self, vm: *Vm, identifier: *Token) isize {
+        if (self.enclosing == null) return -1;
+
+        const local = self.enclosing.?.resolveLocal(identifier);
+        if (local != -1) {
+            return @intCast(isize, self.addUpvalue(vm, @intCast(u8, local), true));
+        }
+
+        const upvalue = self.enclosing.?.resolveUpvalue(vm, identifier);
+        if (upvalue != -1) {
+            return @intCast(isize, self.addUpvalue(vm, @intCast(u8, upvalue), false));
+        }
+
+        return -1;
+    }
+
+    fn getUpvalueLocal(vm: *Vm, upvalue_index: usize) *Local {
+        var comp = vm.compiler.?;
+        var index = upvalue_index;
+        while (!comp.upvalues[index].is_local) {
+            index = comp.upvalues[index].index;
+            comp = comp.enclosing.?;
+        }
+        return &comp.enclosing.?.locals[comp.upvalues[index].index];
     }
 
     fn defineGlobal(vm: *Vm, global: u8, constant: bool) void {
@@ -377,7 +431,7 @@ pub const Compiler = struct {
     fn function(vm: *Vm) void {
         var compiler: Compiler = undefined;
         compiler.init(vm, .function);
-        if (vm.compiler.enclosing.encountered_identifier) |name| {
+        if (vm.compiler.?.enclosing.?.encountered_identifier) |name| {
             compiler.function.?.name = ObjString.copy(vm, name);
         }
         beginScope(vm);
@@ -385,8 +439,8 @@ pub const Compiler = struct {
         consume(vm, .left_paren, "Expect '(' after fn.");
         if (!check(vm, .right_paren)) {
             while (true) {
-                vm.compiler.function.?.arity += 1;
-                if (vm.compiler.function.?.arity > std.math.maxInt(u8)) {
+                vm.compiler.?.function.?.arity += 1;
+                if (vm.compiler.?.function.?.arity > std.math.maxInt(u8)) {
                     errorAtCurrent(vm, "Can't have more than 255 parameters.");
                 }
                 consume(vm, .identifier, "Expect parameter name.");
@@ -399,7 +453,13 @@ pub const Compiler = struct {
         block(vm, .fn_end, "Expect '/fn' after block.");
 
         const new_func = endCompiler(vm);
-        vm.emitOpByte(.constant, makeConstant(vm, Value.function(new_func)));
+        vm.emitOpByte(.closure, makeConstant(vm, Value.function(new_func)));
+
+        var i: usize = 0;
+        while (i < new_func.upvalue_count) : (i += 1) {
+            vm.emitByte(if (compiler.upvalues[i].is_local) 1 else 0);
+            vm.emitByte(compiler.upvalues[i].index);
+        }
     }
 
     fn groupingPrimary(vm: *Vm) bool {
@@ -465,9 +525,9 @@ pub const Compiler = struct {
 
                 const constant = op_type == .colon_colon;
 
-                vm.compiler.encountered_identifier = vm.parser.previous.value;
+                vm.compiler.?.encountered_identifier = vm.parser.previous.value;
 
-                if (vm.compiler.scope_depth > 0) {
+                if (vm.compiler.?.scope_depth > 0) {
                     // local
                     declareLocal(vm, &vm.parser.previous, constant);
                     advance(vm); // accept :: :=
@@ -492,22 +552,33 @@ pub const Compiler = struct {
             .equal, .plus_equal, .minus_equal, .star_equal, .slash_equal, .percent_equal => {
                 // assignment
 
-                vm.compiler.encountered_identifier = vm.parser.previous.value;
+                vm.compiler.?.encountered_identifier = vm.parser.previous.value;
 
-                var arg = vm.compiler.resolveLocal(&vm.parser.previous);
+                var arg = vm.compiler.?.resolveLocal(&vm.parser.previous);
                 var get_op = OpCode.get_local;
                 var set_op = OpCode.set_local;
 
                 if (arg != -1) {
                     // local
-                    if (vm.compiler.locals[@intCast(usize, arg)].constant) {
+                    if (vm.compiler.?.locals[@intCast(usize, arg)].constant) {
                         error_(vm, "Local is constant.");
                     }
                 } else {
-                    // global
-                    arg = identifierConstant(vm, &vm.parser.previous);
-                    get_op = .get_global;
-                    set_op = .set_global;
+                    arg = vm.compiler.?.resolveUpvalue(vm, &vm.parser.previous);
+                    if (arg != -1) {
+                        // upvalue
+                        const local = getUpvalueLocal(vm, @intCast(usize, arg));
+                        if (local.constant) {
+                            error_(vm, "Local is constant.");
+                        }
+                        get_op = .get_upvalue;
+                        set_op = .set_upvalue;
+                    } else {
+                        // global
+                        arg = identifierConstant(vm, &vm.parser.previous);
+                        get_op = .get_global;
+                        set_op = .set_global;
+                    }
                 }
 
                 if (op_type != .equal) {
@@ -542,12 +613,17 @@ pub const Compiler = struct {
     fn variable(vm: *Vm) void {
         var name = vm.parser.previous;
         var op: OpCode = undefined;
-        var arg = vm.compiler.resolveLocal(&name);
+        var arg = vm.compiler.?.resolveLocal(&name);
         if (arg != -1) {
             op = .get_local;
         } else {
-            arg = identifierConstant(vm, &name);
-            op = .get_global;
+            arg = vm.compiler.?.resolveUpvalue(vm, &name);
+            if (arg != -1) {
+                op = .get_upvalue;
+            } else {
+                arg = identifierConstant(vm, &name);
+                op = .get_global;
+            }
         }
         vm.emitOpByte(op, @intCast(u8, arg));
     }
@@ -593,7 +669,7 @@ pub const Compiler = struct {
     }
 
     fn breakStatement(vm: *Vm) void {
-        if (vm.compiler.loop_count == 0) {
+        if (vm.compiler.?.loop_count == 0) {
             error_(vm, "Cannot break, not in a loop.");
             return;
         }
@@ -602,7 +678,7 @@ pub const Compiler = struct {
 
         const skip_jump = emitJump(vm, .jump_if_false_pop);
 
-        const loop = &vm.compiler.loops[vm.compiler.loop_count - 1];
+        const loop = &vm.compiler.?.loops[vm.compiler.?.loop_count - 1];
         scopePop(vm, loop.depth);
         if (loop.exit != -1) patchJump(vm, @intCast(usize, loop.exit));
         loop.exit = @intCast(isize, emitJump(vm, .jump));
@@ -611,7 +687,7 @@ pub const Compiler = struct {
     }
 
     fn continueStatement(vm: *Vm) void {
-        if (vm.compiler.loop_count == 0) {
+        if (vm.compiler.?.loop_count == 0) {
             error_(vm, "Cannot continue, not in a loop.");
             return;
         }
@@ -620,7 +696,7 @@ pub const Compiler = struct {
 
         const skip_jump = emitJump(vm, .jump_if_false_pop);
 
-        const loop = &vm.compiler.loops[vm.compiler.loop_count - 1];
+        const loop = &vm.compiler.?.loops[vm.compiler.?.loop_count - 1];
         scopePop(vm, loop.depth);
         emitLoop(vm, loop.start);
 
@@ -713,18 +789,18 @@ pub const Compiler = struct {
     }
 
     fn loopStatement(vm: *Vm) void {
-        if (vm.compiler.loop_count == max_loop) {
+        if (vm.compiler.?.loop_count == max_loop) {
             error_(vm, "Too many nested loops.");
             return;
         }
 
         beginScope(vm);
 
-        var loop = &vm.compiler.loops[vm.compiler.loop_count];
-        vm.compiler.loop_count += 1;
+        var loop = &vm.compiler.?.loops[vm.compiler.?.loop_count];
+        vm.compiler.?.loop_count += 1;
         loop.start = vm.currentChunk().code.items.len;
         loop.exit = -1;
-        loop.depth = vm.compiler.scope_depth;
+        loop.depth = vm.compiler.?.scope_depth;
 
         while (vm.parser.current.type != .loop_end and vm.parser.current.type != .eof) {
             statement(vm);
@@ -738,7 +814,7 @@ pub const Compiler = struct {
 
         consume(vm, .loop_end, "Expect '/loop' after block.");
 
-        vm.compiler.loop_count -= 1;
+        vm.compiler.?.loop_count -= 1;
     }
 
     fn returnStatement(vm: *Vm) void {
@@ -747,7 +823,7 @@ pub const Compiler = struct {
     }
 
     fn statement(vm: *Vm) void {
-        vm.compiler.encountered_identifier = null;
+        vm.compiler.?.encountered_identifier = null;
 
         if (match(vm, .semicolon)) {
             // empty statement

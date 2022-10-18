@@ -38,6 +38,8 @@ pub fn disassembleInstruction(chunk: *Chunk, offset: usize) usize {
         .set_global => constantInstruction("set global", chunk, offset),
         .get_local => byteInstruction("get local", chunk, offset),
         .set_local => byteInstruction("set local", chunk, offset),
+        .get_upvalue => byteInstruction("get upvalue", chunk, offset),
+        .set_upvalue => byteInstruction("set upvalue", chunk, offset),
         .equal => simpleInstruction("equal", offset),
         .not_equal => simpleInstruction("not equal", offset),
         .greater => simpleInstruction("greater", offset),
@@ -58,6 +60,7 @@ pub fn disassembleInstruction(chunk: *Chunk, offset: usize) usize {
         .jump_if_true_pop => jumpInstruction("jump if true (pop)", 1, chunk, offset),
         .jump_if_false_pop => jumpInstruction("jump if false (pop)", 1, chunk, offset),
         .call => byteInstruction("call", chunk, offset),
+        .closure => closureInstruction("closure", chunk, offset),
         .return_ => simpleInstruction("return", offset),
         else => offset + 1,
     };
@@ -67,6 +70,27 @@ fn byteInstruction(name: []const u8, chunk: *Chunk, offset: usize) usize {
     const index = chunk.code.items[offset + 1];
     std.debug.print("{s: <20} {d:4}\n", .{ name, index });
     return offset + 2;
+}
+
+fn closureInstruction(name: []const u8, chunk: *Chunk, offset: usize) usize {
+    var cur_offset = offset + 1;
+    const constant = chunk.code.items[cur_offset];
+    cur_offset += 1;
+    std.debug.print("{s: <20} {d:4} ", .{ name, constant });
+    chunk.constants.items[constant].print();
+    std.debug.print("\n", .{});
+
+    const function = chunk.constants.items[constant].asFunction();
+    var i: usize = 0;
+    while (i < function.upvalue_count) : (i += 1) {
+        const is_local = chunk.code.items[cur_offset];
+        cur_offset += 1;
+        const index = chunk.code.items[cur_offset];
+        cur_offset += 1;
+        std.debug.print("{d:0>4}      > {s} {d}\n", .{ cur_offset - 2, if (is_local == 1) "local" else "upvalue", index });
+    }
+
+    return cur_offset;
 }
 
 fn constantInstruction(name: []const u8, chunk: *Chunk, offset: usize) usize {
