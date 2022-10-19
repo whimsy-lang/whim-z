@@ -64,6 +64,7 @@ pub const Vm = struct {
     objects: std.ArrayList(Value),
     globals: Map,
     strings: Map,
+    open_upvalues: ?*ObjUpvalue,
 
     frames: [frames_max]CallFrame,
     frame_count: usize,
@@ -120,6 +121,7 @@ pub const Vm = struct {
     fn resetStack(self: *Self) void {
         self.stack_top = &self.stack;
         self.frame_count = 0;
+        self.open_upvalues = null;
     }
 
     fn runtimeError(self: *Self, comptime fmt: []const u8, args: anytype) void {
@@ -218,8 +220,36 @@ pub const Vm = struct {
     }
 
     fn captureUpvalue(self: *Self, local: *Value) *ObjUpvalue {
+        var prev_upvalue: ?*ObjUpvalue = null;
+        var upvalue = self.open_upvalues;
+        while (upvalue != null and @ptrToInt(upvalue.?.location) > @ptrToInt(local)) {
+            prev_upvalue = upvalue;
+            upvalue = upvalue.?.next;
+        }
+
+        if (upvalue != null and upvalue.?.location == local) {
+            return upvalue.?;
+        }
+
         const created_upvalue = ObjUpvalue.init(self, local);
+        created_upvalue.next = upvalue;
+
+        if (prev_upvalue == null) {
+            self.open_upvalues = created_upvalue;
+        } else {
+            prev_upvalue.?.next = created_upvalue;
+        }
+
         return created_upvalue;
+    }
+
+    fn closeUpvalues(self: *Self, last: [*]Value) void {
+        while (self.open_upvalues != null and @ptrToInt(self.open_upvalues.?.location) >= @ptrToInt(last)) {
+            const upvalue = self.open_upvalues.?;
+            upvalue.closed = upvalue.location.*;
+            upvalue.location = &upvalue.closed;
+            self.open_upvalues = upvalue.next;
+        }
     }
 
     const NumBinaryOp = struct {
@@ -453,11 +483,16 @@ pub const Vm = struct {
                         }
                     }
                 },
+                .close_upvalue => {
+                    self.closeUpvalues(self.stack_top - 1);
+                    _ = self.pop();
+                },
                 .return_ => {
                     var new_top = frame.slots;
                     if (frame.pop_one) new_top -= 1;
 
                     const result = self.pop();
+                    self.closeUpvalues(new_top);
                     self.frame_count -= 1;
                     if (self.frame_count == 0) {
                         _ = self.pop();

@@ -177,6 +177,8 @@ pub const ObjString = struct {
 
 pub const ObjUpvalue = struct {
     location: *Value,
+    closed: Value,
+    next: ?*ObjUpvalue,
 
     pub fn init(vm: *Vm, slot: *Value) *ObjUpvalue {
         const upvalue = vm.allocator.create(ObjUpvalue) catch {
@@ -186,6 +188,8 @@ pub const ObjUpvalue = struct {
         vm.registerObject(Value.upvalue(upvalue));
 
         upvalue.location = slot;
+        upvalue.closed = Value.nil();
+        upvalue.next = null;
         return upvalue;
     }
 };

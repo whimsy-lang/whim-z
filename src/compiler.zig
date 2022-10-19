@@ -42,6 +42,7 @@ pub const Compiler = struct {
         name: Token,
         constant: bool,
         depth: isize,
+        is_captured: bool,
     };
 
     const Upvalue = struct {
@@ -208,16 +209,25 @@ pub const Compiler = struct {
         comp.scope_depth -= 1;
 
         while (comp.local_count > 0 and comp.locals[comp.local_count - 1].depth > comp.scope_depth) {
-            vm.emitOp(.pop);
+            if (comp.locals[comp.local_count - 1].is_captured) {
+                vm.emitOp(.close_upvalue);
+            } else {
+                vm.emitOp(.pop);
+            }
             comp.local_count -= 1;
         }
     }
 
     fn scopePop(vm: *Vm, depth: isize) void {
-        var i = @intCast(isize, vm.compiler.?.local_count) - 1;
+        const comp = vm.compiler.?;
+        var i = @intCast(isize, comp.local_count) - 1;
         while (i >= 0) : (i -= 1) {
-            if (vm.compiler.?.locals[@intCast(usize, i)].depth < depth) return;
-            vm.emitOp(.pop);
+            if (comp.locals[@intCast(usize, i)].depth < depth) return;
+            if (comp.locals[@intCast(usize, i)].is_captured) {
+                vm.emitOp(.close_upvalue);
+            } else {
+                vm.emitOp(.pop);
+            }
         }
     }
 
@@ -237,6 +247,7 @@ pub const Compiler = struct {
         local.name = identifier;
         local.constant = constant;
         local.depth = -1;
+        local.is_captured = false;
     }
 
     fn markInitialized(vm: *Vm) void {
@@ -290,6 +301,7 @@ pub const Compiler = struct {
 
         const local = self.enclosing.?.resolveLocal(identifier);
         if (local != -1) {
+            self.enclosing.?.locals[@intCast(usize, local)].is_captured = true;
             return @intCast(isize, self.addUpvalue(vm, @intCast(u8, local), true));
         }
 
