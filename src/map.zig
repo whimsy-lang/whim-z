@@ -1,6 +1,7 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
+const GcAllocator = @import("memory.zig").GcAllocater;
 const ObjString = @import("object.zig").ObjString;
 const Value = @import("value.zig").Value;
 
@@ -10,8 +11,6 @@ pub const ValueContainer = struct {
 };
 
 pub const Map = struct {
-    const Self = @This();
-
     const Entry = struct {
         key: ?*ObjString,
         value: ValueContainer,
@@ -23,7 +22,7 @@ pub const Map = struct {
     count: usize,
     entries: []Entry,
 
-    pub fn init(allocator: Allocator) Self {
+    pub fn init(allocator: Allocator) Map {
         return .{
             .allocator = allocator,
             .count = 0,
@@ -31,7 +30,7 @@ pub const Map = struct {
         };
     }
 
-    pub fn deinit(self: *Self) void {
+    pub fn deinit(self: *Map) void {
         self.allocator.free(self.entries);
         self.count = 0;
         self.entries = &[_]Entry{};
@@ -42,7 +41,7 @@ pub const Map = struct {
         return if (capacity < 8) 8 else capacity * 2;
     }
 
-    fn adjustCapacity(self: *Self, capacity: usize) void {
+    fn adjustCapacity(self: *Map, capacity: usize) void {
         const entries = self.allocator.alloc(Entry, capacity) catch {
             std.debug.print("Could not allocate memory for map.", .{});
             std.process.exit(1);
@@ -89,7 +88,7 @@ pub const Map = struct {
         }
     }
 
-    pub fn findString(self: *Self, chars: []const u8, hash: u32) ?*ObjString {
+    pub fn findString(self: *Map, chars: []const u8, hash: u32) ?*ObjString {
         if (self.count == 0) return null;
 
         var index = hash % self.entries.len;
@@ -107,7 +106,7 @@ pub const Map = struct {
         }
     }
 
-    fn ensureCapacity(self: *Self) void {
+    fn ensureCapacity(self: *Map) void {
         if (@intToFloat(f64, self.count + 1) > @intToFloat(f64, self.entries.len) * max_load) {
             const capacity = growCapacity(self.entries.len);
             self.adjustCapacity(capacity);
@@ -115,7 +114,7 @@ pub const Map = struct {
     }
 
     // adds an item if it doesn't already exist, and returns whether the add succeeded
-    pub fn add(self: *Self, key: *ObjString, value: Value, constant: bool) bool {
+    pub fn add(self: *Map, key: *ObjString, value: Value, constant: bool) bool {
         self.ensureCapacity();
 
         const entry = findEntry(self.entries, key);
@@ -131,7 +130,7 @@ pub const Map = struct {
         return is_new_key;
     }
 
-    pub fn get(self: *Self, key: *ObjString, value: *Value) bool {
+    pub fn get(self: *Map, key: *ObjString, value: *Value) bool {
         if (self.count == 0) return false;
 
         const entry = findEntry(self.entries, key);
@@ -141,7 +140,7 @@ pub const Map = struct {
         return true;
     }
 
-    pub fn getPtr(self: *Self, key: *ObjString, value: **ValueContainer) bool {
+    pub fn getPtr(self: *Map, key: *ObjString, value: **ValueContainer) bool {
         if (self.count == 0) return false;
 
         const entry = findEntry(self.entries, key);
@@ -151,7 +150,7 @@ pub const Map = struct {
         return true;
     }
 
-    pub fn set(self: *Self, key: *ObjString, value: Value) bool {
+    pub fn set(self: *Map, key: *ObjString, value: Value) bool {
         self.ensureCapacity();
 
         const entry = findEntry(self.entries, key);
@@ -164,7 +163,7 @@ pub const Map = struct {
         return is_new_key;
     }
 
-    fn delete(self: *Self, key: *ObjString) bool {
+    fn delete(self: *Map, key: *ObjString) bool {
         if (self.count == 0) return false;
 
         // find the entry
@@ -175,5 +174,14 @@ pub const Map = struct {
         entry.key = null;
         entry.value.value = Value.boolean(true);
         return true;
+    }
+
+    pub fn mark(self: *Map) void {
+        for (self.entries) |entry| {
+            if (entry.key) |key| {
+                Value.string(key).mark();
+            }
+            entry.value.value.mark();
+        }
     }
 };

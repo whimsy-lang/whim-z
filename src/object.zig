@@ -2,14 +2,19 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 const Chunk = @import("chunk.zig").Chunk;
+const debug = @import("debug.zig");
 const Value = @import("value.zig").Value;
 const Vm = @import("vm.zig").Vm;
 
 pub const ObjClosure = struct {
     function: *ObjFunction,
     upvalues: []?*ObjUpvalue,
+    is_marked: bool,
 
     pub fn init(vm: *Vm, func: *ObjFunction) *ObjClosure {
+        if (debug.log_gc) {
+            std.debug.print("allocate for closure\n", .{});
+        }
         const upvalues = vm.allocator.alloc(?*ObjUpvalue, func.upvalue_count) catch {
             std.debug.print("Could not allocate memory for closure.", .{});
             std.process.exit(1);
@@ -27,6 +32,7 @@ pub const ObjClosure = struct {
 
         closure.function = func;
         closure.upvalues = upvalues;
+        closure.is_marked = false;
         return closure;
     }
 };
@@ -36,8 +42,12 @@ pub const ObjFunction = struct {
     upvalue_count: usize,
     chunk: Chunk,
     name: ?*ObjString,
+    is_marked: bool,
 
     pub fn init(vm: *Vm) *ObjFunction {
+        if (debug.log_gc) {
+            std.debug.print("allocate for function\n", .{});
+        }
         const function = vm.allocator.create(ObjFunction) catch {
             std.debug.print("Could not allocate memory for function.", .{});
             std.process.exit(1);
@@ -48,6 +58,7 @@ pub const ObjFunction = struct {
         function.upvalue_count = 0;
         function.name = null;
         function.chunk = Chunk.init(vm.allocator);
+        function.is_marked = false;
         return function;
     }
 
@@ -68,8 +79,12 @@ pub const NativeFn = *const fn ([]Value) Value;
 
 pub const ObjNative = struct {
     function: NativeFn,
+    is_marked: bool,
 
     pub fn init(vm: *Vm, native_fn: NativeFn) *ObjNative {
+        if (debug.log_gc) {
+            std.debug.print("allocate for native fn\n", .{});
+        }
         const func = vm.allocator.create(ObjNative) catch {
             std.debug.print("Could not allocate memory for function.", .{});
             std.process.exit(1);
@@ -77,6 +92,7 @@ pub const ObjNative = struct {
         vm.registerObject(Value.native(func));
 
         func.function = native_fn;
+        func.is_marked = false;
         return func;
     }
 };
@@ -84,8 +100,12 @@ pub const ObjNative = struct {
 pub const ObjString = struct {
     chars: []const u8,
     hash: u32,
+    is_marked: bool,
 
     fn init(vm: *Vm, chars: []const u8, hash: u32) *ObjString {
+        if (debug.log_gc) {
+            std.debug.print("allocate for string\n", .{});
+        }
         const string = vm.allocator.create(ObjString) catch {
             std.debug.print("Could not allocate memory for string.", .{});
             std.process.exit(1);
@@ -94,6 +114,7 @@ pub const ObjString = struct {
 
         string.chars = chars;
         string.hash = hash;
+        string.is_marked = false;
 
         _ = vm.strings.set(string, Value.nil());
 
@@ -179,8 +200,12 @@ pub const ObjUpvalue = struct {
     location: *Value,
     closed: Value,
     next: ?*ObjUpvalue,
+    is_marked: bool,
 
     pub fn init(vm: *Vm, slot: *Value) *ObjUpvalue {
+        if (debug.log_gc) {
+            std.debug.print("allocate for upvalue\n", .{});
+        }
         const upvalue = vm.allocator.create(ObjUpvalue) catch {
             std.debug.print("Could not allocate memory for upvalue.", .{});
             std.process.exit(1);
@@ -190,6 +215,7 @@ pub const ObjUpvalue = struct {
         upvalue.location = slot;
         upvalue.closed = Value.nil();
         upvalue.next = null;
+        upvalue.is_marked = false;
         return upvalue;
     }
 };

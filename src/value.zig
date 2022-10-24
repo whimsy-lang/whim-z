@@ -1,5 +1,6 @@
 const std = @import("std");
 
+const debug = @import("debug.zig");
 const ObjClosure = @import("object.zig").ObjClosure;
 const ObjFunction = @import("object.zig").ObjFunction;
 const ObjNative = @import("object.zig").ObjNative;
@@ -129,6 +130,40 @@ pub const Value = struct {
             .native => std.debug.print("<native fn>", .{}),
             .string => std.debug.print("{s}", .{self.asString().chars}),
             .upvalue => std.debug.print("upvalue", .{}),
+        }
+    }
+
+    pub fn mark(self: Value) void {
+        if (self.getMarked()) return;
+        if (debug.log_gc) {
+            std.debug.print("mark {any}: ", .{self.getType()});
+            self.print();
+            std.debug.print("\n", .{});
+        }
+        self.setMarked(true);
+    }
+
+    pub fn getMarked(self: Value) bool {
+        return switch (self.getType()) {
+            .closure => self.asClosure().is_marked,
+            .function => self.asFunction().is_marked,
+            .native => self.asNative().is_marked,
+            .string => self.asString().is_marked,
+            .upvalue => self.asUpvalue().is_marked,
+
+            else => true,
+        };
+    }
+
+    pub fn setMarked(self: Value, mark_val: bool) void {
+        switch (self.getType()) {
+            .closure => self.asClosure().is_marked = mark_val,
+            .function => self.asFunction().is_marked = mark_val,
+            .native => self.asNative().is_marked = mark_val,
+            .string => self.asString().is_marked = mark_val,
+            .upvalue => self.asUpvalue().is_marked = mark_val,
+
+            else => unreachable,
         }
     }
 };

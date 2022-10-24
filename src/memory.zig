@@ -2,51 +2,58 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 const debug = @import("debug.zig");
+const ObjString = @import("object.zig").ObjString;
 const Value = @import("value.zig").Value;
 const Vm = @import("vm.zig").Vm;
 
 pub const GcAllocater = struct {
-    const Self = @This();
-
-    parent_allocator: Allocator,
+    vm: *Vm,
     bytes_allocated: usize,
     next_gc: usize,
 
-    pub fn init(parent_allocator: Allocator) Self {
+    pub fn init(vm: *Vm) GcAllocater {
         return .{
-            .parent_allocator = parent_allocator,
+            .vm = vm,
             .bytes_allocated = 0,
             .next_gc = 1024 * 1024,
         };
     }
 
-    pub fn allocator(self: *Self) Allocator {
+    pub fn allocator(self: *GcAllocater) Allocator {
         return Allocator.init(self, alloc, resize, free);
     }
 
-    fn alloc(self: *Self, len: usize, ptr_align: u29, len_align: u29, ret_addr: usize) error{OutOfMemory}![]u8 {
+    fn alloc(self: *GcAllocater, len: usize, ptr_align: u29, len_align: u29, ret_addr: usize) error{OutOfMemory}![]u8 {
         if ((self.bytes_allocated + len > self.next_gc) or debug.stress_gc) {
-            try self.collectGarbage();
+            try collectGarbage(self.vm);
         }
-        const out = try self.parent_allocator.rawAlloc(len, ptr_align, len_align, ret_addr);
+        const out = try self.vm.parent_allocator.rawAlloc(len, ptr_align, len_align, ret_addr);
+        const before = self.bytes_allocated;
         self.bytes_allocated += out.len;
+        if (debug.log_gc) {
+            std.debug.print("  {d} -> {d}\n", .{ before, self.bytes_allocated });
+        }
         return out;
     }
 
-    fn resize(self: *Self, buf: []u8, buf_align: u29, new_len: usize, len_align: u29, ret_addr: usize) ?usize {
+    fn resize(self: *GcAllocater, buf: []u8, buf_align: u29, new_len: usize, len_align: u29, ret_addr: usize) ?usize {
         if (new_len > buf.len) {
             if ((self.bytes_allocated + (new_len - buf.len) > self.next_gc) or debug.stress_gc) {
-                self.collectGarbage() catch {
+                collectGarbage(self.vm) catch {
                     return null;
                 };
             }
         }
 
-        if (self.parent_allocator.rawResize(buf, buf_align, new_len, len_align, ret_addr)) |resized_len| {
+        if (self.vm.parent_allocator.rawResize(buf, buf_align, new_len, len_align, ret_addr)) |resized_len| {
+            const before = self.bytes_allocated;
             if (resized_len > buf.len) {
                 self.bytes_allocated += resized_len - buf.len;
             } else {
                 self.bytes_allocated -= buf.len - resized_len;
+            }
+            if (debug.log_gc) {
+                std.debug.print("  {d} -> {d}\n", .{ before, self.bytes_allocated });
             }
             return resized_len;
         }
@@ -54,13 +61,34 @@ pub const GcAllocater = struct {
         return null;
     }
 
-    fn free(self: *Self, buf: []u8, buf_align: u29, ret_addr: usize) void {
-        self.parent_allocator.rawFree(buf, buf_align, ret_addr);
+    fn free(self: *GcAllocater, buf: []u8, buf_align: u29, ret_addr: usize) void {
+        self.vm.parent_allocator.rawFree(buf, buf_align, ret_addr);
+        const before = self.bytes_allocated;
         self.bytes_allocated -= buf.len;
+        if (debug.log_gc) {
+            std.debug.print("  {d} -> {d}\n", .{ before, self.bytes_allocated });
+        }
     }
 
-    fn collectGarbage(self: *Self) !void {
-        _ = self;
+    fn markRoots(vm: *Vm) void {
+        var slot: [*]Value = &vm.stack;
+        while (@ptrToInt(slot) < @ptrToInt(vm.stack_top)) : (slot += 1) {
+            slot[0].mark();
+        }
+
+        vm.globals.mark();
+    }
+
+    fn collectGarbage(vm: *Vm) !void {
+        if (debug.log_gc) {
+            std.debug.print("-- gc begin\n", .{});
+        }
+
+        markRoots(vm);
+
+        if (debug.log_gc) {
+            std.debug.print("-- gc end\n", .{});
+        }
     }
 
     pub fn freeObjects(vm: *Vm) void {
@@ -70,6 +98,9 @@ pub const GcAllocater = struct {
     }
 
     fn freeObject(vm: *Vm, object: Value) void {
+        if (debug.log_gc) {
+            std.debug.print("free {any}\n", .{object.getType()});
+        }
         switch (object.getType()) {
             .closure => {
                 const closure = object.asClosure();

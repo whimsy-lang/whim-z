@@ -6,7 +6,8 @@ const value = @import("value.zig");
 
 pub const print_code = true;
 pub const trace_execution = true;
-pub const stress_gc = false;
+pub const stress_gc = true;
+pub const log_gc = true;
 
 pub fn disassembleChunk(chunk: *Chunk, name: []const u8) void {
     std.debug.print("== {s} ==\n", .{name});

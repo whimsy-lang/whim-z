@@ -25,7 +25,6 @@ pub const InterpretResult = enum {
 };
 
 pub const Vm = struct {
-    const Self = @This();
     const u8_count = std.math.maxInt(u8) + 1;
     const frames_max = 64;
     const stack_max = frames_max * u8_count;
@@ -75,9 +74,9 @@ pub const Vm = struct {
     parser: Parser,
     compiler: ?*Compiler,
 
-    pub fn init(self: *Self, allocator: Allocator) void {
+    pub fn init(self: *Vm, allocator: Allocator) void {
         self.parent_allocator = allocator;
-        self.gc = GcAllocator.init(self.parent_allocator);
+        self.gc = GcAllocator.init(self);
         self.allocator = self.gc.allocator();
         self.objects = std.ArrayList(Value).init(self.parent_allocator);
 
@@ -91,7 +90,7 @@ pub const Vm = struct {
         self.defineNative("time", nativeTime);
     }
 
-    pub fn deinit(self: *Self) void {
+    pub fn deinit(self: *Vm) void {
         GcAllocator.freeObjects(self);
         self.globals.deinit();
         self.strings.deinit();
@@ -111,20 +110,20 @@ pub const Vm = struct {
         return Value.number(time);
     }
 
-    pub fn registerObject(self: *Self, object: Value) void {
+    pub fn registerObject(self: *Vm, object: Value) void {
         self.objects.append(object) catch {
             std.debug.print("Could not allocate memory to track object.", .{});
             std.process.exit(1);
         };
     }
 
-    fn resetStack(self: *Self) void {
+    fn resetStack(self: *Vm) void {
         self.stack_top = &self.stack;
         self.frame_count = 0;
         self.open_upvalues = null;
     }
 
-    fn runtimeError(self: *Self, comptime fmt: []const u8, args: anytype) void {
+    fn runtimeError(self: *Vm, comptime fmt: []const u8, args: anytype) void {
         std.debug.print(fmt, args);
         std.debug.print("\n", .{});
 
@@ -144,7 +143,7 @@ pub const Vm = struct {
         self.resetStack();
     }
 
-    fn defineNative(self: *Self, name: []const u8, native_fn: NativeFn) void {
+    fn defineNative(self: *Vm, name: []const u8, native_fn: NativeFn) void {
         self.push(Value.string(ObjString.copy(self, name)));
         self.push(Value.native(ObjNative.init(self, native_fn)));
         _ = self.globals.set(self.stack[0].asString(), self.stack[1]);
@@ -152,38 +151,38 @@ pub const Vm = struct {
         _ = self.pop();
     }
 
-    fn peek(self: *Self, offset: usize) Value {
+    fn peek(self: *Vm, offset: usize) Value {
         return (self.stack_top - (offset + 1))[0];
     }
 
-    pub fn push(self: *Self, value: Value) void {
+    pub fn push(self: *Vm, value: Value) void {
         self.stack_top[0] = value;
         self.stack_top += 1;
     }
 
-    pub fn pop(self: *Self) Value {
+    pub fn pop(self: *Vm) Value {
         self.stack_top -= 1;
         return self.stack_top[0];
     }
 
-    pub fn currentChunk(self: *Self) *Chunk {
+    pub fn currentChunk(self: *Vm) *Chunk {
         return &self.compiler.?.function.?.chunk;
     }
 
-    pub fn emitByte(self: *Self, byte: u8) void {
+    pub fn emitByte(self: *Vm, byte: u8) void {
         self.currentChunk().write(byte, self.parser.previous.line);
     }
 
-    pub fn emitOp(self: *Self, op: OpCode) void {
+    pub fn emitOp(self: *Vm, op: OpCode) void {
         self.currentChunk().write(@enumToInt(op), self.parser.previous.line);
     }
 
-    pub fn emitOpByte(self: *Self, op: OpCode, byte: u8) void {
+    pub fn emitOpByte(self: *Vm, op: OpCode, byte: u8) void {
         self.emitOp(op);
         self.emitByte(byte);
     }
 
-    fn call(self: *Self, closure: *ObjClosure, arg_count: u8, pop_one: bool) bool {
+    fn call(self: *Vm, closure: *ObjClosure, arg_count: u8, pop_one: bool) bool {
         if (arg_count != closure.function.arity) {
             self.runtimeError("Expected {d} arguments but got {d}.", .{ closure.function.arity, arg_count });
             return false;
@@ -203,7 +202,7 @@ pub const Vm = struct {
         return true;
     }
 
-    fn callValue(self: *Self, callee: Value, arg_count: u8) bool {
+    fn callValue(self: *Vm, callee: Value, arg_count: u8) bool {
         switch (callee.getType()) {
             .closure => return self.call(callee.asClosure(), arg_count, true),
             .native => {
@@ -219,7 +218,7 @@ pub const Vm = struct {
         return false;
     }
 
-    fn captureUpvalue(self: *Self, local: *Value) *ObjUpvalue {
+    fn captureUpvalue(self: *Vm, local: *Value) *ObjUpvalue {
         var prev_upvalue: ?*ObjUpvalue = null;
         var upvalue = self.open_upvalues;
         while (upvalue != null and @ptrToInt(upvalue.?.location) > @ptrToInt(local)) {
@@ -243,7 +242,7 @@ pub const Vm = struct {
         return created_upvalue;
     }
 
-    fn closeUpvalues(self: *Self, last: [*]Value) void {
+    fn closeUpvalues(self: *Vm, last: [*]Value) void {
         while (self.open_upvalues != null and @ptrToInt(self.open_upvalues.?.location) >= @ptrToInt(last)) {
             const upvalue = self.open_upvalues.?;
             upvalue.closed = upvalue.location.*;
@@ -300,7 +299,7 @@ pub const Vm = struct {
         }
     };
 
-    fn concatenate(self: *Self) void {
+    fn concatenate(self: *Vm) void {
         const b = self.peek(0).asString();
         const a = self.peek(1).asString();
 
@@ -318,7 +317,7 @@ pub const Vm = struct {
         self.push(Value.string(result));
     }
 
-    fn run(self: *Self) InterpretResult {
+    fn run(self: *Vm) InterpretResult {
         var frame = &self.frames[self.frame_count - 1];
 
         while (true) {
@@ -508,7 +507,7 @@ pub const Vm = struct {
         }
     }
 
-    pub fn interpret(self: *Self, source: [:0]const u8) InterpretResult {
+    pub fn interpret(self: *Vm, source: [:0]const u8) InterpretResult {
         const function = Compiler.compile(self, source);
         if (function == null) return .compile_error;
 

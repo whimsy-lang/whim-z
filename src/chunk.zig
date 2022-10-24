@@ -53,13 +53,11 @@ pub const OpCode = enum(u8) {
 };
 
 pub const Chunk = struct {
-    const Self = @This();
-
     code: std.ArrayList(u8),
     lines: std.ArrayList(usize),
     constants: std.ArrayList(Value),
 
-    pub fn init(allocator: Allocator) Self {
+    pub fn init(allocator: Allocator) Chunk {
         return .{
             .code = std.ArrayList(u8).init(allocator),
             .lines = std.ArrayList(usize).init(allocator),
@@ -67,13 +65,13 @@ pub const Chunk = struct {
         };
     }
 
-    pub fn deinit(self: *Self) void {
+    pub fn deinit(self: *Chunk) void {
         self.code.deinit();
         self.lines.deinit();
         self.constants.deinit();
     }
 
-    pub fn write(self: *Self, byte: u8, line: usize) void {
+    pub fn write(self: *Chunk, byte: u8, line: usize) void {
         self.code.append(byte) catch {
             std.debug.print("Could not add byte to chunk.", .{});
             std.process.exit(1);
@@ -84,7 +82,7 @@ pub const Chunk = struct {
         };
     }
 
-    pub fn getAddConstant(self: *Self, value: Value) usize {
+    pub fn getAddConstant(self: *Chunk, value: Value) usize {
         for (self.constants.items) |val, ind| {
             if (value.equal(val)) return ind;
         }

@@ -76,14 +76,12 @@ pub const Token = struct {
 };
 
 pub const Lexer = struct {
-    const Self = @This();
-
     source: [:0]const u8,
     start: usize,
     current: usize,
     line: usize,
 
-    pub fn init(source: [:0]const u8) Self {
+    pub fn init(source: [:0]const u8) Lexer {
         return .{
             .source = source,
             .start = 0,
@@ -92,34 +90,34 @@ pub const Lexer = struct {
         };
     }
 
-    pub fn isAtEnd(self: *Self) bool {
+    pub fn isAtEnd(self: *Lexer) bool {
         return self.source[self.current] == 0;
     }
 
-    fn advance(self: *Self) u8 {
+    fn advance(self: *Lexer) u8 {
         self.current += 1;
         return self.source[self.current - 1];
     }
 
-    fn advanceMulti(self: *Self, count: usize) void {
+    fn advanceMulti(self: *Lexer, count: usize) void {
         self.current += count;
     }
 
-    fn peek(self: *Self) u8 {
+    fn peek(self: *Lexer) u8 {
         return self.source[self.current];
     }
 
-    fn peekAt(self: *Self, offset: usize) u8 {
+    fn peekAt(self: *Lexer, offset: usize) u8 {
         return self.source[self.current + offset];
     }
 
-    fn match(self: *Self, expected: u8) bool {
+    fn match(self: *Lexer, expected: u8) bool {
         if (self.peek() != expected) return false;
         self.current += 1;
         return true;
     }
 
-    fn resetLength(self: *Self) void {
+    fn resetLength(self: *Lexer) void {
         self.start = self.current;
     }
 
@@ -142,7 +140,7 @@ pub const Lexer = struct {
         return .identifier;
     }
 
-    fn token(self: *Self, token_type: TokenType) Token {
+    fn token(self: *Lexer, token_type: TokenType) Token {
         return .{
             .type = token_type,
             .value = self.source[self.start..self.current],
@@ -150,7 +148,7 @@ pub const Lexer = struct {
         };
     }
 
-    fn errorToken(self: *Self, message: []const u8) Token {
+    fn errorToken(self: *Lexer, message: []const u8) Token {
         return .{
             .type = .error_,
             .value = message,
@@ -158,7 +156,7 @@ pub const Lexer = struct {
         };
     }
 
-    fn skipBlockComment(self: *Self) void {
+    fn skipBlockComment(self: *Lexer) void {
         var depth: i32 = 1;
 
         while (depth > 0 and !self.isAtEnd()) {
@@ -183,7 +181,7 @@ pub const Lexer = struct {
         self.resetLength();
     }
 
-    fn identifierType(self: *Self) TokenType {
+    fn identifierType(self: *Lexer) TokenType {
         const cur = self.source[self.start..self.current];
         switch (cur[0]) {
             '_' => if (cur.len == 1) return .underscore,
@@ -237,13 +235,13 @@ pub const Lexer = struct {
         return .identifier;
     }
 
-    fn identifier(self: *Self) Token {
+    fn identifier(self: *Lexer) Token {
         while (isAlphaOrDigit(self.peek())) : (_ = self.advance()) {}
 
         return self.token(self.identifierType());
     }
 
-    fn number(self: *Self) Token {
+    fn number(self: *Lexer) Token {
         while (isDigit(self.peek())) : (_ = self.advance()) {}
 
         if (self.peek() == '.' and isDigit(self.peekAt(1))) {
@@ -256,7 +254,7 @@ pub const Lexer = struct {
         return self.token(.number);
     }
 
-    fn string(self: *Self, first: u8) Token {
+    fn string(self: *Lexer, first: u8) Token {
         while (self.peek() != first and !self.isAtEnd()) {
             if (self.peek() == '\n') self.line += 1;
             if (self.peek() == '\\' and self.peekAt(1) != 0 and self.peekAt(1) != '\n') _ = self.advance();
@@ -270,7 +268,7 @@ pub const Lexer = struct {
         return self.token(.string);
     }
 
-    pub fn lexToken(self: *Self) Token {
+    pub fn lexToken(self: *Lexer) Token {
         self.resetLength();
 
         while (!self.isAtEnd()) {

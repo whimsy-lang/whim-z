@@ -34,7 +34,6 @@ const PrimaryParseFn = *const fn (*Vm) bool;
 const ParseFn = *const fn (*Vm) void;
 
 pub const Compiler = struct {
-    const Self = @This();
     const u8_count = std.math.maxInt(u8) + 1;
     const max_loop = 32;
 
@@ -74,7 +73,7 @@ pub const Compiler = struct {
 
     encountered_identifier: ?[]const u8,
 
-    pub fn init(self: *Self, vm: *Vm, fn_type: FunctionType) void {
+    pub fn init(self: *Compiler, vm: *Vm, fn_type: FunctionType) void {
         self.enclosing = vm.compiler;
         self.function = null;
         self.fn_type = fn_type;
@@ -263,7 +262,7 @@ pub const Compiler = struct {
         addLocal(vm, identifier.*, constant);
     }
 
-    fn resolveLocal(self: *Self, identifier: *Token) isize {
+    fn resolveLocal(self: *Compiler, identifier: *Token) isize {
         var i = @intCast(isize, self.local_count) - 1;
         while (i >= 0) : (i -= 1) {
             const local = &self.locals[@intCast(usize, i)];
@@ -274,7 +273,7 @@ pub const Compiler = struct {
         return -1;
     }
 
-    fn addUpvalue(self: *Self, vm: *Vm, index: u8, is_local: bool) usize {
+    fn addUpvalue(self: *Compiler, vm: *Vm, index: u8, is_local: bool) usize {
         const upvalue_count = self.function.?.upvalue_count;
 
         var i: usize = 0;
@@ -296,7 +295,7 @@ pub const Compiler = struct {
         return upvalue_count;
     }
 
-    fn resolveUpvalue(self: *Self, vm: *Vm, identifier: *Token) isize {
+    fn resolveUpvalue(self: *Compiler, vm: *Vm, identifier: *Token) isize {
         if (self.enclosing == null) return -1;
 
         const local = self.enclosing.?.resolveLocal(identifier);
