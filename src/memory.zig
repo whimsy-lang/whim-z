@@ -1,22 +1,31 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
+const Compiler = @import("compiler.zig").Compiler;
 const debug = @import("debug.zig");
 const ObjString = @import("object.zig").ObjString;
 const Value = @import("value.zig").Value;
 const Vm = @import("vm.zig").Vm;
 
 pub const GcAllocater = struct {
+    const heap_grow_factor = 2;
+
     vm: *Vm,
     bytes_allocated: usize,
     next_gc: usize,
+    gray_stack: std.ArrayList(Value),
 
     pub fn init(vm: *Vm) GcAllocater {
         return .{
             .vm = vm,
             .bytes_allocated = 0,
             .next_gc = 1024 * 1024,
+            .gray_stack = std.ArrayList(Value).init(vm.parent_allocator),
         };
+    }
+
+    pub fn deinit(self: *GcAllocater) void {
+        self.gray_stack.deinit();
     }
 
     pub fn allocator(self: *GcAllocater) Allocator {
@@ -73,21 +82,60 @@ pub const GcAllocater = struct {
     fn markRoots(vm: *Vm) void {
         var slot: [*]Value = &vm.stack;
         while (@ptrToInt(slot) < @ptrToInt(vm.stack_top)) : (slot += 1) {
-            slot[0].mark();
+            slot[0].mark(vm);
         }
 
-        vm.globals.mark();
+        var i: usize = 0;
+        while (i < vm.frame_count) : (i += 1) {
+            Value.closure(vm.frames[i].closure).mark(vm);
+        }
+
+        var upvalue = vm.open_upvalues;
+        while (upvalue) |up| {
+            Value.upvalue(up).mark(vm);
+            upvalue = up.next;
+        }
+
+        vm.globals.mark(vm);
+
+        Compiler.markRoots(vm);
+    }
+
+    fn traceReferences(vm: *Vm) void {
+        while (vm.gc.gray_stack.items.len > 0) {
+            const val = vm.gc.gray_stack.pop();
+            val.blacken(vm);
+        }
+    }
+
+    fn sweep(vm: *Vm) void {
+        var i: usize = 0;
+        while (i < vm.objects.items.len) {
+            if (vm.objects.items[i].getMarked()) {
+                vm.objects.items[i].setMarked(false);
+                i += 1;
+            } else {
+                const unreached = vm.objects.swapRemove(i);
+                freeObject(vm, unreached);
+            }
+        }
     }
 
     fn collectGarbage(vm: *Vm) !void {
+        const before = vm.gc.bytes_allocated;
         if (debug.log_gc) {
             std.debug.print("-- gc begin\n", .{});
         }
 
         markRoots(vm);
+        traceReferences(vm);
+        vm.strings.removeWhite();
+        sweep(vm);
+
+        vm.gc.next_gc = vm.gc.bytes_allocated * heap_grow_factor;
 
         if (debug.log_gc) {
-            std.debug.print("-- gc end\n", .{});
+            std.debug.print("-- gc end | collected {d} bytes (from {d} to {d}) next at {d}\n", .{ before - vm.gc.bytes_allocated, before, vm.gc.bytes_allocated, vm.gc.next_gc });
         }
     }
 

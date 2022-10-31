@@ -94,6 +94,7 @@ pub const Vm = struct {
         GcAllocator.freeObjects(self);
         self.globals.deinit();
         self.strings.deinit();
+        self.gc.deinit();
     }
 
     fn nativePrint(values: []Value) Value {

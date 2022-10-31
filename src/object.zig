@@ -116,7 +116,9 @@ pub const ObjString = struct {
         string.hash = hash;
         string.is_marked = false;
 
+        vm.push(Value.string(string));
         _ = vm.strings.set(string, Value.nil());
+        _ = vm.pop();
 
         return string;
     }

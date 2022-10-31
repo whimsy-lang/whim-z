@@ -4,6 +4,7 @@ const Allocator = std.mem.Allocator;
 const GcAllocator = @import("memory.zig").GcAllocater;
 const ObjString = @import("object.zig").ObjString;
 const Value = @import("value.zig").Value;
+const Vm = @import("vm.zig").Vm;
 
 pub const ValueContainer = struct {
     value: Value,
@@ -176,12 +177,22 @@ pub const Map = struct {
         return true;
     }
 
-    pub fn mark(self: *Map) void {
+    pub fn mark(self: *Map, vm: *Vm) void {
         for (self.entries) |entry| {
             if (entry.key) |key| {
-                Value.string(key).mark();
+                Value.string(key).mark(vm);
             }
-            entry.value.value.mark();
+            entry.value.value.mark(vm);
+        }
+    }
+
+    pub fn removeWhite(self: *Map) void {
+        var i: usize = 0;
+        while (i < self.entries.len) : (i += 1) {
+            const entry = &self.entries[i];
+            if (entry.key != null and !entry.key.?.is_marked) {
+                _ = self.delete(entry.key.?);
+            }
         }
     }
 };

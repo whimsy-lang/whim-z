@@ -86,6 +86,16 @@ pub const Compiler = struct {
         vm.compiler = self;
     }
 
+    pub fn markRoots(vm: *Vm) void {
+        var compiler = vm.compiler;
+        while (compiler) |comp| {
+            if (comp.function) |func| {
+                Value.function(func).mark(vm);
+            }
+            compiler = comp.enclosing;
+        }
+    }
+
     fn errorAt(vm: *Vm, token: *Token, message: []const u8) void {
         if (vm.parser.panic_mode) return;
         vm.parser.panic_mode = true;
@@ -175,7 +185,7 @@ pub const Compiler = struct {
     }
 
     fn makeConstant(vm: *Vm, value: Value) u8 {
-        const constant = vm.currentChunk().getAddConstant(value);
+        const constant = vm.currentChunk().getAddConstant(vm, value);
         if (constant > std.math.maxInt(u8)) {
             error_(vm, "Too many constants in one chunk.");
             return 0;

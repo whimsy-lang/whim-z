@@ -2,6 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 const Value = @import("value.zig").Value;
+const Vm = @import("vm.zig").Vm;
 
 pub const OpCode = enum(u8) {
     constant,
@@ -82,14 +83,18 @@ pub const Chunk = struct {
         };
     }
 
-    pub fn getAddConstant(self: *Chunk, value: Value) usize {
+    pub fn getAddConstant(self: *Chunk, vm: *Vm, value: Value) usize {
         for (self.constants.items) |val, ind| {
             if (value.equal(val)) return ind;
         }
+
+        vm.push(value);
         self.constants.append(value) catch {
             std.debug.print("Could not add constant to chunk.", .{});
             std.process.exit(1);
         };
+        _ = vm.pop();
+
         return self.constants.items.len - 1;
     }
 };

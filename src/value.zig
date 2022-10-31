@@ -6,6 +6,7 @@ const ObjFunction = @import("object.zig").ObjFunction;
 const ObjNative = @import("object.zig").ObjNative;
 const ObjString = @import("object.zig").ObjString;
 const ObjUpvalue = @import("object.zig").ObjUpvalue;
+const Vm = @import("vm.zig").Vm;
 
 pub const ValueType = enum {
     bool,
@@ -133,14 +134,56 @@ pub const Value = struct {
         }
     }
 
-    pub fn mark(self: Value) void {
+    pub fn mark(self: Value, vm: *Vm) void {
         if (self.getMarked()) return;
+
         if (debug.log_gc) {
             std.debug.print("mark {any}: ", .{self.getType()});
             self.print();
             std.debug.print("\n", .{});
         }
+
         self.setMarked(true);
+
+        // don't bother queueing up native functions or strings since they
+        // do not have references to check
+        if (self.getType() == .native or self.getType() == .string) return;
+
+        vm.gc.gray_stack.append(self) catch {
+            std.debug.print("Could not allocate memory for garbage collection.", .{});
+            std.process.exit(1);
+        };
+    }
+
+    fn markArray(arr: *std.ArrayList(Value), vm: *Vm) void {
+        for (arr.items) |val| val.mark(vm);
+    }
+
+    pub fn blacken(self: Value, vm: *Vm) void {
+        if (debug.log_gc) {
+            std.debug.print("blacken {any}: ", .{self.getType()});
+            self.print();
+            std.debug.print("\n", .{});
+        }
+
+        switch (self.getType()) {
+            .closure => {
+                const clos = self.asClosure();
+                Value.function(clos.function).mark(vm);
+                for (clos.upvalues) |upval| {
+                    if (upval) |up| Value.upvalue(up).mark(vm);
+                }
+            },
+            .function => {
+                const func = self.asFunction();
+                if (func.name) |name| {
+                    Value.string(name).mark(vm);
+                }
+                markArray(&func.chunk.constants, vm);
+            },
+            .upvalue => self.asUpvalue().closed.mark(vm),
+            else => unreachable,
+        }
     }
 
     pub fn getMarked(self: Value) bool {
