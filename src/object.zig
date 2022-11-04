@@ -6,6 +6,26 @@ const debug = @import("debug.zig");
 const Value = @import("value.zig").Value;
 const Vm = @import("vm.zig").Vm;
 
+pub const ObjClass = struct {
+    name: ?*ObjString,
+    is_marked: bool,
+
+    pub fn init(vm: *Vm, class_name: ?*ObjString) *ObjClass {
+        if (debug.log_gc) {
+            std.debug.print("allocate for class\n", .{});
+        }
+        const class = vm.allocator.create(ObjClass) catch {
+            std.debug.print("Could not allocate memory for class.", .{});
+            std.process.exit(1);
+        };
+        vm.registerObject(Value.class(class));
+
+        class.name = if (class_name != vm.empty_string) class_name else null;
+        class.is_marked = false;
+        return class;
+    }
+};
+
 pub const ObjClosure = struct {
     function: *ObjFunction,
     upvalues: []?*ObjUpvalue,

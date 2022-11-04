@@ -50,7 +50,6 @@ pub const OpCode = enum(u8) {
     close_upvalue,
     return_,
     class,
-    anon_class,
 };
 
 pub const Chunk = struct {

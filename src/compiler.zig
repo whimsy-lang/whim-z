@@ -360,7 +360,7 @@ pub const Compiler = struct {
             .identifier => variable,
             .string => string,
             .number => number,
-            // .class => class,
+            .class => class,
             .false, .nil, .true => literal,
             .fn_ => function,
             else => null,
@@ -447,6 +447,31 @@ pub const Compiler = struct {
     fn call(vm: *Vm) void {
         const arg_count = argumentList(vm);
         vm.emitOpByte(.call, arg_count);
+    }
+
+    fn class(vm: *Vm) void {
+        vm.emitOp(.class);
+        if (vm.compiler.?.encountered_identifier) |name| {
+            const name_const = makeConstant(vm, Value.string(ObjString.copy(vm, name)));
+            vm.emitByte(name_const);
+        } else {
+            const name_const = makeConstant(vm, Value.string(vm.empty_string.?));
+            vm.emitByte(name_const);
+        }
+
+        if (match(vm, .is)) {
+            const super = makeConstant(vm, Value.string(vm.super_string.?));
+            expression(vm);
+
+            _ = super;
+            // defineProperty(vm, super, false, false);
+        }
+
+        while (!check(vm, .class_end) and !check(vm, .eof)) {
+            // classfield
+        }
+
+        consume(vm, .class_end, "Expect '/class' after block.");
     }
 
     fn function(vm: *Vm) void {

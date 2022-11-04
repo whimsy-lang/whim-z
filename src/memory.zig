@@ -99,6 +99,11 @@ pub const GcAllocater = struct {
         vm.globals.mark(vm);
 
         Compiler.markRoots(vm);
+
+        if (vm.empty_string) |s| Value.string(s).mark(vm);
+        if (vm.init_string) |s| Value.string(s).mark(vm);
+        if (vm.type_string) |s| Value.string(s).mark(vm);
+        if (vm.super_string) |s| Value.string(s).mark(vm);
     }
 
     fn traceReferences(vm: *Vm) void {
@@ -150,6 +155,7 @@ pub const GcAllocater = struct {
             std.debug.print("free {any}\n", .{object.getType()});
         }
         switch (object.getType()) {
+            .class => vm.allocator.destroy(object.asClass()),
             .closure => {
                 const closure = object.asClosure();
                 vm.allocator.free(closure.upvalues);

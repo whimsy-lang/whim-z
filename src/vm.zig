@@ -11,6 +11,7 @@ const Map = @import("map.zig").Map;
 const ValueContainer = @import("map.zig").ValueContainer;
 const GcAllocator = @import("memory.zig").GcAllocater;
 const NativeFn = @import("object.zig").NativeFn;
+const ObjClass = @import("object.zig").ObjClass;
 const ObjClosure = @import("object.zig").ObjClosure;
 const ObjFunction = @import("object.zig").ObjFunction;
 const ObjNative = @import("object.zig").ObjNative;
@@ -65,6 +66,11 @@ pub const Vm = struct {
     strings: Map,
     open_upvalues: ?*ObjUpvalue,
 
+    empty_string: ?*ObjString,
+    init_string: ?*ObjString,
+    type_string: ?*ObjString,
+    super_string: ?*ObjString,
+
     frames: [frames_max]CallFrame,
     frame_count: usize,
     stack: [stack_max]Value,
@@ -86,14 +92,30 @@ pub const Vm = struct {
         self.strings = Map.init(self.allocator);
         self.resetStack();
 
+        self.empty_string = null;
+        self.init_string = null;
+        self.type_string = null;
+        self.super_string = null;
+
+        self.empty_string = ObjString.copy(self, "");
+        self.init_string = ObjString.copy(self, "init");
+        self.type_string = ObjString.copy(self, "type");
+        self.super_string = ObjString.copy(self, "super");
+
         self.defineNative("print", nativePrint);
         self.defineNative("time", nativeTime);
     }
 
     pub fn deinit(self: *Vm) void {
-        GcAllocator.freeObjects(self);
+        self.empty_string = null;
+        self.init_string = null;
+        self.type_string = null;
+        self.super_string = null;
+
         self.globals.deinit();
         self.strings.deinit();
+
+        GcAllocator.freeObjects(self);
         self.gc.deinit();
     }
 
@@ -503,6 +525,7 @@ pub const Vm = struct {
                     self.push(result);
                     frame = &self.frames[self.frame_count - 1];
                 },
+                .class => self.push(Value.class(ObjClass.init(self, frame.readString()))),
                 else => return .runtime_error,
             }
         }

@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const debug = @import("debug.zig");
+const ObjClass = @import("object.zig").ObjClass;
 const ObjClosure = @import("object.zig").ObjClosure;
 const ObjFunction = @import("object.zig").ObjFunction;
 const ObjNative = @import("object.zig").ObjNative;
@@ -13,6 +14,7 @@ pub const ValueType = enum {
     nil,
     number,
 
+    class,
     closure,
     function,
     native,
@@ -26,6 +28,7 @@ pub const Value = struct {
         nil: void,
         number: f64,
 
+        class: *ObjClass,
         closure: *ObjClosure,
         function: *ObjFunction,
         native: *ObjNative,
@@ -39,6 +42,10 @@ pub const Value = struct {
 
     pub fn boolean(value: bool) Value {
         return .{ .as = .{ .bool = value } };
+    }
+
+    pub fn class(value: *ObjClass) Value {
+        return .{ .as = .{ .class = value } };
     }
 
     pub fn closure(value: *ObjClosure) Value {
@@ -77,6 +84,10 @@ pub const Value = struct {
         return self.as.bool;
     }
 
+    pub fn asClass(self: Value) *ObjClass {
+        return self.as.class;
+    }
+
     pub fn asClosure(self: Value) *ObjClosure {
         return self.as.closure;
     }
@@ -112,6 +123,7 @@ pub const Value = struct {
             .nil => true,
             .number => self.asNumber() == other.asNumber(),
 
+            .class => self.asClass() == other.asClass(),
             .closure => self.asClosure() == other.asClosure(),
             .function => self.asFunction() == other.asFunction(),
             .native => self.asNative() == other.asNative(),
@@ -126,6 +138,11 @@ pub const Value = struct {
             .nil => std.debug.print("nil", .{}),
             .number => std.debug.print("{d}", .{self.asNumber()}),
 
+            .class => if (self.asClass().name) |name| {
+                std.debug.print("class {s}", .{name.chars});
+            } else {
+                std.debug.print("anon class", .{});
+            },
             .closure => self.asClosure().function.print(),
             .function => self.asFunction().print(),
             .native => std.debug.print("<native fn>", .{}),
@@ -167,6 +184,7 @@ pub const Value = struct {
         }
 
         switch (self.getType()) {
+            .class => if (self.asClass().name) |name| Value.string(name).mark(vm),
             .closure => {
                 const clos = self.asClosure();
                 Value.function(clos.function).mark(vm);
@@ -188,6 +206,7 @@ pub const Value = struct {
 
     pub fn getMarked(self: Value) bool {
         return switch (self.getType()) {
+            .class => self.asClass().is_marked,
             .closure => self.asClosure().is_marked,
             .function => self.asFunction().is_marked,
             .native => self.asNative().is_marked,
@@ -200,6 +219,7 @@ pub const Value = struct {
 
     pub fn setMarked(self: Value, mark_val: bool) void {
         switch (self.getType()) {
+            .class => self.asClass().is_marked = mark_val,
             .closure => self.asClosure().is_marked = mark_val,
             .function => self.asFunction().is_marked = mark_val,
             .native => self.asNative().is_marked = mark_val,

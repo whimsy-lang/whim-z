@@ -1,20 +1,6 @@
 // simple test file
 
-outer :: fn()
-    x :: 3
-    c := 0
-    loop
-        a := 1
-        b := 2
-        break c >= x
-        fn()
-            a += 7
-        /fn
-        continue false
-        fn()
-            b -= 2
-        /fn
-        c += 1
-    /loop
-/fn
-outer()
+c :: class /class
+print(c)
+
+print(class /class)
