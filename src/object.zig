@@ -3,11 +3,14 @@ const Allocator = std.mem.Allocator;
 
 const Chunk = @import("chunk.zig").Chunk;
 const debug = @import("debug.zig");
+const Map = @import("map.zig").Map;
 const Value = @import("value.zig").Value;
 const Vm = @import("vm.zig").Vm;
 
 pub const ObjClass = struct {
     name: ?*ObjString,
+    super: ?*ObjClass,
+    fields: Map,
     is_marked: bool,
 
     pub fn init(vm: *Vm, class_name: ?*ObjString) *ObjClass {
@@ -21,8 +24,14 @@ pub const ObjClass = struct {
         vm.registerObject(Value.class(class));
 
         class.name = if (class_name != vm.empty_string) class_name else null;
+        class.super = null;
+        class.fields = Map.init(vm.allocator);
         class.is_marked = false;
         return class;
+    }
+
+    pub fn deinit(self: *ObjClass) void {
+        self.fields.deinit();
     }
 };
 
@@ -92,6 +101,32 @@ pub const ObjFunction = struct {
         } else {
             std.debug.print("<script>", .{});
         }
+    }
+};
+
+pub const ObjInstance = struct {
+    type: *ObjClass,
+    fields: Map,
+    is_marked: bool,
+
+    pub fn init(vm: *Vm, class: *ObjClass) *ObjInstance {
+        if (debug.log_gc) {
+            std.debug.print("allocate for instance\n", .{});
+        }
+        const instance = vm.allocator.create(ObjInstance) catch {
+            std.debug.print("Could not allocate memory for instance.", .{});
+            std.process.exit(1);
+        };
+        vm.registerObject(Value.instance(instance));
+
+        instance.type = class;
+        instance.fields = Map.init(vm.allocator);
+        instance.is_marked = false;
+        return instance;
+    }
+
+    pub fn deinit(self: *ObjInstance) void {
+        self.fields.deinit();
     }
 };
 

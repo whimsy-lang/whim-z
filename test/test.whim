@@ -1,6 +1,29 @@
 // simple test file
 
-c :: class /class
+b :: class
+    zeroeth :: '-0'
+/class
+
+c :: class is b
+    first :: 1
+    second :: 'two'
+/class
 print(c)
 
-print(class /class)
+c.test :: 'hi'
+
+i :: c()
+print(i)
+
+i.t2 := 'yo'
+
+print(c.test)
+print(i.test)
+print(i.t2)
+
+i.t2 = 7
+
+print(i.t2)
+print(i.zeroeth)
+print(i.first)
+print(i.second)

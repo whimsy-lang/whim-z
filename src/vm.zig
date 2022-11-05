@@ -14,6 +14,7 @@ const NativeFn = @import("object.zig").NativeFn;
 const ObjClass = @import("object.zig").ObjClass;
 const ObjClosure = @import("object.zig").ObjClosure;
 const ObjFunction = @import("object.zig").ObjFunction;
+const ObjInstance = @import("object.zig").ObjInstance;
 const ObjNative = @import("object.zig").ObjNative;
 const ObjString = @import("object.zig").ObjString;
 const ObjUpvalue = @import("object.zig").ObjUpvalue;
@@ -227,6 +228,11 @@ pub const Vm = struct {
 
     fn callValue(self: *Vm, callee: Value, arg_count: u8) bool {
         switch (callee.getType()) {
+            .class => {
+                const class = callee.asClass();
+                (self.stack_top - (arg_count + 1))[0] = Value.instance(ObjInstance.init(self, class));
+                return true;
+            },
             .closure => return self.call(callee.asClosure(), arg_count, true),
             .native => {
                 const native = callee.asNative().function;
@@ -340,6 +346,165 @@ pub const Vm = struct {
         self.push(Value.string(result));
     }
 
+    fn defineProperty(self: *Vm, name: *ObjString, object: Value, value: Value, constant: bool) bool {
+        var fields: *Map = undefined;
+        if (object.getType() == .instance) {
+            const instance = object.asInstance();
+            fields = &instance.fields;
+
+            if (name == self.type_string) {
+                if (value.getType() == .class) {
+                    instance.type = value.asClass();
+                } else {
+                    self.runtimeError("Instance type must be a class.", .{});
+                    return false;
+                }
+            }
+        } else if (object.getType() == .class) {
+            const class = object.asClass();
+            fields = &class.fields;
+
+            if (name == self.super_string) {
+                if (value.getType() == .class) {
+                    const super = value.asClass();
+                    if (class != super) {
+                        class.super = super;
+                    } else {
+                        self.runtimeError("Class cannot be its own superclass.", .{});
+                        return false;
+                    }
+                } else {
+                    self.runtimeError("Superclass must be a class.", .{});
+                    return false;
+                }
+            }
+        } else {
+            self.runtimeError("Only classes and instances have properties.", .{});
+            return false;
+        }
+
+        if (!fields.add(name, value, constant)) {
+            self.runtimeError("Property '{s}' already exists.", .{name.chars});
+            return false;
+        }
+
+        return true;
+    }
+
+    fn getProperty(self: *Vm, name: *ObjString, object: Value, do_pop: bool) bool {
+        var class: ?*ObjClass = null;
+        // var bind = false;
+        if (object.getType() == .instance) {
+            const instance = object.asInstance();
+
+            if (name == self.type_string) {
+                if (do_pop) _ = self.pop();
+                self.push(Value.class(instance.type));
+                return true;
+            }
+
+            var value: Value = undefined;
+            if (instance.fields.get(name, &value)) {
+                if (do_pop) _ = self.pop();
+                self.push(value);
+                return true;
+            }
+            class = instance.type;
+            // bind = true;
+        } else if (object.getType() == .class) {
+            class = object.asClass();
+        } else {
+            self.runtimeError("Only classes and instances have properties.", .{});
+            return false;
+        }
+
+        while (class) |cl| {
+            if (name == self.super_string and cl.super != null) {
+                if (do_pop) _ = self.pop();
+                self.push(Value.class(cl.super.?));
+                return true;
+            }
+
+            var value: Value = undefined;
+            if (cl.fields.get(name, &value)) {
+                // if (bind && IS_CLOSURE(value)) {
+                //     // bind method
+                //     ObjBoundMethod* bound = newBoundMethod(vm, obj, AS_CLOSURE(value));
+                //     if (doPop) pop(vm);
+                //     push(vm, OBJ_VAL(bound));
+                //     return true;
+                // }
+                // else {
+
+                if (do_pop) _ = self.pop();
+                self.push(value);
+                return true;
+
+                // }
+            }
+            class = cl.super;
+        }
+
+        self.runtimeError("Undefined property '{s}'.", .{name.chars});
+        return false;
+    }
+
+    fn setProperty(self: *Vm, name: *ObjString, object: Value, value: Value) bool {
+        var current: *ValueContainer = undefined;
+        var found = false;
+        var class: ?*ObjClass = null;
+        if (object.getType() == .instance) {
+            const instance = object.asInstance();
+            if (instance.fields.getPtr(name, &current)) {
+                found = true;
+                if (name == self.type_string) {
+                    if (value.getType() == .class) {
+                        instance.type = value.asClass();
+                    } else {
+                        self.runtimeError("Instance type must be a class.", .{});
+                        return false;
+                    }
+                }
+            }
+            class = instance.type;
+        } else if (object.getType() == .class) {
+            class = object.asClass();
+        }
+
+        while (!found and class != null) {
+            if (class.?.fields.getPtr(name, &current)) {
+                found = true;
+                if (name == self.super_string) {
+                    if (value.getType() == .class) {
+                        const super = value.asClass();
+                        if (class != super) {
+                            class.?.super = super;
+                        } else {
+                            self.runtimeError("Class cannot be its own superclass.", .{});
+                            return false;
+                        }
+                    } else {
+                        self.runtimeError("Superclass must be a class.", .{});
+                        return false;
+                    }
+                }
+            }
+            class = class.?.super;
+        }
+
+        if (!found) {
+            self.runtimeError("Undefined property '{s}'.", .{name.chars});
+            return false;
+        }
+        if (current.constant) {
+            self.runtimeError("Property '{s}' is constant.", .{name.chars});
+            return false;
+        }
+
+        current.value = value;
+        return true;
+    }
+
     fn run(self: *Vm) InterpretResult {
         var frame = &self.frames[self.frame_count - 1];
 
@@ -357,7 +522,8 @@ pub const Vm = struct {
             }
 
             const instruction = frame.readByte();
-            switch (@intToEnum(OpCode, instruction)) {
+            const op = @intToEnum(OpCode, instruction);
+            switch (op) {
                 .constant => {
                     const constant = frame.readConstant();
                     self.push(constant);
@@ -419,6 +585,29 @@ pub const Vm = struct {
                 .set_upvalue => {
                     const index = frame.readByte();
                     frame.closure.upvalues[index].?.location.* = self.pop();
+                },
+                .define_property_const, .define_property_const_pop, .define_property_var, .define_property_var_pop => {
+                    const name = frame.readString();
+                    const constant = (op == .define_property_const) or (op == .define_property_const_pop);
+                    if (!self.defineProperty(name, self.peek(1), self.peek(0), constant)) {
+                        return .runtime_error;
+                    }
+                    _ = self.pop();
+                    if ((op == .define_property_const_pop) or (op == .define_property_var_pop)) _ = self.pop();
+                },
+                .get_property, .get_property_pop => {
+                    const name = frame.readString();
+                    if (!self.getProperty(name, self.peek(0), op == .get_property_pop)) {
+                        return .runtime_error;
+                    }
+                },
+                .set_property => {
+                    const name = frame.readString();
+                    if (!self.setProperty(name, self.peek(1), self.peek(0))) {
+                        return .runtime_error;
+                    }
+                    _ = self.pop();
+                    _ = self.pop();
                 },
                 .equal => {
                     const b = self.pop();

@@ -72,6 +72,7 @@ pub const Compiler = struct {
     scope_depth: isize,
 
     encountered_identifier: ?[]const u8,
+    is_method: bool,
 
     pub fn init(self: *Compiler, vm: *Vm, fn_type: FunctionType) void {
         self.enclosing = vm.compiler;
@@ -336,6 +337,14 @@ pub const Compiler = struct {
         vm.emitOpByte(if (constant) .define_global_const else .define_global_var, global);
     }
 
+    fn defineProperty(vm: *Vm, name: u8, constant: bool, pop: bool) void {
+        if (pop) {
+            vm.emitOpByte(if (constant) .define_property_const_pop else .define_property_var_pop, name);
+        } else {
+            vm.emitOpByte(if (constant) .define_property_const else .define_property_var, name);
+        }
+    }
+
     fn getPrefixPrimary(tok_type: TokenType) ?PrimaryParseFn {
         return switch (tok_type) {
             .left_paren => groupingPrimary,
@@ -347,7 +356,7 @@ pub const Compiler = struct {
     fn getInfixPrimary(tok_type: TokenType) ?PrimaryParseFn {
         return switch (tok_type) {
             .left_paren => callPrimary,
-            // .dot => dotPrimary,
+            .dot => dotPrimary,
             else => null,
         };
     }
@@ -370,7 +379,7 @@ pub const Compiler = struct {
     fn getInfix(tok_type: TokenType) ?ParseFn {
         return switch (tok_type) {
             .left_paren => call,
-            // .dot => dot,
+            .dot => dot,
             .bang_equal, .equal_equal => binary,
             .less, .less_equal, .greater, .greater_equal => binary,
             .plus, .minus, .star, .slash, .percent => binary,
@@ -449,6 +458,25 @@ pub const Compiler = struct {
         vm.emitOpByte(.call, arg_count);
     }
 
+    fn classField(vm: *Vm) void {
+        consume(vm, .identifier, "Expect field name.");
+        const name = identifierConstant(vm, &vm.parser.previous);
+
+        switch (vm.parser.current.type) {
+            .colon_colon, .colon_equal => {
+                const constant = vm.parser.current.type == .colon_colon;
+
+                vm.compiler.?.encountered_identifier = vm.parser.previous.value;
+                vm.compiler.?.is_method = true;
+
+                advance(vm); // accept :: :=
+                expression(vm);
+                defineProperty(vm, name, constant, false);
+            },
+            else => error_(vm, "Expect '::' or ':=' declaration."),
+        }
+    }
+
     fn class(vm: *Vm) void {
         vm.emitOp(.class);
         if (vm.compiler.?.encountered_identifier) |name| {
@@ -462,16 +490,84 @@ pub const Compiler = struct {
         if (match(vm, .is)) {
             const super = makeConstant(vm, Value.string(vm.super_string.?));
             expression(vm);
-
-            _ = super;
-            // defineProperty(vm, super, false, false);
+            defineProperty(vm, super, false, false);
         }
 
         while (!check(vm, .class_end) and !check(vm, .eof)) {
-            // classfield
+            classField(vm);
         }
 
         consume(vm, .class_end, "Expect '/class' after block.");
+    }
+
+    fn dotHelper(vm: *Vm, name: u8) void {
+        if (match(vm, .left_paren)) {
+            const arg_count = argumentList(vm);
+            vm.emitOpByte(.invoke, name);
+            vm.emitByte(arg_count);
+        } else {
+            vm.emitOpByte(.get_property_pop, name);
+        }
+    }
+
+    fn dot(vm: *Vm) void {
+        consume(vm, .identifier, "Expect property name after '.'.");
+        const name = identifierConstant(vm, &vm.parser.previous);
+        dotHelper(vm, name);
+    }
+
+    fn dotPrimary(vm: *Vm) bool {
+        consume(vm, .identifier, "Expect property name after '.'.");
+        const name = identifierConstant(vm, &vm.parser.previous);
+
+        const op_type = vm.parser.current.type;
+        switch (op_type) {
+            .colon_colon, .colon_equal => {
+                // declaration
+                const constant = op_type == .colon_colon;
+
+                vm.compiler.?.encountered_identifier = vm.parser.previous.value;
+                vm.compiler.?.is_method = false;
+
+                advance(vm); // accept :: :=
+                expression(vm);
+                defineProperty(vm, name, constant, true);
+
+                return true;
+            },
+            .equal, .plus_equal, .minus_equal, .star_equal, .slash_equal, .percent_equal => {
+                // assignment
+                vm.compiler.?.encountered_identifier = vm.parser.previous.value;
+                vm.compiler.?.is_method = false;
+
+                if (op_type != .equal) {
+                    // emit get
+                    vm.emitOpByte(.get_property, name);
+                }
+
+                advance(vm); // accept = += -= *= /= %=
+                expression(vm);
+
+                // emit op
+                switch (op_type) {
+                    .plus_equal => vm.emitOp(.add),
+                    .minus_equal => vm.emitOp(.subtract),
+                    .star_equal => vm.emitOp(.multiply),
+                    .slash_equal => vm.emitOp(.divide),
+                    .percent_equal => vm.emitOp(.modulus),
+                    else => {},
+                }
+
+                // emit set
+                vm.emitOpByte(.set_property, name);
+
+                return true;
+            },
+            else => {},
+        }
+        // not an assignment, so get the property
+        dotHelper(vm, name);
+        return false;
     }
 
     fn function(vm: *Vm) void {
@@ -572,6 +668,7 @@ pub const Compiler = struct {
                 const constant = op_type == .colon_colon;
 
                 vm.compiler.?.encountered_identifier = vm.parser.previous.value;
+                vm.compiler.?.is_method = false;
 
                 if (vm.compiler.?.scope_depth > 0) {
                     // local
@@ -599,6 +696,7 @@ pub const Compiler = struct {
                 // assignment
 
                 vm.compiler.?.encountered_identifier = vm.parser.previous.value;
+                vm.compiler.?.is_method = false;
 
                 var arg = vm.compiler.?.resolveLocal(&vm.parser.previous);
                 var get_op = OpCode.get_local;

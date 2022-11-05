@@ -155,7 +155,11 @@ pub const GcAllocater = struct {
             std.debug.print("free {any}\n", .{object.getType()});
         }
         switch (object.getType()) {
-            .class => vm.allocator.destroy(object.asClass()),
+            .class => {
+                const class = object.asClass();
+                class.deinit();
+                vm.allocator.destroy(class);
+            },
             .closure => {
                 const closure = object.asClosure();
                 vm.allocator.free(closure.upvalues);
@@ -165,6 +169,11 @@ pub const GcAllocater = struct {
                 const function = object.asFunction();
                 function.deinit();
                 vm.allocator.destroy(function);
+            },
+            .instance => {
+                const instance = object.asInstance();
+                instance.deinit();
+                vm.allocator.destroy(instance);
             },
             .native => vm.allocator.destroy(object.asNative()),
             .string => {

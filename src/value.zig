@@ -4,6 +4,7 @@ const debug = @import("debug.zig");
 const ObjClass = @import("object.zig").ObjClass;
 const ObjClosure = @import("object.zig").ObjClosure;
 const ObjFunction = @import("object.zig").ObjFunction;
+const ObjInstance = @import("object.zig").ObjInstance;
 const ObjNative = @import("object.zig").ObjNative;
 const ObjString = @import("object.zig").ObjString;
 const ObjUpvalue = @import("object.zig").ObjUpvalue;
@@ -17,6 +18,7 @@ pub const ValueType = enum {
     class,
     closure,
     function,
+    instance,
     native,
     string,
     upvalue,
@@ -31,6 +33,7 @@ pub const Value = struct {
         class: *ObjClass,
         closure: *ObjClosure,
         function: *ObjFunction,
+        instance: *ObjInstance,
         native: *ObjNative,
         string: *ObjString,
         upvalue: *ObjUpvalue,
@@ -54,6 +57,10 @@ pub const Value = struct {
 
     pub fn function(value: *ObjFunction) Value {
         return .{ .as = .{ .function = value } };
+    }
+
+    pub fn instance(value: *ObjInstance) Value {
+        return .{ .as = .{ .instance = value } };
     }
 
     pub fn native(value: *ObjNative) Value {
@@ -96,6 +103,10 @@ pub const Value = struct {
         return self.as.function;
     }
 
+    pub fn asInstance(self: Value) *ObjInstance {
+        return self.as.instance;
+    }
+
     pub fn asNative(self: Value) *ObjNative {
         return self.as.native;
     }
@@ -126,6 +137,7 @@ pub const Value = struct {
             .class => self.asClass() == other.asClass(),
             .closure => self.asClosure() == other.asClosure(),
             .function => self.asFunction() == other.asFunction(),
+            .instance => self.asInstance() == other.asInstance(),
             .native => self.asNative() == other.asNative(),
             .string => self.asString() == other.asString(),
             .upvalue => self.asUpvalue() == other.asUpvalue(),
@@ -145,6 +157,11 @@ pub const Value = struct {
             },
             .closure => self.asClosure().function.print(),
             .function => self.asFunction().print(),
+            .instance => if (self.asInstance().type.name) |name| {
+                std.debug.print("{s} inst", .{name.chars});
+            } else {
+                std.debug.print("anon inst", .{});
+            },
             .native => std.debug.print("<native fn>", .{}),
             .string => std.debug.print("{s}", .{self.asString().chars}),
             .upvalue => std.debug.print("upvalue", .{}),
@@ -184,7 +201,12 @@ pub const Value = struct {
         }
 
         switch (self.getType()) {
-            .class => if (self.asClass().name) |name| Value.string(name).mark(vm),
+            .class => {
+                const clas = self.asClass();
+                if (clas.name) |name| Value.string(name).mark(vm);
+                if (clas.super) |super| Value.class(super).mark(vm);
+                clas.fields.mark(vm);
+            },
             .closure => {
                 const clos = self.asClosure();
                 Value.function(clos.function).mark(vm);
@@ -199,6 +221,11 @@ pub const Value = struct {
                 }
                 markArray(&func.chunk.constants, vm);
             },
+            .instance => {
+                const inst = self.asInstance();
+                Value.class(inst.type).mark(vm);
+                inst.fields.mark(vm);
+            },
             .upvalue => self.asUpvalue().closed.mark(vm),
             else => unreachable,
         }
@@ -209,6 +236,7 @@ pub const Value = struct {
             .class => self.asClass().is_marked,
             .closure => self.asClosure().is_marked,
             .function => self.asFunction().is_marked,
+            .instance => self.asInstance().is_marked,
             .native => self.asNative().is_marked,
             .string => self.asString().is_marked,
             .upvalue => self.asUpvalue().is_marked,
@@ -222,6 +250,7 @@ pub const Value = struct {
             .class => self.asClass().is_marked = mark_val,
             .closure => self.asClosure().is_marked = mark_val,
             .function => self.asFunction().is_marked = mark_val,
+            .instance => self.asInstance().is_marked = mark_val,
             .native => self.asNative().is_marked = mark_val,
             .string => self.asString().is_marked = mark_val,
             .upvalue => self.asUpvalue().is_marked = mark_val,
