@@ -2,6 +2,9 @@
 
 b :: class
     zeroeth :: '-0'
+    thing :: fn(self, x)
+        print(x)
+    /fn
 /class
 
 c :: class is b
@@ -27,3 +30,5 @@ print(i.t2)
 print(i.zeroeth)
 print(i.first)
 print(i.second)
+
+i.thing('awesome!')

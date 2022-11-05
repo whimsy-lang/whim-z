@@ -6,8 +6,8 @@ const value = @import("value.zig");
 
 pub const print_code = true;
 pub const trace_execution = true;
-pub const stress_gc = true;
-pub const log_gc = true;
+pub const stress_gc = false;
+pub const log_gc = false;
 
 pub fn disassembleChunk(chunk: *Chunk, name: []const u8) void {
     std.debug.print("== {s} ==\n", .{name});
@@ -68,11 +68,11 @@ pub fn disassembleInstruction(chunk: *Chunk, offset: usize) usize {
         .jump_if_true_pop => jumpInstruction("jump if true (pop)", 1, chunk, offset),
         .jump_if_false_pop => jumpInstruction("jump if false (pop)", 1, chunk, offset),
         .call => byteInstruction("call", chunk, offset),
+        .invoke => invokeInstruction("invoke", chunk, offset),
         .closure => closureInstruction("closure", chunk, offset),
         .close_upvalue => simpleInstruction("close upvalue", offset),
         .return_ => simpleInstruction("return", offset),
         .class => constantInstruction("class", chunk, offset),
-        else => offset + 1,
     };
 }
 
@@ -109,6 +109,15 @@ fn constantInstruction(name: []const u8, chunk: *Chunk, offset: usize) usize {
     chunk.constants.items[constant].print();
     std.debug.print("'\n", .{});
     return offset + 2;
+}
+
+fn invokeInstruction(name: []const u8, chunk: *Chunk, offset: usize) usize {
+    const constant = chunk.code.items[offset + 1];
+    const arg_count = chunk.code.items[offset + 2];
+    std.debug.print("{s: <20} {d:4} '", .{ name, constant });
+    chunk.constants.items[constant].print();
+    std.debug.print("' ({d})\n", .{arg_count});
+    return offset + 3;
 }
 
 fn jumpInstruction(name: []const u8, sign: isize, chunk: *Chunk, offset: usize) usize {
