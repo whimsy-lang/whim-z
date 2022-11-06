@@ -67,7 +67,7 @@ pub const Map = struct {
     }
 
     fn findEntry(entries: []Entry, key: *ObjString) *Entry {
-        var index = key.hash % entries.len;
+        var index = key.hash & (entries.len - 1);
         var tombstone: ?*Entry = null;
 
         while (true) {
@@ -85,14 +85,14 @@ pub const Map = struct {
                 return entry;
             }
 
-            index = (index + 1) % entries.len;
+            index = (index + 1) & (entries.len - 1);
         }
     }
 
     pub fn findString(self: *Map, chars: []const u8, hash: u32) ?*ObjString {
         if (self.count == 0) return null;
 
-        var index = hash % self.entries.len;
+        var index = hash & (self.entries.len - 1);
         while (true) {
             const entry = &self.entries[index];
             if (entry.key == null) {
@@ -103,7 +103,7 @@ pub const Map = struct {
                 return entry.key;
             }
 
-            index = (index + 1) % self.entries.len;
+            index = (index + 1) & (self.entries.len - 1);
         }
     }
 

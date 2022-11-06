@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const debug = @import("debug.zig");
+const ObjBoundMethod = @import("object.zig").ObjBoundMethod;
 const ObjClass = @import("object.zig").ObjClass;
 const ObjClosure = @import("object.zig").ObjClosure;
 const ObjFunction = @import("object.zig").ObjFunction;
@@ -15,6 +16,7 @@ pub const ValueType = enum {
     nil,
     number,
 
+    bound_method,
     class,
     closure,
     function,
@@ -30,6 +32,7 @@ pub const Value = struct {
         nil: void,
         number: f64,
 
+        bound_method: *ObjBoundMethod,
         class: *ObjClass,
         closure: *ObjClosure,
         function: *ObjFunction,
@@ -45,6 +48,10 @@ pub const Value = struct {
 
     pub fn boolean(value: bool) Value {
         return .{ .as = .{ .bool = value } };
+    }
+
+    pub fn boundMethod(value: *ObjBoundMethod) Value {
+        return .{ .as = .{ .bound_method = value } };
     }
 
     pub fn class(value: *ObjClass) Value {
@@ -91,6 +98,10 @@ pub const Value = struct {
         return self.as.bool;
     }
 
+    pub fn asBoundMethod(self: Value) *ObjBoundMethod {
+        return self.as.bound_method;
+    }
+
     pub fn asClass(self: Value) *ObjClass {
         return self.as.class;
     }
@@ -134,6 +145,7 @@ pub const Value = struct {
             .nil => true,
             .number => self.asNumber() == other.asNumber(),
 
+            .bound_method => self.asBoundMethod() == other.asBoundMethod(),
             .class => self.asClass() == other.asClass(),
             .closure => self.asClosure() == other.asClosure(),
             .function => self.asFunction() == other.asFunction(),
@@ -150,6 +162,7 @@ pub const Value = struct {
             .nil => std.debug.print("nil", .{}),
             .number => std.debug.print("{d}", .{self.asNumber()}),
 
+            .bound_method => self.asBoundMethod().method.function.print(),
             .class => if (self.asClass().name) |name| {
                 std.debug.print("class {s}", .{name.chars});
             } else {
@@ -201,6 +214,11 @@ pub const Value = struct {
         }
 
         switch (self.getType()) {
+            .bound_method => {
+                const bound = self.asBoundMethod();
+                bound.receiver.mark(vm);
+                Value.closure(bound.method).mark(vm);
+            },
             .class => {
                 const clas = self.asClass();
                 if (clas.name) |name| Value.string(name).mark(vm);
@@ -233,6 +251,7 @@ pub const Value = struct {
 
     pub fn getMarked(self: Value) bool {
         return switch (self.getType()) {
+            .bound_method => self.asBoundMethod().is_marked,
             .class => self.asClass().is_marked,
             .closure => self.asClosure().is_marked,
             .function => self.asFunction().is_marked,
@@ -247,6 +266,7 @@ pub const Value = struct {
 
     pub fn setMarked(self: Value, mark_val: bool) void {
         switch (self.getType()) {
+            .bound_method => self.asBoundMethod().is_marked = mark_val,
             .class => self.asClass().is_marked = mark_val,
             .closure => self.asClosure().is_marked = mark_val,
             .function => self.asFunction().is_marked = mark_val,

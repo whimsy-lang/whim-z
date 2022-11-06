@@ -11,6 +11,7 @@ const Map = @import("map.zig").Map;
 const ValueContainer = @import("map.zig").ValueContainer;
 const GcAllocator = @import("memory.zig").GcAllocater;
 const NativeFn = @import("object.zig").NativeFn;
+const ObjBoundMethod = @import("object.zig").ObjBoundMethod;
 const ObjClass = @import("object.zig").ObjClass;
 const ObjClosure = @import("object.zig").ObjClosure;
 const ObjFunction = @import("object.zig").ObjFunction;
@@ -228,9 +229,28 @@ pub const Vm = struct {
 
     fn callValue(self: *Vm, callee: Value, arg_count: u8) bool {
         switch (callee.getType()) {
+            .bound_method => {
+                const bound = callee.asBoundMethod();
+                (self.stack_top - (arg_count + 1))[0] = bound.receiver;
+                return self.call(bound.method, arg_count + 1, false);
+            },
             .class => {
-                const class = callee.asClass();
-                (self.stack_top - (arg_count + 1))[0] = Value.instance(ObjInstance.init(self, class));
+                var class: ?*ObjClass = callee.asClass();
+                (self.stack_top - (arg_count + 1))[0] = Value.instance(ObjInstance.init(self, class.?));
+
+                var initializer: Value = undefined;
+                while (class) |cl| {
+                    if (cl.fields.get(self.init_string.?, &initializer)) {
+                        return self.call(initializer.asClosure(), arg_count + 1, false);
+                    }
+                    class = cl.super;
+                }
+
+                if (arg_count != 0) {
+                    self.runtimeError("Expected 0 arguments but got {d}.", .{arg_count});
+                    return false;
+                }
+
                 return true;
             },
             .closure => return self.call(callee.asClosure(), arg_count, true),
@@ -244,6 +264,48 @@ pub const Vm = struct {
             else => {},
         }
         self.runtimeError("Can only call functions and classes.", .{});
+        return false;
+    }
+
+    fn invoke(self: *Vm, name: *ObjString, arg_count: u8) bool {
+        const receiver = self.peek(arg_count);
+
+        if (receiver.getType() == .instance) {
+            const instance = receiver.asInstance();
+
+            var value: Value = undefined;
+            if (instance.fields.get(name, &value)) {
+                (self.stack_top - (arg_count + 1))[0] = value;
+                return self.callValue(value, arg_count);
+            }
+
+            var current: ?*ObjClass = instance.type;
+            var method: Value = undefined;
+            while (current) |cur| {
+                if (cur.fields.get(name, &method)) {
+                    return self.call(method.asClosure(), arg_count + 1, false);
+                }
+                current = cur.super;
+            }
+
+            self.runtimeError("Undefined property '{s}'.", .{name.chars});
+            return false;
+        } else if (receiver.getType() == .class) {
+            var class: ?*ObjClass = receiver.asClass();
+
+            var value: Value = undefined;
+            while (class) |cl| {
+                if (cl.fields.get(name, &value)) {
+                    (self.stack_top - (arg_count + 1))[0] = value;
+                    return self.callValue(value, arg_count);
+                }
+                class = cl.super;
+            }
+
+            self.runtimeError("Undefined property '{s}'.", .{name.chars});
+            return false;
+        }
+        self.runtimeError("Only classes and instances have properties.", .{});
         return false;
     }
 
@@ -393,7 +455,7 @@ pub const Vm = struct {
 
     fn getProperty(self: *Vm, name: *ObjString, object: Value, do_pop: bool) bool {
         var class: ?*ObjClass = null;
-        // var bind = false;
+        var bind = false;
         if (object.getType() == .instance) {
             const instance = object.asInstance();
 
@@ -410,7 +472,7 @@ pub const Vm = struct {
                 return true;
             }
             class = instance.type;
-            // bind = true;
+            bind = true;
         } else if (object.getType() == .class) {
             class = object.asClass();
         } else {
@@ -427,20 +489,16 @@ pub const Vm = struct {
 
             var value: Value = undefined;
             if (cl.fields.get(name, &value)) {
-                // if (bind && IS_CLOSURE(value)) {
-                //     // bind method
-                //     ObjBoundMethod* bound = newBoundMethod(vm, obj, AS_CLOSURE(value));
-                //     if (doPop) pop(vm);
-                //     push(vm, OBJ_VAL(bound));
-                //     return true;
-                // }
-                // else {
-
-                if (do_pop) _ = self.pop();
-                self.push(value);
+                if (bind and value.getType() == .closure) {
+                    // bind method
+                    const bound = ObjBoundMethod.init(self, object, value.asClosure());
+                    if (do_pop) _ = self.pop();
+                    self.push(Value.boundMethod(bound));
+                } else {
+                    if (do_pop) _ = self.pop();
+                    self.push(value);
+                }
                 return true;
-
-                // }
             }
             class = cl.super;
         }
@@ -678,6 +736,14 @@ pub const Vm = struct {
                     }
                     frame = &self.frames[self.frame_count - 1];
                 },
+                .invoke => {
+                    const name = frame.readString();
+                    const arg_count = frame.readByte();
+                    if (!self.invoke(name, arg_count)) {
+                        return .runtime_error;
+                    }
+                    frame = &self.frames[self.frame_count - 1];
+                },
                 .closure => {
                     const function = frame.readConstant().asFunction();
                     const closure = ObjClosure.init(self, function);
@@ -715,7 +781,6 @@ pub const Vm = struct {
                     frame = &self.frames[self.frame_count - 1];
                 },
                 .class => self.push(Value.class(ObjClass.init(self, frame.readString()))),
-                else => return .runtime_error,
             }
         }
     }

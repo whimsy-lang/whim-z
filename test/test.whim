@@ -1,34 +1,34 @@
 // simple test file
 
-b :: class
-    zeroeth :: '-0'
-    thing :: fn(self, x)
-        print(x)
+c :: class
+    field :: 3
+
+    init :: fn(self, val)
+        self.thing := val
+
+        f :: fn(self)
+            print('arf from ', self)
+        /fn
+        self.arf := f
+    /fn
+
+    test :: fn(self, val)
+        print(self, ' has ', val)
     /fn
 /class
 
-c :: class is b
-    first :: 1
-    second :: 'two'
-/class
-print(c)
+i :: c(42)
+print(i.thing)
 
-c.test :: 'hi'
+i.test('something')
 
-i :: c()
-print(i)
+i.arf2 := fn(self) print('arf2 from ', self) /fn
 
-i.t2 := 'yo'
+b :: i.test
 
-print(c.test)
-print(i.test)
-print(i.t2)
+b('a bound method')
 
-i.t2 = 7
-
-print(i.t2)
-print(i.zeroeth)
-print(i.first)
-print(i.second)
-
-i.thing('awesome!')
+print(i.field)
+print(c.field)
+i.arf()
+i.arf2()

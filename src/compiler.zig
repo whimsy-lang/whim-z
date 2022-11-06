@@ -57,6 +57,7 @@ pub const Compiler = struct {
 
     const FunctionType = enum {
         function,
+        initializer,
         script,
     };
 
@@ -181,7 +182,11 @@ pub const Compiler = struct {
     }
 
     fn emitReturn(vm: *Vm) void {
-        vm.emitOp(.nil);
+        if (vm.compiler.?.fn_type == .initializer) {
+            vm.emitOpByte(.get_local, 0);
+        } else {
+            vm.emitOp(.nil);
+        }
         vm.emitOp(.return_);
     }
 
@@ -571,10 +576,15 @@ pub const Compiler = struct {
     }
 
     fn function(vm: *Vm) void {
+        const is_method = vm.compiler.?.is_method;
         var compiler: Compiler = undefined;
         compiler.init(vm, .function);
         if (vm.compiler.?.enclosing.?.encountered_identifier) |name| {
             compiler.function.?.name = ObjString.copy(vm, name);
+
+            if (is_method and compiler.function.?.name == vm.init_string) {
+                compiler.fn_type = .initializer;
+            }
         }
         beginScope(vm);
 
@@ -962,6 +972,9 @@ pub const Compiler = struct {
     }
 
     fn returnStatement(vm: *Vm) void {
+        if (vm.compiler.?.fn_type == .initializer) {
+            error_(vm, "Can't return a value from an initializer.");
+        }
         expression(vm);
         vm.emitOp(.return_);
     }

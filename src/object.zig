@@ -7,6 +7,28 @@ const Map = @import("map.zig").Map;
 const Value = @import("value.zig").Value;
 const Vm = @import("vm.zig").Vm;
 
+pub const ObjBoundMethod = struct {
+    receiver: Value,
+    method: *ObjClosure,
+    is_marked: bool,
+
+    pub fn init(vm: *Vm, b_receiver: Value, b_method: *ObjClosure) *ObjBoundMethod {
+        if (debug.log_gc) {
+            std.debug.print("allocate for bound method\n", .{});
+        }
+        const bound = vm.allocator.create(ObjBoundMethod) catch {
+            std.debug.print("Could not allocate memory for bound method.", .{});
+            std.process.exit(1);
+        };
+        vm.registerObject(Value.boundMethod(bound));
+
+        bound.receiver = b_receiver;
+        bound.method = b_method;
+        bound.is_marked = false;
+        return bound;
+    }
+};
+
 pub const ObjClass = struct {
     name: ?*ObjString,
     super: ?*ObjClass,
