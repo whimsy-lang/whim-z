@@ -234,9 +234,7 @@ pub const Value = struct {
             },
             .function => {
                 const func = self.asFunction();
-                if (func.name) |name| {
-                    Value.string(name).mark(vm);
-                }
+                if (func.name) |name| Value.string(name).mark(vm);
                 markArray(&func.chunk.constants, vm);
             },
             .instance => {

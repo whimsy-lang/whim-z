@@ -143,6 +143,7 @@ pub const ObjInstance = struct {
 
         instance.type = class;
         instance.fields = Map.init(vm.allocator);
+        _ = instance.fields.set(vm.type_string.?, Value.class(class));
         instance.is_marked = false;
         return instance;
     }

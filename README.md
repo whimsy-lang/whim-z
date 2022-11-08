@@ -239,6 +239,19 @@ compiled: *.whir
 
 ## TODO
 
+### C to Zig
+
+* [X] chunk
+* [ ] compiler
+* [X] debug
+* [ ] lexer
+* [X] main
+* [X] map
+* [X] memory
+* [X] object
+* [X] value
+* [ ] vm
+
 ### General
 
 * better line number encoding
