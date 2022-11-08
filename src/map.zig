@@ -187,9 +187,7 @@ pub const Map = struct {
     }
 
     pub fn removeWhite(self: *Map) void {
-        var i: usize = 0;
-        while (i < self.entries.len) : (i += 1) {
-            const entry = &self.entries[i];
+        for (self.entries) |entry| {
             if (entry.key != null and !entry.key.?.is_marked) {
                 _ = self.delete(entry.key.?);
             }

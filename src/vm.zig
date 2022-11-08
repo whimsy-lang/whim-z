@@ -270,7 +270,7 @@ pub const Vm = struct {
     fn invoke(self: *Vm, name: *ObjString, arg_count: u8) bool {
         const receiver = self.peek(arg_count);
 
-        if (receiver.getType() == .instance) {
+        if (receiver.is(.instance)) {
             const instance = receiver.asInstance();
 
             var value: Value = undefined;
@@ -290,7 +290,7 @@ pub const Vm = struct {
 
             self.runtimeError("Undefined property '{s}'.", .{name.chars});
             return false;
-        } else if (receiver.getType() == .class) {
+        } else if (receiver.is(.class)) {
             var class: ?*ObjClass = receiver.asClass();
 
             var value: Value = undefined;
@@ -410,24 +410,24 @@ pub const Vm = struct {
 
     fn defineProperty(self: *Vm, name: *ObjString, object: Value, value: Value, constant: bool) bool {
         var fields: *Map = undefined;
-        if (object.getType() == .instance) {
+        if (object.is(.instance)) {
             const instance = object.asInstance();
             fields = &instance.fields;
 
             if (name == self.type_string) {
-                if (value.getType() == .class) {
+                if (value.is(.class)) {
                     instance.type = value.asClass();
                 } else {
                     self.runtimeError("Instance type must be a class.", .{});
                     return false;
                 }
             }
-        } else if (object.getType() == .class) {
+        } else if (object.is(.class)) {
             const class = object.asClass();
             fields = &class.fields;
 
             if (name == self.super_string) {
-                if (value.getType() == .class) {
+                if (value.is(.class)) {
                     const super = value.asClass();
                     if (class != super) {
                         class.super = super;
@@ -456,7 +456,7 @@ pub const Vm = struct {
     fn getProperty(self: *Vm, name: *ObjString, object: Value, do_pop: bool) bool {
         var class: ?*ObjClass = null;
         var bind = false;
-        if (object.getType() == .instance) {
+        if (object.is(.instance)) {
             const instance = object.asInstance();
 
             if (name == self.type_string) {
@@ -473,7 +473,7 @@ pub const Vm = struct {
             }
             class = instance.type;
             bind = true;
-        } else if (object.getType() == .class) {
+        } else if (object.is(.class)) {
             class = object.asClass();
         } else {
             self.runtimeError("Only classes and instances have properties.", .{});
@@ -489,7 +489,7 @@ pub const Vm = struct {
 
             var value: Value = undefined;
             if (cl.fields.get(name, &value)) {
-                if (bind and value.getType() == .closure) {
+                if (bind and value.is(.closure)) {
                     // bind method
                     const bound = ObjBoundMethod.init(self, object, value.asClosure());
                     if (do_pop) _ = self.pop();
@@ -511,12 +511,12 @@ pub const Vm = struct {
         var current: *ValueContainer = undefined;
         var found = false;
         var class: ?*ObjClass = null;
-        if (object.getType() == .instance) {
+        if (object.is(.instance)) {
             const instance = object.asInstance();
             if (instance.fields.getPtr(name, &current)) {
                 found = true;
                 if (name == self.type_string) {
-                    if (value.getType() == .class) {
+                    if (value.is(.class)) {
                         instance.type = value.asClass();
                     } else {
                         self.runtimeError("Instance type must be a class.", .{});
@@ -525,7 +525,7 @@ pub const Vm = struct {
                 }
             }
             class = instance.type;
-        } else if (object.getType() == .class) {
+        } else if (object.is(.class)) {
             class = object.asClass();
         }
 
@@ -533,7 +533,7 @@ pub const Vm = struct {
             if (class.?.fields.getPtr(name, &current)) {
                 found = true;
                 if (name == self.super_string) {
-                    if (value.getType() == .class) {
+                    if (value.is(.class)) {
                         const super = value.asClass();
                         if (class != super) {
                             class.?.super = super;
