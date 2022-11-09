@@ -162,17 +162,13 @@ pub const Lexer = struct {
         while (depth > 0 and !self.isAtEnd()) {
             switch (self.advance()) {
                 '\n' => self.line += 1,
-                '/' => {
-                    if (self.peek() == '*') {
-                        _ = self.advance();
-                        depth += 1;
-                    }
+                '/' => if (self.peek() == '*') {
+                    _ = self.advance();
+                    depth += 1;
                 },
-                '*' => {
-                    if (self.peek() == '/') {
-                        _ = self.advance();
-                        depth -= 1;
-                    }
+                '*' => if (self.peek() == '/') {
+                    _ = self.advance();
+                    depth -= 1;
                 },
                 else => {},
             }
@@ -236,19 +232,19 @@ pub const Lexer = struct {
     }
 
     fn identifier(self: *Lexer) Token {
-        while (isAlphaOrDigit(self.peek())) : (_ = self.advance()) {}
+        while (isAlphaOrDigit(self.peek())) _ = self.advance();
 
         return self.token(self.identifierType());
     }
 
     fn number(self: *Lexer) Token {
-        while (isDigit(self.peek())) : (_ = self.advance()) {}
+        while (isDigit(self.peek())) _ = self.advance();
 
         if (self.peek() == '.' and isDigit(self.peekAt(1))) {
             // accept the .
             _ = self.advance();
 
-            while (isDigit(self.peek())) : (_ = self.advance()) {}
+            while (isDigit(self.peek())) _ = self.advance();
         }
 
         return self.token(.number);
@@ -326,7 +322,7 @@ pub const Lexer = struct {
                     },
                     '/' => {
                         _ = self.advance();
-                        while (self.peek() != '\n' and !self.isAtEnd()) : (_ = self.advance()) {}
+                        while (self.peek() != '\n' and !self.isAtEnd()) _ = self.advance();
                         self.resetLength();
                     },
                     '*' => {
@@ -354,17 +350,13 @@ pub const Lexer = struct {
                     },
                     'f' => {
                         switch (self.peekAt(1)) {
-                            'n' => {
-                                if (!isAlphaOrDigit(self.peekAt(2))) {
-                                    self.advanceMulti(2);
-                                    return self.token(.fn_end);
-                                }
+                            'n' => if (!isAlphaOrDigit(self.peekAt(2))) {
+                                self.advanceMulti(2);
+                                return self.token(.fn_end);
                             },
-                            'o' => {
-                                if (self.peekAt(2) == 'r' and !isAlphaOrDigit(self.peekAt(3))) {
-                                    self.advanceMulti(3);
-                                    return self.token(.for_end);
-                                }
+                            'o' => if (self.peekAt(2) == 'r' and !isAlphaOrDigit(self.peekAt(3))) {
+                                self.advanceMulti(3);
+                                return self.token(.for_end);
                             },
                             else => {},
                         }

@@ -244,7 +244,7 @@ compiled: *.whir
 * [X] chunk
 * [ ] compiler
 * [X] debug
-* [ ] lexer
+* [X] lexer
 * [X] main
 * [X] map
 * [X] memory
