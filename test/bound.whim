@@ -1,0 +1,65 @@
+// bound test file
+
+c :: class
+    init :: fn(self, val)
+        self.val := val
+
+        self.init1 :: fn(s)
+            print('init fn 1: ', s)
+        /fn
+
+        self.init2 :: fn(s, v)
+            print('init fn 2: ', s, ', ', v)
+        /fn
+    /fn
+
+    fn1 :: fn(self)
+        print('fn with 1: ', self)
+    /fn
+
+    fn2 :: fn(self, val)
+        print('fn with 2: ', self, ', ', val)
+    /fn
+/class
+
+i :: c(42)
+
+i.instFn1 :: fn(self)
+    print('inst fn 1: ', self)
+/fn
+
+i.instFn2 :: fn(self, val)
+    print('inst fn 2: ', self, ', ', val)
+/fn
+
+i.init1(1)
+f := i.init1
+f(1)
+
+i.init2(1, 2)
+f = i.init2
+f(1, 2)
+
+c.fn1(1)
+f = c.fn1
+f(1)
+
+c.fn2(1, 2)
+f = c.fn2
+f(1, 2)
+
+i.fn1()
+f = i.fn1
+f()
+
+i.fn2(2)
+f = i.fn2
+f(2)
+
+i.instFn1(1)
+f = i.instFn1
+f(1)
+
+i.instFn2(1, 2)
+f = i.instFn2
+f(1, 2)
