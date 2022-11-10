@@ -35,7 +35,7 @@ pub const OpCode = enum(u8) {
     subtract,
     multiply,
     divide,
-    modulus,
+    remainder,
     negate,
     not,
     jump,

@@ -385,7 +385,7 @@ pub const Vm = struct {
             return Value.number(a / b);
         }
 
-        fn modulus(a: f64, b: f64) Value {
+        fn remainder(a: f64, b: f64) Value {
             return Value.number(@rem(a, b));
         }
     };
@@ -689,7 +689,7 @@ pub const Vm = struct {
                 .subtract => if (!NumBinaryOp.run(self, NumBinaryOp.subtract)) return .runtime_error,
                 .multiply => if (!NumBinaryOp.run(self, NumBinaryOp.multiply)) return .runtime_error,
                 .divide => if (!NumBinaryOp.run(self, NumBinaryOp.divide)) return .runtime_error,
-                .modulus => if (!NumBinaryOp.run(self, NumBinaryOp.modulus)) return .runtime_error,
+                .remainder => if (!NumBinaryOp.run(self, NumBinaryOp.remainder)) return .runtime_error,
                 .negate => {
                     if (!self.peek(0).is(.number)) {
                         self.runtimeError("Operand must be a number.", .{});

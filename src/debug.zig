@@ -58,7 +58,7 @@ pub fn disassembleInstruction(chunk: *Chunk, offset: usize) usize {
         .subtract => simpleInstruction("subtract", offset),
         .multiply => simpleInstruction("multiply", offset),
         .divide => simpleInstruction("divide", offset),
-        .modulus => simpleInstruction("modulus", offset),
+        .remainder => simpleInstruction("remainder", offset),
         .negate => simpleInstruction("negate", offset),
         .not => simpleInstruction("not", offset),
         .jump => jumpInstruction("jump", 1, chunk, offset),

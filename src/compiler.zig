@@ -452,7 +452,7 @@ pub const Compiler = struct {
             .minus => vm.emitOp(.subtract),
             .star => vm.emitOp(.multiply),
             .slash => vm.emitOp(.divide),
-            .percent => vm.emitOp(.modulus),
+            .percent => vm.emitOp(.remainder),
             else => unreachable,
         }
     }
@@ -563,7 +563,7 @@ pub const Compiler = struct {
                     .minus_equal => vm.emitOp(.subtract),
                     .star_equal => vm.emitOp(.multiply),
                     .slash_equal => vm.emitOp(.divide),
-                    .percent_equal => vm.emitOp(.modulus),
+                    .percent_equal => vm.emitOp(.remainder),
                     else => {},
                 }
 
@@ -753,7 +753,7 @@ pub const Compiler = struct {
                     .minus_equal => vm.emitOp(.subtract),
                     .star_equal => vm.emitOp(.multiply),
                     .slash_equal => vm.emitOp(.divide),
-                    .percent_equal => vm.emitOp(.modulus),
+                    .percent_equal => vm.emitOp(.remainder),
                     else => {},
                 }
 
