@@ -90,9 +90,9 @@ pub const Vm = struct {
 
         self.compiler = null;
 
+        self.resetStack();
         self.globals = Map.init(self.allocator);
         self.strings = Map.init(self.allocator);
-        self.resetStack();
 
         self.empty_string = null;
         self.init_string = null;
@@ -109,13 +109,13 @@ pub const Vm = struct {
     }
 
     pub fn deinit(self: *Vm) void {
+        self.globals.deinit();
+        self.strings.deinit();
+
         self.empty_string = null;
         self.init_string = null;
         self.type_string = null;
         self.super_string = null;
-
-        self.globals.deinit();
-        self.strings.deinit();
 
         GcAllocator.freeObjects(self);
         self.gc.deinit();
@@ -159,7 +159,7 @@ pub const Vm = struct {
             const instruction = @ptrToInt(frame.ip) - @ptrToInt(function.chunk.code.items.ptr) - 1;
             std.debug.print("[line {d}] in ", .{function.chunk.lines.items[instruction]});
             if (function.name == null) {
-                std.debug.print("script\n", .{});
+                std.debug.print("{s}\n", .{if (i == 0) "script" else "fn()"});
             } else {
                 std.debug.print("{s}()\n", .{function.name.?.chars});
             }
@@ -171,7 +171,7 @@ pub const Vm = struct {
     fn defineNative(self: *Vm, name: []const u8, native_fn: NativeFn) void {
         self.push(Value.string(ObjString.copy(self, name)));
         self.push(Value.native(ObjNative.init(self, native_fn)));
-        _ = self.globals.set(self.stack[0].asString(), self.stack[1]);
+        _ = self.globals.set(self.peek(1).asString(), self.peek(0));
         _ = self.pop();
         _ = self.pop();
     }
@@ -590,17 +590,9 @@ pub const Vm = struct {
                 .true => self.push(Value.boolean(true)),
                 .false => self.push(Value.boolean(false)),
                 .pop => _ = self.pop(),
-                .define_global_const => {
+                .define_global_const, .define_global_var => {
                     const name = frame.readString();
-                    if (!self.globals.add(name, self.peek(0), true)) {
-                        self.runtimeError("Global '{s}' already exists.", .{name.chars});
-                        return .runtime_error;
-                    }
-                    _ = self.pop();
-                },
-                .define_global_var => {
-                    const name = frame.readString();
-                    if (!self.globals.add(name, self.peek(0), false)) {
+                    if (!self.globals.add(name, self.peek(0), op == .define_global_const)) {
                         self.runtimeError("Global '{s}' already exists.", .{name.chars});
                         return .runtime_error;
                     }
@@ -647,11 +639,12 @@ pub const Vm = struct {
                 .define_property_const, .define_property_const_pop, .define_property_var, .define_property_var_pop => {
                     const name = frame.readString();
                     const constant = (op == .define_property_const) or (op == .define_property_const_pop);
+                    const do_pop = (op == .define_property_const_pop) or (op == .define_property_var_pop);
                     if (!self.defineProperty(name, self.peek(1), self.peek(0), constant)) {
                         return .runtime_error;
                     }
                     _ = self.pop();
-                    if ((op == .define_property_const_pop) or (op == .define_property_var_pop)) _ = self.pop();
+                    if (do_pop) _ = self.pop();
                 },
                 .get_property, .get_property_pop => {
                     const name = frame.readString();
