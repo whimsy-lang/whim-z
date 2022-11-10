@@ -28,6 +28,7 @@ const Precedence = enum {
     factor, // * / %
     unary, // ! -
     call, // . () []
+    primary,
 };
 
 const PrimaryParseFn = *const fn (*Vm) bool;
@@ -272,6 +273,9 @@ pub const Compiler = struct {
 
     fn declareLocal(vm: *Vm, identifier: *Token, constant: bool) void {
         if (vm.compiler.?.resolveLocal(identifier) != -1) {
+            error_(vm, "A variable with this name already exists.");
+        }
+        if (vm.compiler.?.resolveUpvalue(vm, identifier) != -1) {
             error_(vm, "A variable with this name already exists.");
         }
 

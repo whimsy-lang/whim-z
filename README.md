@@ -242,7 +242,7 @@ compiled: *.whir
 ### C to Zig
 
 * [X] chunk
-* [ ] compiler
+* [X] compiler
 * [X] debug
 * [X] lexer
 * [X] main

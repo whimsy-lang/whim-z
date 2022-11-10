@@ -6,8 +6,8 @@ c :: class
     init :: fn(self, val)
         self.thing := val
 
-        f :: fn(self)
-            print('arf from ', self)
+        f :: fn(s)
+            print('arf from ', s)
         /fn
         self.arf := f
     /fn
