@@ -630,9 +630,17 @@ pub const Vm = struct {
                     }
                     value.value = self.pop();
                 },
+                .get_local_0, .get_local_1, .get_local_2, .get_local_3, .get_local_4, .get_local_5, .get_local_6, .get_local_7, .get_local_8, .get_local_9, .get_local_10, .get_local_11, .get_local_12, .get_local_13, .get_local_14, .get_local_15 => {
+                    const index = @enumToInt(op) - @enumToInt(OpCode.get_local_0);
+                    self.push(frame.slots[index]);
+                },
                 .get_local => {
                     const index = frame.readByte();
                     self.push(frame.slots[index]);
+                },
+                .set_local_0, .set_local_1, .set_local_2, .set_local_3, .set_local_4, .set_local_5, .set_local_6, .set_local_7, .set_local_8, .set_local_9, .set_local_10, .set_local_11, .set_local_12, .set_local_13, .set_local_14, .set_local_15 => {
+                    const index = @enumToInt(op) - @enumToInt(OpCode.set_local_0);
+                    frame.slots[index] = self.pop();
                 },
                 .set_local => {
                     const index = frame.readByte();

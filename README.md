@@ -243,8 +243,8 @@ compiled: *.whir
 * \> 256 constants
 * error handling
 * compiler arrays should not be a fixed size
-* directly load and store common local opcodes
-* call opcodes that directly encode the number of arguments
+* directly load and store common upvalues (probably least beneficial)
+* call and invoke opcodes that directly encode the number of arguments
 * strings - flexible array members
 * support other key types for hash tables
 * string hash set (instead of table with nil values) for interning

@@ -1,2 +1,9 @@
 // simple test file
 
+f :: fn(a, b, c, d,)
+    x := a + b + c + d
+    x += 7
+    print(x)
+/fn
+
+f(1, 2, 3, 4)
