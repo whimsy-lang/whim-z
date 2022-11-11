@@ -204,6 +204,32 @@ pub const Compiler = struct {
         vm.emitOpByte(.constant, makeConstant(vm, value));
     }
 
+    fn emitNumber(vm: *Vm, value: f64) void {
+        if (value == -1) {
+            vm.emitOp(.num_n1);
+        } else if (value == 0) {
+            vm.emitOp(.num_0);
+        } else if (value == 1) {
+            vm.emitOp(.num_1);
+        } else if (value == 2) {
+            vm.emitOp(.num_2);
+        } else if (value == 3) {
+            vm.emitOp(.num_3);
+        } else if (value == 4) {
+            vm.emitOp(.num_4);
+        } else if (value == 5) {
+            vm.emitOp(.num_5);
+        } else if (value == 6) {
+            vm.emitOp(.num_6);
+        } else if (value == 7) {
+            vm.emitOp(.num_7);
+        } else if (value == 8) {
+            vm.emitOp(.num_8);
+        } else {
+            emitConstant(vm, Value.number(value));
+        }
+    }
+
     fn endCompiler(vm: *Vm) *ObjFunction {
         emitReturn(vm);
         const func = vm.compiler.?.function.?;
@@ -640,7 +666,7 @@ pub const Compiler = struct {
     fn negate(vm: *Vm) void {
         if (match(vm, .number)) {
             const value = std.fmt.parseFloat(f64, vm.parser.previous.value) catch 0;
-            emitConstant(vm, Value.number(-value));
+            emitNumber(vm, -value);
         } else {
             // compile the operand
             parsePrecedence(vm, .unary);
@@ -656,7 +682,7 @@ pub const Compiler = struct {
 
     fn number(vm: *Vm) void {
         const value = std.fmt.parseFloat(f64, vm.parser.previous.value) catch 0;
-        emitConstant(vm, Value.number(value));
+        emitNumber(vm, value);
     }
 
     fn orOp(vm: *Vm) void {

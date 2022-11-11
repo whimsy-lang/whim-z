@@ -134,7 +134,7 @@ MyClass :: class is Parent      // optional inheritance, Parent is assigned to M
 myInst :: MyClass(1, 2)
 
 // a class is a map with a few specific values defined
-// name - the name of the type
+// type - the name of the type
 // super - optional superclass
 // init  - optional initializer
 
@@ -239,13 +239,10 @@ compiled: *.whir
 
 ## TODO
 
-### General
-
 * better line number encoding
 * \> 256 constants
 * error handling
 * compiler arrays should not be a fixed size
-* directly load common number opcodes
 * directly load and store common local opcodes
 * call opcodes that directly encode the number of arguments
 * strings - flexible array members

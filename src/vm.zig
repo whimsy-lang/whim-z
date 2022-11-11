@@ -589,6 +589,16 @@ pub const Vm = struct {
                 .nil => self.push(Value.nil()),
                 .true => self.push(Value.boolean(true)),
                 .false => self.push(Value.boolean(false)),
+                .num_n1 => self.push(Value.number(-1)),
+                .num_0 => self.push(Value.number(0)),
+                .num_1 => self.push(Value.number(1)),
+                .num_2 => self.push(Value.number(2)),
+                .num_3 => self.push(Value.number(3)),
+                .num_4 => self.push(Value.number(4)),
+                .num_5 => self.push(Value.number(5)),
+                .num_6 => self.push(Value.number(6)),
+                .num_7 => self.push(Value.number(7)),
+                .num_8 => self.push(Value.number(8)),
                 .pop => _ = self.pop(),
                 .define_global_const, .define_global_var => {
                     const name = frame.readString();
