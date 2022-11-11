@@ -256,7 +256,6 @@ compiled: *.whir
 * error reporting from native code
 * closures only for functions that need it?
 * loop var new per item/closure
-* more compact object header
 * generational gc
 * properties by string
 * setting a property by string with a class or function value should set the name if it is null
