@@ -1,9 +1,19 @@
 // simple test file
 
 f :: fn(a, b, c, d,)
-    x := a + b + c + d
-    x += 7
-    print(x)
+    aa := a
+    bb := b
+    cc := c
+    dd := d
+    inner :: fn()
+        print(aa + bb + cc * dd)
+        aa = 7
+        bb = 8
+        cc = 9
+        dd = 10
+        print(aa + bb + cc * dd)
+    /fn
+    inner()
 /fn
 
 f(1, 2, 3, 4)

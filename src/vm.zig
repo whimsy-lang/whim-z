@@ -648,9 +648,17 @@ pub const Vm = struct {
                     const index = frame.readByte();
                     frame.slots[index] = self.pop();
                 },
+                .get_upvalue_0, .get_upvalue_1, .get_upvalue_2, .get_upvalue_3 => {
+                    const index = @enumToInt(op) - @enumToInt(OpCode.get_upvalue_0);
+                    self.push(frame.closure.upvalues[index].?.location.*);
+                },
                 .get_upvalue => {
                     const index = frame.readByte();
                     self.push(frame.closure.upvalues[index].?.location.*);
+                },
+                .set_upvalue_0, .set_upvalue_1, .set_upvalue_2, .set_upvalue_3 => {
+                    const index = @enumToInt(op) - @enumToInt(OpCode.set_upvalue_0);
+                    frame.closure.upvalues[index].?.location.* = self.pop();
                 },
                 .set_upvalue => {
                     const index = frame.readByte();
