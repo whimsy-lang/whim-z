@@ -750,6 +750,13 @@ pub const Vm = struct {
                     const offset = frame.readShort();
                     if (self.pop().isFalsey()) frame.ip += offset;
                 },
+                .call_0, .call_1, .call_2, .call_3, .call_4, .call_5, .call_6, .call_7, .call_8, .call_9, .call_10, .call_11, .call_12, .call_13, .call_14, .call_15, .call_16 => {
+                    const arg_count = @enumToInt(op) - @enumToInt(OpCode.call_0);
+                    if (!self.callValue(self.peek(arg_count), arg_count)) {
+                        return .runtime_error;
+                    }
+                    frame = &self.frames[self.frame_count - 1];
+                },
                 .call => {
                     const arg_count = frame.readByte();
                     if (!self.callValue(self.peek(arg_count), arg_count)) {
