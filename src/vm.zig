@@ -599,6 +599,8 @@ pub const Vm = struct {
                 .num_6 => self.push(Value.number(6)),
                 .num_7 => self.push(Value.number(7)),
                 .num_8 => self.push(Value.number(8)),
+                .num_9 => self.push(Value.number(9)),
+                .num_10 => self.push(Value.number(10)),
                 .pop => _ = self.pop(),
                 .define_global_const, .define_global_var => {
                     const name = frame.readString();

@@ -42,6 +42,8 @@ pub fn disassembleInstruction(chunk: *Chunk, offset: usize) usize {
         .num_6 => simpleInstruction("num 6", offset),
         .num_7 => simpleInstruction("num 7", offset),
         .num_8 => simpleInstruction("num 8", offset),
+        .num_9 => simpleInstruction("num 9", offset),
+        .num_10 => simpleInstruction("num 10", offset),
         .pop => simpleInstruction("pop", offset),
         .define_global_const => constantInstruction("def const global", chunk, offset),
         .define_global_var => constantInstruction("def var global", chunk, offset),

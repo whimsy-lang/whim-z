@@ -243,6 +243,10 @@ pub const Compiler = struct {
             vm.emitOp(.num_7);
         } else if (value == 8) {
             vm.emitOp(.num_8);
+        } else if (value == 9) {
+            vm.emitOp(.num_9);
+        } else if (value == 10) {
+            vm.emitOp(.num_10);
         } else {
             emitConstant(vm, Value.number(value));
         }
