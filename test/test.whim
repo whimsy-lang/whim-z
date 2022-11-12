@@ -1,19 +1,10 @@
 // simple test file
 
-f :: fn(a, b, c, d,)
-    aa := a
-    bb := b
-    cc := c
-    dd := d
-    inner :: fn()
-        print(aa + bb + cc * dd)
-        aa = 7
-        bb = 8
-        cc = 9
-        dd = 10
-        print(aa + bb + cc * dd)
+c :: class
+    f :: fn(self, x, y)
+        print('added is ', x + y)
     /fn
-    inner()
-/fn
+/class
 
-f(1, 2, 3, 4)
+i :: c()
+i.f(1, 2)

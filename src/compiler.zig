@@ -580,9 +580,15 @@ pub const Compiler = struct {
 
     fn dotHelper(vm: *Vm, name: u8) void {
         if (match(vm, .left_paren)) {
+            const max = @enumToInt(OpCode.invoke_16) - @enumToInt(OpCode.invoke_0);
             const arg_count = argumentList(vm);
-            vm.emitOpByte(.invoke, name);
-            vm.emitByte(arg_count);
+            if (arg_count <= max) {
+                vm.emitByte(@enumToInt(OpCode.invoke_0) + arg_count);
+                vm.emitByte(name);
+            } else {
+                vm.emitOpByte(.invoke, name);
+                vm.emitByte(arg_count);
+            }
         } else {
             vm.emitOpByte(.get_property_pop, name);
         }
