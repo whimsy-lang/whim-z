@@ -6,6 +6,7 @@ const ObjClass = @import("object.zig").ObjClass;
 const ObjClosure = @import("object.zig").ObjClosure;
 const ObjFunction = @import("object.zig").ObjFunction;
 const ObjInstance = @import("object.zig").ObjInstance;
+const ObjList = @import("object.zig").ObjList;
 const ObjNative = @import("object.zig").ObjNative;
 const ObjString = @import("object.zig").ObjString;
 const ObjUpvalue = @import("object.zig").ObjUpvalue;
@@ -21,6 +22,7 @@ pub const ValueType = enum {
     closure,
     function,
     instance,
+    list,
     native,
     string,
     upvalue,
@@ -37,6 +39,7 @@ pub const Value = struct {
         closure: *ObjClosure,
         function: *ObjFunction,
         instance: *ObjInstance,
+        list: *ObjList,
         native: *ObjNative,
         string: *ObjString,
         upvalue: *ObjUpvalue,
@@ -68,6 +71,10 @@ pub const Value = struct {
 
     pub fn instance(value: *ObjInstance) Value {
         return .{ .as = .{ .instance = value } };
+    }
+
+    pub fn list(value: *ObjList) Value {
+        return .{ .as = .{ .list = value } };
     }
 
     pub fn native(value: *ObjNative) Value {
@@ -118,6 +125,10 @@ pub const Value = struct {
         return self.as.instance;
     }
 
+    pub fn asList(self: Value) *ObjList {
+        return self.as.list;
+    }
+
     pub fn asNative(self: Value) *ObjNative {
         return self.as.native;
     }
@@ -150,6 +161,7 @@ pub const Value = struct {
             .closure => self.asClosure() == other.asClosure(),
             .function => self.asFunction() == other.asFunction(),
             .instance => self.asInstance() == other.asInstance(),
+            .list => self.asList() == other.asList(),
             .native => self.asNative() == other.asNative(),
             .string => self.asString() == other.asString(),
             .upvalue => self.asUpvalue() == other.asUpvalue(),
@@ -174,6 +186,19 @@ pub const Value = struct {
                 std.debug.print("{s} inst", .{name.chars});
             } else {
                 std.debug.print("anon inst", .{});
+            },
+            .list => {
+                std.debug.print("(", .{});
+                var first = true;
+                for (self.asList().items.items) |item| {
+                    if (first) {
+                        first = false;
+                    } else {
+                        std.debug.print(", ", .{});
+                    }
+                    item.print();
+                }
+                std.debug.print(")", .{});
             },
             .native => std.debug.print("<native fn>", .{}),
             .string => std.debug.print("{s}", .{self.asString().chars}),
@@ -242,6 +267,7 @@ pub const Value = struct {
                 Value.class(inst.type).mark(vm);
                 inst.fields.mark(vm);
             },
+            .list => markArray(&self.asList().items, vm),
             .upvalue => self.asUpvalue().closed.mark(vm),
             else => unreachable,
         }
@@ -254,6 +280,7 @@ pub const Value = struct {
             .closure => self.asClosure().is_marked,
             .function => self.asFunction().is_marked,
             .instance => self.asInstance().is_marked,
+            .list => self.asList().is_marked,
             .native => self.asNative().is_marked,
             .string => self.asString().is_marked,
             .upvalue => self.asUpvalue().is_marked,
@@ -269,6 +296,7 @@ pub const Value = struct {
             .closure => self.asClosure().is_marked = mark_val,
             .function => self.asFunction().is_marked = mark_val,
             .instance => self.asInstance().is_marked = mark_val,
+            .list => self.asList().is_marked = mark_val,
             .native => self.asNative().is_marked = mark_val,
             .string => self.asString().is_marked = mark_val,
             .upvalue => self.asUpvalue().is_marked = mark_val,

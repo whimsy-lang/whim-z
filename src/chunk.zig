@@ -149,6 +149,7 @@ pub const OpCode = enum(u8) {
     close_upvalue,
     return_,
     class,
+    list,
 };
 
 pub const Chunk = struct {

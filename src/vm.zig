@@ -16,6 +16,7 @@ const ObjClass = @import("object.zig").ObjClass;
 const ObjClosure = @import("object.zig").ObjClosure;
 const ObjFunction = @import("object.zig").ObjFunction;
 const ObjInstance = @import("object.zig").ObjInstance;
+const ObjList = @import("object.zig").ObjList;
 const ObjNative = @import("object.zig").ObjNative;
 const ObjString = @import("object.zig").ObjString;
 const ObjUpvalue = @import("object.zig").ObjUpvalue;
@@ -817,6 +818,17 @@ pub const Vm = struct {
                     frame = &self.frames[self.frame_count - 1];
                 },
                 .class => self.push(Value.class(ObjClass.init(self, frame.readString()))),
+                .list => {
+                    const count = frame.readByte();
+                    const list = ObjList.init(self);
+                    self.push(Value.list(list));
+                    list.items.appendSlice((self.stack_top - (count + 1))[0..count]) catch {
+                        std.debug.print("Could not allocate memory for list.", .{});
+                        std.process.exit(1);
+                    };
+                    self.stack_top -= (count + 1);
+                    self.push(Value.list(list));
+                },
             }
         }
     }

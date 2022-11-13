@@ -699,8 +699,24 @@ pub const Compiler = struct {
     }
 
     fn grouping(vm: *Vm) void {
-        expression(vm);
+        var count: u8 = 0;
+        var list = false;
+        if (!check(vm, .right_paren)) {
+            while (true) {
+                expression(vm);
+                if (count == std.math.maxInt(u8)) {
+                    error_(vm, "Can't have more than 255 starting list items.");
+                }
+                count += 1;
+                if (check(vm, .comma)) list = true;
+                if (!(match(vm, .comma) and !check(vm, .right_paren))) break;
+            }
+        }
         consume(vm, .right_paren, "Expect ')' after expression.");
+
+        if (count == 0 or list) {
+            vm.emitOpByte(.list, count);
+        }
     }
 
     fn literal(vm: *Vm) void {

@@ -153,6 +153,30 @@ pub const ObjInstance = struct {
     }
 };
 
+pub const ObjList = struct {
+    items: std.ArrayList(Value),
+    is_marked: bool,
+
+    pub fn init(vm: *Vm) *ObjList {
+        if (debug.log_gc) {
+            std.debug.print("allocate for list\n", .{});
+        }
+        const list = vm.allocator.create(ObjList) catch {
+            std.debug.print("Could not allocate memory for list.", .{});
+            std.process.exit(1);
+        };
+        vm.registerObject(Value.list(list));
+
+        list.items = std.ArrayList(Value).init(vm.allocator);
+        list.is_marked = false;
+        return list;
+    }
+
+    pub fn deinit(self: *ObjList) void {
+        self.items.deinit();
+    }
+};
+
 pub const NativeFn = *const fn ([]Value) Value;
 
 pub const ObjNative = struct {
