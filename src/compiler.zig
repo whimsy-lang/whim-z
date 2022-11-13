@@ -418,6 +418,10 @@ pub const Compiler = struct {
         }
     }
 
+    fn defineIndexer(vm: *Vm, constant: bool) void {
+        vm.emitOp(if (constant) .define_indexer_const else .define_indexer_var);
+    }
+
     fn getPrefixPrimary(tok_type: TokenType) ?PrimaryParseFn {
         return switch (tok_type) {
             .left_paren => groupingPrimary,
@@ -430,6 +434,7 @@ pub const Compiler = struct {
         return switch (tok_type) {
             .left_paren => callPrimary,
             .dot => dotPrimary,
+            .left_bracket => indexerPrimary,
             else => null,
         };
     }
@@ -453,6 +458,7 @@ pub const Compiler = struct {
         return switch (tok_type) {
             .left_paren => call,
             .dot => dot,
+            .left_bracket => indexer,
             .bang_equal, .equal_equal => binary,
             .less, .less_equal, .greater, .greater_equal => binary,
             .plus, .minus, .star, .slash, .percent => binary,
@@ -464,7 +470,7 @@ pub const Compiler = struct {
 
     fn getPrecedence(tok_type: TokenType) Precedence {
         return switch (tok_type) {
-            .left_paren, .dot => .call,
+            .left_paren, .dot, .left_bracket => .call,
             .bang_equal, .equal_equal => .equality,
             .less, .less_equal, .greater, .greater_equal => .comparison,
             .plus, .minus => .term,
@@ -717,6 +723,61 @@ pub const Compiler = struct {
         if (count == 0 or list) {
             vm.emitOpByte(.list, count);
         }
+    }
+
+    fn indexerPrimary(vm: *Vm) bool {
+        expression(vm);
+        consume(vm, .right_bracket, "Expect ']' after expression.");
+
+        const op_type = vm.parser.current.type;
+        switch (op_type) {
+            .colon_colon, .colon_equal => {
+                // declaration
+                const constant = op_type == .colon_colon;
+
+                advance(vm); // accept :: :=
+                expression(vm);
+                defineIndexer(vm, constant);
+
+                return true;
+            },
+            .equal, .plus_equal, .minus_equal, .star_equal, .slash_equal, .percent_equal => {
+                // assignment
+
+                if (op_type != .equal) {
+                    // emit get
+                    vm.emitOp(.get_indexer);
+                }
+
+                advance(vm); // accept = += -= *= /= %=
+                expression(vm);
+
+                // emit op
+                switch (op_type) {
+                    .plus_equal => vm.emitOp(.add),
+                    .minus_equal => vm.emitOp(.subtract),
+                    .star_equal => vm.emitOp(.multiply),
+                    .slash_equal => vm.emitOp(.divide),
+                    .percent_equal => vm.emitOp(.remainder),
+                    else => {},
+                }
+
+                // emit set
+                vm.emitOp(.set_indexer);
+
+                return true;
+            },
+            else => {},
+        }
+        // not an assignment, so get the indexer
+        vm.emitOp(.get_indexer_pop);
+        return false;
+    }
+
+    fn indexer(vm: *Vm) void {
+        expression(vm);
+        consume(vm, .right_bracket, "Expect ']' after expression.");
+        vm.emitOp(.get_indexer_pop);
     }
 
     fn literal(vm: *Vm) void {

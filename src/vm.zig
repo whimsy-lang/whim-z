@@ -409,13 +409,20 @@ pub const Vm = struct {
         self.push(Value.string(result));
     }
 
-    fn defineProperty(self: *Vm, name: *ObjString, object: Value, value: Value, constant: bool) bool {
+    fn defineProperty(self: *Vm, name: Value, object: Value, value: Value, constant: bool) bool {
+        if (!name.is(.string)) {
+            self.runtimeError("Key must be a string.", .{});
+            return false;
+        }
+
+        const name_str = name.asString();
+
         var fields: *Map = undefined;
         if (object.is(.instance)) {
             const instance = object.asInstance();
             fields = &instance.fields;
 
-            if (name == self.type_string) {
+            if (name_str == self.type_string) {
                 if (value.is(.class)) {
                     instance.type = value.asClass();
                 } else {
@@ -427,7 +434,7 @@ pub const Vm = struct {
             const class = object.asClass();
             fields = &class.fields;
 
-            if (name == self.super_string) {
+            if (name_str == self.super_string) {
                 if (value.is(.class)) {
                     const super = value.asClass();
                     if (class != super) {
@@ -446,29 +453,36 @@ pub const Vm = struct {
             return false;
         }
 
-        if (!fields.add(name, value, constant)) {
-            self.runtimeError("Property '{s}' already exists.", .{name.chars});
+        if (!fields.add(name_str, value, constant)) {
+            self.runtimeError("Property '{s}' already exists.", .{name_str.chars});
             return false;
         }
 
         return true;
     }
 
-    fn getProperty(self: *Vm, name: *ObjString, object: Value, do_pop: bool) bool {
+    fn getProperty(self: *Vm, name: Value, object: Value, pop_count: usize) bool {
+        if (!name.is(.string)) {
+            self.runtimeError("Key must be a string.", .{});
+            return false;
+        }
+
+        const name_str = name.asString();
+
         var class: ?*ObjClass = null;
         var bind = false;
         if (object.is(.instance)) {
             const instance = object.asInstance();
 
-            if (name == self.type_string) {
-                if (do_pop) _ = self.pop();
+            if (name_str == self.type_string) {
+                self.stack_top -= pop_count;
                 self.push(Value.class(instance.type));
                 return true;
             }
 
             var value: Value = undefined;
-            if (instance.fields.get(name, &value)) {
-                if (do_pop) _ = self.pop();
+            if (instance.fields.get(name_str, &value)) {
+                self.stack_top -= pop_count;
                 self.push(value);
                 return true;
             }
@@ -482,21 +496,21 @@ pub const Vm = struct {
         }
 
         while (class) |cl| {
-            if (name == self.super_string and cl.super != null) {
-                if (do_pop) _ = self.pop();
+            if (name_str == self.super_string and cl.super != null) {
+                self.stack_top -= pop_count;
                 self.push(Value.class(cl.super.?));
                 return true;
             }
 
             var value: Value = undefined;
-            if (cl.fields.get(name, &value)) {
+            if (cl.fields.get(name_str, &value)) {
                 if (bind and value.is(.closure)) {
                     // bind method
                     const bound = ObjBoundMethod.init(self, object, value.asClosure());
-                    if (do_pop) _ = self.pop();
+                    self.stack_top -= pop_count;
                     self.push(Value.boundMethod(bound));
                 } else {
-                    if (do_pop) _ = self.pop();
+                    self.stack_top -= pop_count;
                     self.push(value);
                 }
                 return true;
@@ -504,19 +518,26 @@ pub const Vm = struct {
             class = cl.super;
         }
 
-        self.runtimeError("Undefined property '{s}'.", .{name.chars});
+        self.runtimeError("Undefined property '{s}'.", .{name_str.chars});
         return false;
     }
 
-    fn setProperty(self: *Vm, name: *ObjString, object: Value, value: Value) bool {
+    fn setProperty(self: *Vm, name: Value, object: Value, value: Value) bool {
+        if (!name.is(.string)) {
+            self.runtimeError("Key must be a string.", .{});
+            return false;
+        }
+
+        const name_str = name.asString();
+
         var current: *ValueContainer = undefined;
         var found = false;
         var class: ?*ObjClass = null;
         if (object.is(.instance)) {
             const instance = object.asInstance();
-            if (instance.fields.getPtr(name, &current)) {
+            if (instance.fields.getPtr(name_str, &current)) {
                 found = true;
-                if (name == self.type_string) {
+                if (name_str == self.type_string) {
                     if (value.is(.class)) {
                         instance.type = value.asClass();
                     } else {
@@ -531,9 +552,9 @@ pub const Vm = struct {
         }
 
         while (!found and class != null) {
-            if (class.?.fields.getPtr(name, &current)) {
+            if (class.?.fields.getPtr(name_str, &current)) {
                 found = true;
-                if (name == self.super_string) {
+                if (name_str == self.super_string) {
                     if (value.is(.class)) {
                         const super = value.asClass();
                         if (class != super) {
@@ -552,11 +573,11 @@ pub const Vm = struct {
         }
 
         if (!found) {
-            self.runtimeError("Undefined property '{s}'.", .{name.chars});
+            self.runtimeError("Undefined property '{s}'.", .{name_str.chars});
             return false;
         }
         if (current.constant) {
-            self.runtimeError("Property '{s}' is constant.", .{name.chars});
+            self.runtimeError("Property '{s}' is constant.", .{name_str.chars});
             return false;
         }
 
@@ -669,7 +690,7 @@ pub const Vm = struct {
                     const name = frame.readString();
                     const constant = (op == .define_property_const) or (op == .define_property_const_pop);
                     const do_pop = (op == .define_property_const_pop) or (op == .define_property_var_pop);
-                    if (!self.defineProperty(name, self.peek(1), self.peek(0), constant)) {
+                    if (!self.defineProperty(Value.string(name), self.peek(1), self.peek(0), constant)) {
                         return .runtime_error;
                     }
                     _ = self.pop();
@@ -677,17 +698,35 @@ pub const Vm = struct {
                 },
                 .get_property, .get_property_pop => {
                     const name = frame.readString();
-                    if (!self.getProperty(name, self.peek(0), op == .get_property_pop)) {
+                    const pop_count: usize = if (op == .get_property_pop) 1 else 0;
+                    if (!self.getProperty(Value.string(name), self.peek(0), pop_count)) {
                         return .runtime_error;
                     }
                 },
                 .set_property => {
                     const name = frame.readString();
-                    if (!self.setProperty(name, self.peek(1), self.peek(0))) {
+                    if (!self.setProperty(Value.string(name), self.peek(1), self.peek(0))) {
                         return .runtime_error;
                     }
-                    _ = self.pop();
-                    _ = self.pop();
+                    self.stack_top -= 2;
+                },
+                .define_indexer_const, .define_indexer_var => {
+                    if (!self.defineProperty(self.peek(1), self.peek(2), self.peek(0), op == .define_indexer_const)) {
+                        return .runtime_error;
+                    }
+                    self.stack_top -= 3;
+                },
+                .get_indexer, .get_indexer_pop => {
+                    const pop_count: usize = if (op == .get_indexer_pop) 2 else 0;
+                    if (!self.getProperty(self.peek(0), self.peek(1), pop_count)) {
+                        return .runtime_error;
+                    }
+                },
+                .set_indexer => {
+                    if (!self.setProperty(self.peek(1), self.peek(2), self.peek(0))) {
+                        return .runtime_error;
+                    }
+                    self.stack_top -= 3;
                 },
                 .equal => {
                     const b = self.pop();

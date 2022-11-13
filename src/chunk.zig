@@ -85,6 +85,12 @@ pub const OpCode = enum(u8) {
     get_property_pop,
     set_property,
 
+    define_indexer_const,
+    define_indexer_var,
+    get_indexer,
+    get_indexer_pop,
+    set_indexer,
+
     equal,
     not_equal,
     greater,

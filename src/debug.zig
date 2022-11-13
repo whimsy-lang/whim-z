@@ -5,7 +5,7 @@ const OpCode = @import("chunk.zig").OpCode;
 const value = @import("value.zig");
 
 pub const print_code = true;
-pub const trace_execution = false;
+pub const trace_execution = true;
 pub const stress_gc = false;
 pub const log_gc = false;
 
@@ -100,6 +100,11 @@ pub fn disassembleInstruction(chunk: *Chunk, offset: usize) usize {
         .get_property => constantInstruction("get prop", chunk, offset),
         .get_property_pop => constantInstruction("get prop (pop)", chunk, offset),
         .set_property => constantInstruction("set prop", chunk, offset),
+        .define_indexer_const => simpleInstruction("def indexer const", offset),
+        .define_indexer_var => simpleInstruction("def indexer var", offset),
+        .get_indexer => simpleInstruction("get indexer", offset),
+        .get_indexer_pop => simpleInstruction("get indexer (pop)", offset),
+        .set_indexer => simpleInstruction("set indexer", offset),
         .equal => simpleInstruction("equal", offset),
         .not_equal => simpleInstruction("not equal", offset),
         .greater => simpleInstruction("greater", offset),
