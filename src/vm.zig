@@ -409,20 +409,20 @@ pub const Vm = struct {
         self.push(Value.string(result));
     }
 
-    fn defineProperty(self: *Vm, name: Value, object: Value, value: Value, constant: bool) bool {
-        if (!name.is(.string)) {
+    fn defineProperty(self: *Vm, key: Value, object: Value, value: Value, constant: bool) bool {
+        if (!key.is(.string)) {
             self.runtimeError("Key must be a string.", .{});
             return false;
         }
 
-        const name_str = name.asString();
+        const key_str = key.asString();
 
         var fields: *Map = undefined;
         if (object.is(.instance)) {
             const instance = object.asInstance();
             fields = &instance.fields;
 
-            if (name_str == self.type_string) {
+            if (key_str == self.type_string) {
                 if (value.is(.class)) {
                     instance.type = value.asClass();
                 } else {
@@ -434,7 +434,7 @@ pub const Vm = struct {
             const class = object.asClass();
             fields = &class.fields;
 
-            if (name_str == self.super_string) {
+            if (key_str == self.super_string) {
                 if (value.is(.class)) {
                     const super = value.asClass();
                     if (class != super) {
@@ -453,35 +453,47 @@ pub const Vm = struct {
             return false;
         }
 
-        if (!fields.add(name_str, value, constant)) {
-            self.runtimeError("Property '{s}' already exists.", .{name_str.chars});
+        if (!fields.add(key_str, value, constant)) {
+            self.runtimeError("Property '{s}' already exists.", .{key_str.chars});
             return false;
         }
 
         return true;
     }
 
-    fn getProperty(self: *Vm, name: Value, object: Value, pop_count: usize) bool {
-        if (!name.is(.string)) {
+    fn getProperty(self: *Vm, key: Value, object: Value, pop_count: usize) bool {
+        if (object.is(.list) and key.is(.number)) {
+            const list = object.asList();
+            const index = @floatToInt(isize, key.asNumber());
+            if (index < 0 or index >= list.items.items.len) {
+                self.runtimeError("Index {d} is out of bounds (0-{d}).", .{ index, list.items.items.len - 1 });
+                return false;
+            }
+            self.stack_top -= pop_count;
+            self.push(list.items.items[@intCast(usize, index)]);
+            return true;
+        }
+
+        if (!key.is(.string)) {
             self.runtimeError("Key must be a string.", .{});
             return false;
         }
 
-        const name_str = name.asString();
+        const key_str = key.asString();
 
         var class: ?*ObjClass = null;
         var bind = false;
         if (object.is(.instance)) {
             const instance = object.asInstance();
 
-            if (name_str == self.type_string) {
+            if (key_str == self.type_string) {
                 self.stack_top -= pop_count;
                 self.push(Value.class(instance.type));
                 return true;
             }
 
             var value: Value = undefined;
-            if (instance.fields.get(name_str, &value)) {
+            if (instance.fields.get(key_str, &value)) {
                 self.stack_top -= pop_count;
                 self.push(value);
                 return true;
@@ -496,14 +508,14 @@ pub const Vm = struct {
         }
 
         while (class) |cl| {
-            if (name_str == self.super_string and cl.super != null) {
+            if (key_str == self.super_string and cl.super != null) {
                 self.stack_top -= pop_count;
                 self.push(Value.class(cl.super.?));
                 return true;
             }
 
             var value: Value = undefined;
-            if (cl.fields.get(name_str, &value)) {
+            if (cl.fields.get(key_str, &value)) {
                 if (bind and value.is(.closure)) {
                     // bind method
                     const bound = ObjBoundMethod.init(self, object, value.asClosure());
@@ -518,26 +530,37 @@ pub const Vm = struct {
             class = cl.super;
         }
 
-        self.runtimeError("Undefined property '{s}'.", .{name_str.chars});
+        self.runtimeError("Undefined property '{s}'.", .{key_str.chars});
         return false;
     }
 
-    fn setProperty(self: *Vm, name: Value, object: Value, value: Value) bool {
-        if (!name.is(.string)) {
+    fn setProperty(self: *Vm, key: Value, object: Value, value: Value) bool {
+        if (object.is(.list) and key.is(.number)) {
+            const list = object.asList();
+            const index = @floatToInt(isize, key.asNumber());
+            if (index < 0 or index >= list.items.items.len) {
+                self.runtimeError("Index {d} is out of bounds (0-{d}).", .{ index, list.items.items.len - 1 });
+                return false;
+            }
+            list.items.items[@intCast(usize, index)] = value;
+            return true;
+        }
+
+        if (!key.is(.string)) {
             self.runtimeError("Key must be a string.", .{});
             return false;
         }
 
-        const name_str = name.asString();
+        const key_str = key.asString();
 
         var current: *ValueContainer = undefined;
         var found = false;
         var class: ?*ObjClass = null;
         if (object.is(.instance)) {
             const instance = object.asInstance();
-            if (instance.fields.getPtr(name_str, &current)) {
+            if (instance.fields.getPtr(key_str, &current)) {
                 found = true;
-                if (name_str == self.type_string) {
+                if (key_str == self.type_string) {
                     if (value.is(.class)) {
                         instance.type = value.asClass();
                     } else {
@@ -552,9 +575,9 @@ pub const Vm = struct {
         }
 
         while (!found and class != null) {
-            if (class.?.fields.getPtr(name_str, &current)) {
+            if (class.?.fields.getPtr(key_str, &current)) {
                 found = true;
-                if (name_str == self.super_string) {
+                if (key_str == self.super_string) {
                     if (value.is(.class)) {
                         const super = value.asClass();
                         if (class != super) {
@@ -573,11 +596,11 @@ pub const Vm = struct {
         }
 
         if (!found) {
-            self.runtimeError("Undefined property '{s}'.", .{name_str.chars});
+            self.runtimeError("Undefined property '{s}'.", .{key_str.chars});
             return false;
         }
         if (current.constant) {
-            self.runtimeError("Property '{s}' is constant.", .{name_str.chars});
+            self.runtimeError("Property '{s}' is constant.", .{key_str.chars});
             return false;
         }
 

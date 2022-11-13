@@ -1,11 +1,6 @@
 // simple test file
 
-c :: class /class
-i :: c()
-i["first"] := 7
-print(i["first"])
-i["first"] = 21
-print(i["first"])
-i["first"] *= 2
-print(i["first"])
-print(i['fir' + 'st'])
+l :: (1, 2, 3)
+l[0] = 21
+l[0] *= 2
+print(l, ', ', l[2])
