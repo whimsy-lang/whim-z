@@ -409,7 +409,7 @@ pub const Vm = struct {
         self.push(Value.string(result));
     }
 
-    fn defineProperty(self: *Vm, key: Value, object: Value, value: Value, constant: bool) bool {
+    fn defineOnValue(self: *Vm, object: Value, key: Value, value: Value, constant: bool) bool {
         if (!key.is(.string)) {
             self.runtimeError("Key must be a string.", .{});
             return false;
@@ -461,7 +461,8 @@ pub const Vm = struct {
         return true;
     }
 
-    fn getProperty(self: *Vm, key: Value, object: Value, pop_count: usize) bool {
+    fn getOnValue(self: *Vm, object: Value, key: Value, pop_count: usize) bool {
+        // list
         if (object.is(.list) and key.is(.number)) {
             const list = object.asList();
             const index = @floatToInt(isize, key.asNumber());
@@ -474,6 +475,21 @@ pub const Vm = struct {
             return true;
         }
 
+        // string
+        if (object.is(.string) and key.is(.number)) {
+            const string = object.asString();
+            const index = @floatToInt(isize, key.asNumber());
+            if (index < 0 or index >= string.chars.len) {
+                self.runtimeError("Index {d} is out of bounds (0-{d}).", .{ index, string.chars.len - 1 });
+                return false;
+            }
+            self.stack_top -= pop_count;
+            const uindex = @intCast(usize, index);
+            self.push(Value.string(ObjString.copy(self, string.chars[uindex .. uindex + 1])));
+            return true;
+        }
+
+        // class/instance
         if (!key.is(.string)) {
             self.runtimeError("Key must be a string.", .{});
             return false;
@@ -534,7 +550,7 @@ pub const Vm = struct {
         return false;
     }
 
-    fn setProperty(self: *Vm, key: Value, object: Value, value: Value) bool {
+    fn setOnValue(self: *Vm, object: Value, key: Value, value: Value) bool {
         if (object.is(.list) and key.is(.number)) {
             const list = object.asList();
             const index = @floatToInt(isize, key.asNumber());
@@ -713,7 +729,7 @@ pub const Vm = struct {
                     const name = frame.readString();
                     const constant = (op == .define_property_const) or (op == .define_property_const_pop);
                     const do_pop = (op == .define_property_const_pop) or (op == .define_property_var_pop);
-                    if (!self.defineProperty(Value.string(name), self.peek(1), self.peek(0), constant)) {
+                    if (!self.defineOnValue(self.peek(1), Value.string(name), self.peek(0), constant)) {
                         return .runtime_error;
                     }
                     _ = self.pop();
@@ -722,31 +738,31 @@ pub const Vm = struct {
                 .get_property, .get_property_pop => {
                     const name = frame.readString();
                     const pop_count: usize = if (op == .get_property_pop) 1 else 0;
-                    if (!self.getProperty(Value.string(name), self.peek(0), pop_count)) {
+                    if (!self.getOnValue(self.peek(0), Value.string(name), pop_count)) {
                         return .runtime_error;
                     }
                 },
                 .set_property => {
                     const name = frame.readString();
-                    if (!self.setProperty(Value.string(name), self.peek(1), self.peek(0))) {
+                    if (!self.setOnValue(self.peek(1), Value.string(name), self.peek(0))) {
                         return .runtime_error;
                     }
                     self.stack_top -= 2;
                 },
                 .define_indexer_const, .define_indexer_var => {
-                    if (!self.defineProperty(self.peek(1), self.peek(2), self.peek(0), op == .define_indexer_const)) {
+                    if (!self.defineOnValue(self.peek(2), self.peek(1), self.peek(0), op == .define_indexer_const)) {
                         return .runtime_error;
                     }
                     self.stack_top -= 3;
                 },
                 .get_indexer, .get_indexer_pop => {
                     const pop_count: usize = if (op == .get_indexer_pop) 2 else 0;
-                    if (!self.getProperty(self.peek(0), self.peek(1), pop_count)) {
+                    if (!self.getOnValue(self.peek(1), self.peek(0), pop_count)) {
                         return .runtime_error;
                     }
                 },
                 .set_indexer => {
-                    if (!self.setProperty(self.peek(1), self.peek(2), self.peek(0))) {
+                    if (!self.setOnValue(self.peek(2), self.peek(1), self.peek(0))) {
                         return .runtime_error;
                     }
                     self.stack_top -= 3;

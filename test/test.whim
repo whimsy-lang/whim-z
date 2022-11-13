@@ -1,6 +1,14 @@
 // simple test file
 
-l :: (1, 2, 3)
-l[0] = 21
-l[0] *= 2
-print(l, ', ', l[2])
+s :: 'hello'
+print(s[1])
+print('test'[2])
+
+c :: class /class
+i :: c()
+i.first := 1
+i.first += 7
+print(i.first)
+i["second"] := 21
+i["second"] *= 2
+print(i["sec" + "ond"])
