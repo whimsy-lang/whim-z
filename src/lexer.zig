@@ -9,7 +9,6 @@ pub const TokenType = enum {
     comma,
     dot,
     semicolon,
-    underscore,
     // two character tokens
     colon_colon,
     colon_equal,
@@ -47,7 +46,6 @@ pub const TokenType = enum {
     false,
     fn_,
     for_,
-    from,
     if_,
     in,
     is,
@@ -180,7 +178,6 @@ pub const Lexer = struct {
     fn identifierType(self: *Lexer) TokenType {
         const cur = self.source[self.start..self.current];
         switch (cur[0]) {
-            '_' => if (cur.len == 1) return .underscore,
             'a' => return checkKeyword(cur[1..], "nd", .and_),
             'b' => return checkKeyword(cur[1..], "reak", .break_),
             'c' => if (cur.len > 1) {
@@ -203,7 +200,6 @@ pub const Lexer = struct {
                     'a' => return checkKeyword(cur[2..], "lse", .false),
                     'n' => if (cur.len == 2) return .fn_,
                     'o' => return checkKeyword(cur[2..], "r", .for_),
-                    'r' => return checkKeyword(cur[2..], "om", .from),
                     else => {},
                 }
             },

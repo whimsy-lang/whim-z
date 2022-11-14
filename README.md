@@ -28,35 +28,12 @@ myVariable := "initialized"
 myVar := 0
 myVar = 7
 
-// you can declare and assign multiple items by separating them with commas
-first, second = second, first
-
-// lists, maps, and objects can be destructured
-first, second := from myList
-// is the same as
-first := myList[0]
-second := myList[1]
-
-first, second := from myObject
-// is the same as
-first := myObject.first
-second := myObject.second
-
-// _ can be used to skip/discard a value
-first, _, third := from myList
-
 // mutability is per level, so a constant can have mutable fields
 
 // scoped blocks
 do
   // statements
 /do
-
-// import modules with use - the module is returned, so assign it to a variable or constant
-std :: use Some.Standard.Library
-
-// or maybe with a function?
-lib :: std.import(Some.Standard.Library)
 
 // number literals
 12        // decimal
@@ -83,7 +60,6 @@ i :: instance()
 i.property := 'yay'
 // these are then equivalent:
 i.property
-i.'property'
 i['property']
 i[propName]
 
@@ -145,8 +121,6 @@ myInst :: MyClass(1, 2)
 list := (1, 2.3, 'hi', myObj, MyClass, myFunc)
 list[1]        // this is 2.3
 list[2] = 42   // this has now changed from a string to an int
-// negative indexes are equivalent to list.length + index
-list[-1] = 'last item'    // this updates the last item in the list
 
 // sets are unordered and unindexed collections of any type denoted with []
 // sets cannot contain duplicates
@@ -195,10 +169,6 @@ loop
 /loop
 
 for i in item   // creates an iterator from item, and i contains the next value
-/for
-
-for _ in 5
-  // loop 5 times
 /for
 
 // a semicolon is an explicit empty statement for grammar ambiguities
