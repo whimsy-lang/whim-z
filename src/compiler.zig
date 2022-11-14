@@ -572,9 +572,8 @@ pub const Compiler = struct {
         }
 
         if (match(vm, .is)) {
-            const super = makeConstant(vm, Value.string(vm.super_string.?));
             expression(vm);
-            defineProperty(vm, super, false, false);
+            vm.emitOp(.define_super);
         }
 
         while (!check(vm, .class_end) and !check(vm, .eof)) {

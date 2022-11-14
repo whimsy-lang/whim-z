@@ -424,21 +424,6 @@ pub const Vm = struct {
         } else if (object.is(.class)) {
             const class = object.asClass();
             fields = &class.fields;
-
-            if (key_str == self.super_string) {
-                if (value.is(.class)) {
-                    const super = value.asClass();
-                    if (class != super) {
-                        class.super = super;
-                    } else {
-                        self.runtimeError("Class cannot be its own superclass.", .{});
-                        return false;
-                    }
-                } else {
-                    self.runtimeError("Superclass must be a class.", .{});
-                    return false;
-                }
-            }
         } else {
             self.runtimeError("Only classes and instances have properties.", .{});
             return false;
@@ -508,12 +493,6 @@ pub const Vm = struct {
         }
 
         while (class) |cl| {
-            if (key_str == self.super_string and cl.super != null) {
-                self.stack_top -= pop_count;
-                self.push(Value.class(cl.super.?));
-                return true;
-            }
-
             var value: Value = undefined;
             if (cl.fields.get(key_str, &value)) {
                 if (bind and value.is(.closure)) {
@@ -569,20 +548,6 @@ pub const Vm = struct {
         while (!found and class != null) {
             if (class.?.fields.getPtr(key_str, &current)) {
                 found = true;
-                if (key_str == self.super_string) {
-                    if (value.is(.class)) {
-                        const super = value.asClass();
-                        if (class != super) {
-                            class.?.super = super;
-                        } else {
-                            self.runtimeError("Class cannot be its own superclass.", .{});
-                            return false;
-                        }
-                    } else {
-                        self.runtimeError("Superclass must be a class.", .{});
-                        return false;
-                    }
-                }
             }
             class = class.?.super;
         }
@@ -710,6 +675,21 @@ pub const Vm = struct {
                     }
                     _ = self.pop();
                     if (do_pop) _ = self.pop();
+                },
+                .define_super => {
+                    if (!self.peek(1).is(.class)) {
+                        self.runtimeError("Only classes can have a superclass.", .{});
+                        return .runtime_error;
+                    }
+                    if (!self.peek(0).is(.class)) {
+                        self.runtimeError("Superclass must be a class.", .{});
+                        return .runtime_error;
+                    }
+                    const class = self.peek(1).asClass();
+                    const super = self.peek(0).asClass();
+                    class.super = super;
+                    _ = class.fields.set(self.super_string.?, Value.class(super));
+                    _ = self.pop();
                 },
                 .get_property, .get_property_pop => {
                     const name = frame.readString();

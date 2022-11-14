@@ -1,7 +1,7 @@
 // simple test file
 
 c1 :: class /class
-c2 :: class /class
+c2 :: class is c1 /class
 
-i := c1()
-print(i.type)
+print(c1.super)
+print(c2.super)

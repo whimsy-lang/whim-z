@@ -48,6 +48,7 @@ pub const ObjClass = struct {
         class.name = if (class_name != vm.empty_string) class_name else null;
         class.super = null;
         class.fields = Map.init(vm.allocator);
+        _ = class.fields.add(vm.super_string.?, Value.nil(), true);
         class.is_marked = false;
         return class;
     }

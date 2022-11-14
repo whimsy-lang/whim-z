@@ -97,6 +97,7 @@ pub fn disassembleInstruction(chunk: *Chunk, offset: usize) usize {
         .define_property_const_pop => constantInstruction("def const prop (pop)", chunk, offset),
         .define_property_var => constantInstruction("def var prop", chunk, offset),
         .define_property_var_pop => constantInstruction("def var prop (pop)", chunk, offset),
+        .define_super => simpleInstruction("def super", offset),
         .get_property => constantInstruction("get prop", chunk, offset),
         .get_property_pop => constantInstruction("get prop (pop)", chunk, offset),
         .set_property => constantInstruction("set prop", chunk, offset),
