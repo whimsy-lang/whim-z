@@ -1,14 +1,7 @@
 // simple test file
 
-s :: 'hello'
-print(s[1])
-print('test'[2])
+c1 :: class /class
+c2 :: class /class
 
-c :: class /class
-i :: c()
-i.first := 1
-i.first += 7
-print(i.first)
-i["second"] := 21
-i["second"] *= 2
-print(i["sec" + "ond"])
+i := c1()
+print(i.type)

@@ -421,15 +421,6 @@ pub const Vm = struct {
         if (object.is(.instance)) {
             const instance = object.asInstance();
             fields = &instance.fields;
-
-            if (key_str == self.type_string) {
-                if (value.is(.class)) {
-                    instance.type = value.asClass();
-                } else {
-                    self.runtimeError("Instance type must be a class.", .{});
-                    return false;
-                }
-            }
         } else if (object.is(.class)) {
             const class = object.asClass();
             fields = &class.fields;
@@ -501,13 +492,6 @@ pub const Vm = struct {
         var bind = false;
         if (object.is(.instance)) {
             const instance = object.asInstance();
-
-            if (key_str == self.type_string) {
-                self.stack_top -= pop_count;
-                self.push(Value.class(instance.type));
-                return true;
-            }
-
             var value: Value = undefined;
             if (instance.fields.get(key_str, &value)) {
                 self.stack_top -= pop_count;
@@ -576,14 +560,6 @@ pub const Vm = struct {
             const instance = object.asInstance();
             if (instance.fields.getPtr(key_str, &current)) {
                 found = true;
-                if (key_str == self.type_string) {
-                    if (value.is(.class)) {
-                        instance.type = value.asClass();
-                    } else {
-                        self.runtimeError("Instance type must be a class.", .{});
-                        return false;
-                    }
-                }
             }
             class = instance.type;
         } else if (object.is(.class)) {
