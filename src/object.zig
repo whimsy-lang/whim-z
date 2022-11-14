@@ -35,7 +35,7 @@ pub const ObjClass = struct {
     fields: Map,
     is_marked: bool,
 
-    pub fn init(vm: *Vm, class_name: ?*ObjString) *ObjClass {
+    pub fn init(vm: *Vm, class_name: *ObjString) *ObjClass {
         if (debug.log_gc) {
             std.debug.print("allocate for class\n", .{});
         }
