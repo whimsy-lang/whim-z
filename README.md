@@ -50,15 +50,21 @@ myFunc :: fn(x, y, z)
 
 // all functions are static and require an explicit self
 
-// these are equivalent if first is an instance of Class
-first.func(second)
-Class.func(first, second)
+// these are equivalent, : is used to pass the left hand side as the first argument
+first:func(second)
+func(first, second)
 
-// property access can be by identifier or string, with this setup:
-propName :: 'property'
-i :: instance()
-i.property := 'yay'
-// these are then equivalent:
+// functions can be partially applied by appending .fn
+partial :: myFunc(args).fn
+bound :: myObject:method().fn
+
+// partial example
+add :: fn(a, b)
+  return a + b
+/fn
+add1 :: add(1).fn
+
+// property access by string or identifier, if propName :: 'property' then these are equivalent:
 i.property
 i['property']
 i[propName]
@@ -141,7 +147,7 @@ map := [
 
   'var' := 3,
 
-  'someFn' :: fn
+  'someFn' :: fn()
     return 'hello'
   /fn,
 ]
@@ -151,13 +157,8 @@ map.someFn()  // 'hello'
 
 // Ranges
 [from]..[to(exclusive)] [: step]
-// from defaults to 0
-// to defaults to item.length if applicable
 // step defaults to 1
 1..3      // 1, 2
-..4       // 0, 1, 2, 3
-3..       // 3 to length - 1
-..        // 0 to length - 1
 1..4: 2   // 1, 3
 4..1: -1  // 4, 3, 2
 
@@ -197,11 +198,11 @@ a
 // map        Map           [key :: const, key := var, 'string key' :: val]
 // range      Range         from..to : step
 
-// Operators: + - * / % ! == != and or :: := = += -= *= /= %= is from
+// Operators: + - * / % ! == != and or :: := = += -= *= /= %= is
 
 // no implicit string conversion
-val := 3 + someStr.num()
-message :: "Value is " + val.str()
+val := 3 + someStr:num()
+message :: "Value is " + val:str()
 ```
 
 text: *.whim  
@@ -227,3 +228,21 @@ compiled: *.whir
 * generational gc
 * setting a property by string with a class or function value should set the name if it is null
 * NaN boxing
+
+### Language Features
+
+* binary, octal, hex
+* `_` in number literals
+* use `:` to pass lhs to a function
+* partially apply functions with `.fn`
+* remove bound methods
+* strings as class keys
+* operator overloading on classes
+* sets
+* maps
+* ranges
+* for loop
+* std library
+  * functions for lists
+  * type conversions
+  * organize and expand existing functions
