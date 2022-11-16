@@ -17,9 +17,6 @@ Whimsy is based on [Crafting Interpreters](http://craftinginterpreters.com/) by 
    /* nesting */ is also allowed
 */
 
-// A closing comment token on its own is valid (and ignored)
-*/
-
 // constant and variable declarations
 myConstant :: "hello"
 myVariable := "initialized"
@@ -53,16 +50,6 @@ myFunc :: fn(x, y, z)
 // these are equivalent, : is used to pass the left hand side as the first argument
 first:func(second)
 func(first, second)
-
-// functions can be partially applied by appending .fn
-partial :: myFunc(args).fn
-bound :: myObject:method().fn
-
-// partial example
-add :: fn(a, b)
-  return a + b
-/fn
-add1 :: add(1).fn
 
 // property access by string or identifier, if propName :: 'property' then these are equivalent:
 i.property
@@ -234,7 +221,7 @@ compiled: *.whir
 * binary, octal, hex
 * `_` in number literals
 * use `:` to pass lhs to a function
-* partially apply functions with `.fn`
+* `is` op
 * remove bound methods
 * strings as class keys
 * operator overloading on classes
