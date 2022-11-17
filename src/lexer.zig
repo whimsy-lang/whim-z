@@ -9,10 +9,10 @@ pub const TokenType = enum {
     comma,
     dot,
     semicolon,
-    // two character tokens
+    // one or two character tokens
+    colon,
     colon_colon,
     colon_equal,
-    // one or two character tokens
     bang,
     bang_equal,
     equal,
@@ -291,7 +291,7 @@ pub const Lexer = struct {
                         _ = self.advance();
                         return self.token(.colon_equal);
                     },
-                    else => return self.errorToken("Unexpected character."),
+                    else => return self.token(.colon),
                 },
                 '!' => return self.token(if (self.match('=')) .bang_equal else .bang),
                 '=' => return self.token(if (self.match('=')) .equal_equal else .equal),

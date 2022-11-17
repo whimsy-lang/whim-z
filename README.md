@@ -220,7 +220,6 @@ compiled: *.whir
 
 * binary, octal, hex
 * `_` in number literals
-* use `:` to pass lhs to a function
 * `is` op
 * strings as class keys
 * operator overloading on classes

@@ -44,11 +44,15 @@ pub fn disassembleInstruction(chunk: *Chunk, offset: usize) usize {
         .num_8 => simpleInstruction("num 8", offset),
         .num_9 => simpleInstruction("num 9", offset),
         .num_10 => simpleInstruction("num 10", offset),
+
+        .dup => simpleInstruction("dup", offset),
         .pop => simpleInstruction("pop", offset),
+
         .define_global_const => constantInstruction("def const global", chunk, offset),
         .define_global_var => constantInstruction("def var global", chunk, offset),
         .get_global => constantInstruction("get global", chunk, offset),
         .set_global => constantInstruction("set global", chunk, offset),
+
         .get_local_0 => simpleInstruction("get local 0", offset),
         .get_local_1 => simpleInstruction("get local 1", offset),
         .get_local_2 => simpleInstruction("get local 2", offset),
@@ -66,6 +70,7 @@ pub fn disassembleInstruction(chunk: *Chunk, offset: usize) usize {
         .get_local_14 => simpleInstruction("get local 14", offset),
         .get_local_15 => simpleInstruction("get local 15", offset),
         .get_local => byteInstruction("get local", chunk, offset),
+
         .set_local_0 => simpleInstruction("set local 0", offset),
         .set_local_1 => simpleInstruction("set local 1", offset),
         .set_local_2 => simpleInstruction("set local 2", offset),
@@ -83,16 +88,19 @@ pub fn disassembleInstruction(chunk: *Chunk, offset: usize) usize {
         .set_local_14 => simpleInstruction("set local 14", offset),
         .set_local_15 => simpleInstruction("set local 15", offset),
         .set_local => byteInstruction("set local", chunk, offset),
+
         .get_upvalue_0 => simpleInstruction("get upvalue 0", offset),
         .get_upvalue_1 => simpleInstruction("get upvalue 1", offset),
         .get_upvalue_2 => simpleInstruction("get upvalue 2", offset),
         .get_upvalue_3 => simpleInstruction("get upvalue 3", offset),
         .get_upvalue => byteInstruction("get upvalue", chunk, offset),
+
         .set_upvalue_0 => simpleInstruction("set upvalue 0", offset),
         .set_upvalue_1 => simpleInstruction("set upvalue 1", offset),
         .set_upvalue_2 => simpleInstruction("set upvalue 2", offset),
         .set_upvalue_3 => simpleInstruction("set upvalue 3", offset),
         .set_upvalue => byteInstruction("set upvalue", chunk, offset),
+
         .define_property_const => constantInstruction("def const prop", chunk, offset),
         .define_property_const_pop => constantInstruction("def const prop (pop)", chunk, offset),
         .define_property_var => constantInstruction("def var prop", chunk, offset),
@@ -101,11 +109,13 @@ pub fn disassembleInstruction(chunk: *Chunk, offset: usize) usize {
         .get_property => constantInstruction("get prop", chunk, offset),
         .get_property_pop => constantInstruction("get prop (pop)", chunk, offset),
         .set_property => constantInstruction("set prop", chunk, offset),
+
         .define_indexer_const => simpleInstruction("def indexer const", offset),
         .define_indexer_var => simpleInstruction("def indexer var", offset),
         .get_indexer => simpleInstruction("get indexer", offset),
         .get_indexer_pop => simpleInstruction("get indexer (pop)", offset),
         .set_indexer => simpleInstruction("set indexer", offset),
+
         .equal => simpleInstruction("equal", offset),
         .not_equal => simpleInstruction("not equal", offset),
         .greater => simpleInstruction("greater", offset),
@@ -117,14 +127,17 @@ pub fn disassembleInstruction(chunk: *Chunk, offset: usize) usize {
         .multiply => simpleInstruction("multiply", offset),
         .divide => simpleInstruction("divide", offset),
         .remainder => simpleInstruction("remainder", offset),
+
         .negate => simpleInstruction("negate", offset),
         .not => simpleInstruction("not", offset),
+
         .jump => jumpInstruction("jump", 1, chunk, offset),
         .jump_back => jumpInstruction("jump back", -1, chunk, offset),
         .jump_if_true => jumpInstruction("jump if true", 1, chunk, offset),
         .jump_if_false => jumpInstruction("jump if false", 1, chunk, offset),
         .jump_if_true_pop => jumpInstruction("jump if true (pop)", 1, chunk, offset),
         .jump_if_false_pop => jumpInstruction("jump if false (pop)", 1, chunk, offset),
+
         .call_0 => simpleInstruction("call (0)", offset),
         .call_1 => simpleInstruction("call (1)", offset),
         .call_2 => simpleInstruction("call (2)", offset),
@@ -143,6 +156,7 @@ pub fn disassembleInstruction(chunk: *Chunk, offset: usize) usize {
         .call_15 => simpleInstruction("call (15)", offset),
         .call_16 => simpleInstruction("call (16)", offset),
         .call => byteInstruction("call", chunk, offset),
+
         .invoke_0 => constantInstruction("invoke (0)", chunk, offset),
         .invoke_1 => constantInstruction("invoke (1)", chunk, offset),
         .invoke_2 => constantInstruction("invoke (2)", chunk, offset),
@@ -161,6 +175,7 @@ pub fn disassembleInstruction(chunk: *Chunk, offset: usize) usize {
         .invoke_15 => constantInstruction("invoke (15)", chunk, offset),
         .invoke_16 => constantInstruction("invoke (16)", chunk, offset),
         .invoke => invokeInstruction("invoke", chunk, offset),
+
         .closure => closureInstruction("closure", chunk, offset),
         .close_upvalue => simpleInstruction("close upvalue", offset),
         .return_ => simpleInstruction("return", offset),

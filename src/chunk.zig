@@ -22,6 +22,7 @@ pub const OpCode = enum(u8) {
     num_9,
     num_10,
 
+    dup,
     pop,
 
     define_global_const,

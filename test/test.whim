@@ -1,12 +1,16 @@
 // simple test file
 
 c :: class
-    test :: fn(self)
-        print('hey ', self)
+    test :: fn(self, a, b)
+        print('hey ', self, ', ', a, b)
+    /fn
+    t2 :: fn(self)
+        print('yay ', self)
     /fn
 /class
 
 i :: c()
-i.test(i)
-t :: i.test
-t(i)
+i.test(i, 'oh', ' boy')
+i.t2('heya')
+i:test('oh', ' boy')
+i:t2()

@@ -27,7 +27,7 @@ const Precedence = enum {
     term, // + -
     factor, // * / %
     unary, // ! -
-    call, // . () []
+    call, // . : () []
     primary,
 };
 
@@ -434,6 +434,7 @@ pub const Compiler = struct {
         return switch (tok_type) {
             .left_paren => callPrimary,
             .dot => dotPrimary,
+            .colon => methodPrimary,
             .left_bracket => indexerPrimary,
             else => null,
         };
@@ -458,6 +459,7 @@ pub const Compiler = struct {
         return switch (tok_type) {
             .left_paren => call,
             .dot => dot,
+            .colon => method,
             .left_bracket => indexer,
             .bang_equal, .equal_equal => binary,
             .less, .less_equal, .greater, .greater_equal => binary,
@@ -470,7 +472,7 @@ pub const Compiler = struct {
 
     fn getPrecedence(tok_type: TokenType) Precedence {
         return switch (tok_type) {
-            .left_paren, .dot, .left_bracket => .call,
+            .left_paren, .dot, .colon, .left_bracket => .call,
             .bang_equal, .equal_equal => .equality,
             .less, .less_equal, .greater, .greater_equal => .comparison,
             .plus, .minus => .term,
@@ -599,12 +601,6 @@ pub const Compiler = struct {
         }
     }
 
-    fn dot(vm: *Vm) void {
-        consume(vm, .identifier, "Expect property name after '.'.");
-        const name = identifierConstant(vm, &vm.parser.previous);
-        dotHelper(vm, name);
-    }
-
     fn dotPrimary(vm: *Vm) bool {
         consume(vm, .identifier, "Expect property name after '.'.");
         const name = identifierConstant(vm, &vm.parser.previous);
@@ -657,6 +653,12 @@ pub const Compiler = struct {
         // not an assignment, so get the property
         dotHelper(vm, name);
         return false;
+    }
+
+    fn dot(vm: *Vm) void {
+        consume(vm, .identifier, "Expect property name after '.'.");
+        const name = identifierConstant(vm, &vm.parser.previous);
+        dotHelper(vm, name);
     }
 
     fn function(vm: *Vm) void {
@@ -785,6 +787,27 @@ pub const Compiler = struct {
             .nil => vm.emitOp(.nil),
             .true => vm.emitOp(.true),
             else => unreachable,
+        }
+    }
+
+    fn methodPrimary(vm: *Vm) bool {
+        method(vm);
+        return false;
+    }
+
+    fn method(vm: *Vm) void {
+        consume(vm, .identifier, "Expect method name after ':'.");
+        const name = identifierConstant(vm, &vm.parser.previous);
+        consume(vm, .left_paren, "Expect '(' after method name.");
+        vm.emitOp(.dup);
+        const max = @enumToInt(OpCode.invoke_16) - @enumToInt(OpCode.invoke_0);
+        const arg_count = argumentList(vm) + 1;
+        if (arg_count <= max) {
+            vm.emitByte(@enumToInt(OpCode.invoke_0) + arg_count);
+            vm.emitByte(name);
+        } else {
+            vm.emitOpByte(.invoke, name);
+            vm.emitByte(arg_count);
         }
     }
 

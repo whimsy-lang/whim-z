@@ -588,7 +588,10 @@ pub const Vm = struct {
                 .num_8 => self.push(Value.number(8)),
                 .num_9 => self.push(Value.number(9)),
                 .num_10 => self.push(Value.number(10)),
+
+                .dup => self.push(self.peek(0)),
                 .pop => _ = self.pop(),
+
                 .define_global_const, .define_global_var => {
                     const name = frame.readString();
                     if (!self.globals.add(name, self.peek(0), op == .define_global_const)) {
@@ -619,6 +622,7 @@ pub const Vm = struct {
                     }
                     value.value = self.pop();
                 },
+
                 .get_local_0, .get_local_1, .get_local_2, .get_local_3, .get_local_4, .get_local_5, .get_local_6, .get_local_7, .get_local_8, .get_local_9, .get_local_10, .get_local_11, .get_local_12, .get_local_13, .get_local_14, .get_local_15 => {
                     const index = @enumToInt(op) - @enumToInt(OpCode.get_local_0);
                     self.push(frame.slots[index]);
@@ -627,6 +631,7 @@ pub const Vm = struct {
                     const index = frame.readByte();
                     self.push(frame.slots[index]);
                 },
+
                 .set_local_0, .set_local_1, .set_local_2, .set_local_3, .set_local_4, .set_local_5, .set_local_6, .set_local_7, .set_local_8, .set_local_9, .set_local_10, .set_local_11, .set_local_12, .set_local_13, .set_local_14, .set_local_15 => {
                     const index = @enumToInt(op) - @enumToInt(OpCode.set_local_0);
                     frame.slots[index] = self.pop();
@@ -635,6 +640,7 @@ pub const Vm = struct {
                     const index = frame.readByte();
                     frame.slots[index] = self.pop();
                 },
+
                 .get_upvalue_0, .get_upvalue_1, .get_upvalue_2, .get_upvalue_3 => {
                     const index = @enumToInt(op) - @enumToInt(OpCode.get_upvalue_0);
                     self.push(frame.closure.upvalues[index].?.location.*);
@@ -643,6 +649,7 @@ pub const Vm = struct {
                     const index = frame.readByte();
                     self.push(frame.closure.upvalues[index].?.location.*);
                 },
+
                 .set_upvalue_0, .set_upvalue_1, .set_upvalue_2, .set_upvalue_3 => {
                     const index = @enumToInt(op) - @enumToInt(OpCode.set_upvalue_0);
                     frame.closure.upvalues[index].?.location.* = self.pop();
@@ -651,6 +658,7 @@ pub const Vm = struct {
                     const index = frame.readByte();
                     frame.closure.upvalues[index].?.location.* = self.pop();
                 },
+
                 .define_property_const, .define_property_const_pop, .define_property_var, .define_property_var_pop => {
                     const name = frame.readString();
                     const constant = (op == .define_property_const) or (op == .define_property_const_pop);
@@ -690,6 +698,7 @@ pub const Vm = struct {
                     }
                     self.stack_top -= 2;
                 },
+
                 .define_indexer_const, .define_indexer_var => {
                     if (!self.defineOnValue(self.peek(2), self.peek(1), self.peek(0), op == .define_indexer_const)) {
                         return .runtime_error;
@@ -708,6 +717,7 @@ pub const Vm = struct {
                     }
                     self.stack_top -= 3;
                 },
+
                 .equal => {
                     const b = self.pop();
                     const a = self.pop();
@@ -738,6 +748,7 @@ pub const Vm = struct {
                 .multiply => if (!NumBinaryOp.run(self, NumBinaryOp.multiply)) return .runtime_error,
                 .divide => if (!NumBinaryOp.run(self, NumBinaryOp.divide)) return .runtime_error,
                 .remainder => if (!NumBinaryOp.run(self, NumBinaryOp.remainder)) return .runtime_error,
+
                 .negate => {
                     if (!self.peek(0).is(.number)) {
                         self.runtimeError("Operand must be a number.", .{});
@@ -746,6 +757,7 @@ pub const Vm = struct {
                     self.push(Value.number(-self.pop().asNumber()));
                 },
                 .not => self.push(Value.boolean(self.pop().isFalsey())),
+
                 .jump => {
                     const offset = frame.readShort();
                     frame.ip += offset;
@@ -770,6 +782,7 @@ pub const Vm = struct {
                     const offset = frame.readShort();
                     if (self.pop().isFalsey()) frame.ip += offset;
                 },
+
                 .call_0, .call_1, .call_2, .call_3, .call_4, .call_5, .call_6, .call_7, .call_8, .call_9, .call_10, .call_11, .call_12, .call_13, .call_14, .call_15, .call_16 => {
                     const arg_count = @enumToInt(op) - @enumToInt(OpCode.call_0);
                     if (!self.callValue(self.peek(arg_count), arg_count)) {
@@ -784,6 +797,7 @@ pub const Vm = struct {
                     }
                     frame = &self.frames[self.frame_count - 1];
                 },
+
                 .invoke_0, .invoke_1, .invoke_2, .invoke_3, .invoke_4, .invoke_5, .invoke_6, .invoke_7, .invoke_8, .invoke_9, .invoke_10, .invoke_11, .invoke_12, .invoke_13, .invoke_14, .invoke_15, .invoke_16 => {
                     const name = frame.readString();
                     const arg_count = @enumToInt(op) - @enumToInt(OpCode.invoke_0);
@@ -800,6 +814,7 @@ pub const Vm = struct {
                     }
                     frame = &self.frames[self.frame_count - 1];
                 },
+
                 .closure => {
                     const function = frame.readConstant().asFunction();
                     const closure = ObjClosure.init(self, function);
