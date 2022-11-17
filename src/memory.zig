@@ -155,7 +155,6 @@ pub const GcAllocater = struct {
             std.debug.print("free {any}\n", .{object.getType()});
         }
         switch (object.getType()) {
-            .bound_method => vm.allocator.destroy(object.asBoundMethod()),
             .class => {
                 const class = object.asClass();
                 class.deinit();

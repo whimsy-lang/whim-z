@@ -1,7 +1,12 @@
 // simple test file
 
-c1 :: class /class
-c2 :: class is c1 /class
+c :: class
+    test :: fn(self)
+        print('hey ', self)
+    /fn
+/class
 
-print(c1.super)
-print(c2.super)
+i :: c()
+i.test(i)
+t :: i.test
+t(i)

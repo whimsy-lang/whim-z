@@ -222,7 +222,6 @@ compiled: *.whir
 * `_` in number literals
 * use `:` to pass lhs to a function
 * `is` op
-* remove bound methods
 * strings as class keys
 * operator overloading on classes
 * sets

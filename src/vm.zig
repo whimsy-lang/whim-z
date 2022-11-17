@@ -11,7 +11,6 @@ const Map = @import("map.zig").Map;
 const ValueContainer = @import("map.zig").ValueContainer;
 const GcAllocator = @import("memory.zig").GcAllocater;
 const NativeFn = @import("object.zig").NativeFn;
-const ObjBoundMethod = @import("object.zig").ObjBoundMethod;
 const ObjClass = @import("object.zig").ObjClass;
 const ObjClosure = @import("object.zig").ObjClosure;
 const ObjFunction = @import("object.zig").ObjFunction;
@@ -230,11 +229,6 @@ pub const Vm = struct {
 
     fn callValue(self: *Vm, callee: Value, arg_count: u8) bool {
         switch (callee.getType()) {
-            .bound_method => {
-                const bound = callee.asBoundMethod();
-                (self.stack_top - (arg_count + 1))[0] = bound.receiver;
-                return self.call(bound.method, arg_count + 1, false);
-            },
             .class => {
                 var class: ?*ObjClass = callee.asClass();
                 (self.stack_top - (arg_count + 1))[0] = Value.instance(ObjInstance.init(self, class.?));
@@ -284,7 +278,7 @@ pub const Vm = struct {
             var method: Value = undefined;
             while (current) |cur| {
                 if (cur.fields.get(name, &method)) {
-                    return self.call(method.asClosure(), arg_count + 1, false);
+                    return self.call(method.asClosure(), arg_count, true);
                 }
                 current = cur.super;
             }
@@ -474,7 +468,6 @@ pub const Vm = struct {
         const key_str = key.asString();
 
         var class: ?*ObjClass = null;
-        var bind = false;
         if (object.is(.instance)) {
             const instance = object.asInstance();
             var value: Value = undefined;
@@ -484,7 +477,6 @@ pub const Vm = struct {
                 return true;
             }
             class = instance.type;
-            bind = true;
         } else if (object.is(.class)) {
             class = object.asClass();
         } else {
@@ -495,15 +487,8 @@ pub const Vm = struct {
         while (class) |cl| {
             var value: Value = undefined;
             if (cl.fields.get(key_str, &value)) {
-                if (bind and value.is(.closure)) {
-                    // bind method
-                    const bound = ObjBoundMethod.init(self, object, value.asClosure());
-                    self.stack_top -= pop_count;
-                    self.push(Value.boundMethod(bound));
-                } else {
-                    self.stack_top -= pop_count;
-                    self.push(value);
-                }
+                self.stack_top -= pop_count;
+                self.push(value);
                 return true;
             }
             class = cl.super;
