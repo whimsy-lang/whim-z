@@ -305,10 +305,6 @@ pub const Lexer = struct {
                         _ = self.advance();
                         return self.token(.star_equal);
                     },
-                    '/' => {
-                        _ = self.advance();
-                        self.resetLength();
-                    },
                     else => return self.token(.star),
                 },
                 '/' => switch (self.peek()) {
