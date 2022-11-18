@@ -385,6 +385,38 @@ pub const Vm = struct {
         }
     };
 
+    fn checkIs(self: *Vm) bool {
+        const b = self.pop();
+        const a = self.pop();
+
+        if (!b.is(.class)) {
+            self.runtimeError("Right operand of 'is' must be a class.", .{});
+            return false;
+        }
+
+        const target = b.asClass();
+        var class: ?*ObjClass = null;
+        if (a.is(.instance)) {
+            class = a.asInstance().type;
+        } else if (a.is(.class)) {
+            class = a.asClass();
+        } else {
+            self.runtimeError("Left operand of 'is' must by a class or instance.", .{});
+            return false;
+        }
+
+        while (class) |cl| {
+            if (cl == target) {
+                self.push(Value.boolean(true));
+                return true;
+            }
+            class = cl.super;
+        }
+
+        self.push(Value.boolean(false));
+        return true;
+    }
+
     fn concatenate(self: *Vm) void {
         const b = self.peek(0).asString();
         const a = self.peek(1).asString();
@@ -732,6 +764,7 @@ pub const Vm = struct {
                 .greater_equal => if (!NumBinaryOp.run(self, NumBinaryOp.greaterEqual)) return .runtime_error,
                 .less => if (!NumBinaryOp.run(self, NumBinaryOp.less)) return .runtime_error,
                 .less_equal => if (!NumBinaryOp.run(self, NumBinaryOp.lessEqual)) return .runtime_error,
+                .is => if (!checkIs(self)) return .runtime_error,
                 .add => {
                     if (self.peek(0).is(.number) and self.peek(1).is(.number)) {
                         const b = self.pop().asNumber();

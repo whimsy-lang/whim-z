@@ -99,6 +99,7 @@ pub const OpCode = enum(u8) {
     greater_equal,
     less,
     less_equal,
+    is,
     add,
     subtract,
     multiply,

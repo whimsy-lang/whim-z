@@ -1,16 +1,13 @@
 // simple test file
 
-c :: class
-    test :: fn(self, a, b)
-        print('hey ', self, ', ', a, b)
-    /fn
-    t2 :: fn(self)
-        print('yay ', self)
-    /fn
-/class
-
+b :: class /class
+c :: class is b /class
 i :: c()
-i.test(i, 'oh', ' boy')
-i.t2('heya')
-i:test('oh', ' boy')
-i:t2()
+
+print('i is c: ', i is c)
+print('i is b: ', i is b)
+print('c is c: ', c is c)
+print('c is b: ', c is b)
+print('b is c: ', b is c)
+print('using type: ', i is i.type)
+print('order of ops: ', b is c == b is c)

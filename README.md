@@ -220,7 +220,9 @@ compiled: *.whir
 
 * binary, octal, hex
 * `_` in number literals
-* `is` op
+* native types
+* allow `is` on native types
+  * or more generally, have a `type` property on all Values, with full support (except inheritance?)
 * strings as class keys
 * operator overloading on classes
 * sets

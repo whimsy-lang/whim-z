@@ -122,6 +122,7 @@ pub fn disassembleInstruction(chunk: *Chunk, offset: usize) usize {
         .greater_equal => simpleInstruction("greater equal", offset),
         .less => simpleInstruction("less", offset),
         .less_equal => simpleInstruction("less equal", offset),
+        .is => simpleInstruction("is", offset),
         .add => simpleInstruction("add", offset),
         .subtract => simpleInstruction("subtract", offset),
         .multiply => simpleInstruction("multiply", offset),
