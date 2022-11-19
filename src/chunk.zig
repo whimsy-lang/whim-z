@@ -159,6 +159,8 @@ pub const OpCode = enum(u8) {
     return_,
     class,
     list,
+    range,
+    range_inclusive,
 };
 
 pub const Chunk = struct {

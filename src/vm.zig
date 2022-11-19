@@ -17,6 +17,7 @@ const ObjFunction = @import("object.zig").ObjFunction;
 const ObjInstance = @import("object.zig").ObjInstance;
 const ObjList = @import("object.zig").ObjList;
 const ObjNative = @import("object.zig").ObjNative;
+const ObjRange = @import("object.zig").ObjRange;
 const ObjString = @import("object.zig").ObjString;
 const ObjUpvalue = @import("object.zig").ObjUpvalue;
 const Value = @import("value.zig").Value;
@@ -481,14 +482,47 @@ pub const Vm = struct {
         if (object.is(.string) and key.is(.number)) {
             const string = object.asString();
             const index = @floatToInt(isize, key.asNumber());
+
             if (index < 0 or index >= string.chars.len) {
                 self.runtimeError("Index {d} is out of bounds (0-{d}).", .{ index, string.chars.len - 1 });
                 return false;
             }
+
             self.stack_top -= pop_count;
             const uindex = @intCast(usize, index);
             self.push(Value.string(ObjString.copy(self, string.chars[uindex .. uindex + 1])));
             return true;
+        } else if (object.is(.string) and key.is(.range)) {
+            const string = object.asString();
+            const range = key.asRange();
+            if (range.start.is(.number) and range.end.is(.number)) {
+                const start = @floatToInt(isize, range.start.asNumber());
+                var end = @floatToInt(isize, range.end.asNumber());
+                if (range.inclusive) end += 1;
+
+                if (start < 0 or start > string.chars.len) {
+                    self.runtimeError("Start {d} is out of bounds (0-{d}).", .{ start, string.chars.len });
+                    return false;
+                }
+                if (end < 0 or end > string.chars.len) {
+                    self.runtimeError("End {d} is out of bounds (0-{d}).", .{ end, string.chars.len });
+                    return false;
+                }
+                if (end < start) {
+                    self.runtimeError("End {d} is before start {d}.", .{ end, start });
+                    return false;
+                }
+
+                const ustart = @intCast(usize, start);
+                const uend = @intCast(usize, end);
+
+                self.stack_top -= pop_count;
+                self.push(Value.string(ObjString.copy(self, string.chars[ustart..uend])));
+                return true;
+            } else {
+                self.runtimeError("Only numeric ranges can be used to index a string.", .{});
+                return false;
+            }
         }
 
         // class/instance
@@ -895,6 +929,21 @@ pub const Vm = struct {
                     };
                     self.stack_top -= (count + 1);
                     self.push(Value.list(list));
+                },
+                .range, .range_inclusive => {
+                    const b = self.peek(0);
+                    const a = self.peek(1);
+                    if ((a.is(.number) and b.is(.number)) or
+                        (a.is(.string) and b.is(.string) and a.asString().chars.len == 1 and b.asString().chars.len == 1))
+                    {
+                        const range = ObjRange.init(self, a, b, op == .range_inclusive);
+                        _ = self.pop();
+                        _ = self.pop();
+                        self.push(Value.range(range));
+                    } else {
+                        self.runtimeError("Operands must both be numbers or strings of length 1.", .{});
+                        return .runtime_error;
+                    }
                 },
             }
         }

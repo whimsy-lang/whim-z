@@ -178,6 +178,30 @@ pub const ObjNative = struct {
     }
 };
 
+pub const ObjRange = struct {
+    start: Value,
+    end: Value,
+    inclusive: bool,
+    is_marked: bool,
+
+    pub fn init(vm: *Vm, start_val: Value, end_val: Value, inclusive_val: bool) *ObjRange {
+        if (debug.log_gc) {
+            std.debug.print("allocate for range\n", .{});
+        }
+        const range = vm.allocator.create(ObjRange) catch {
+            std.debug.print("Could not allocate memory for range.", .{});
+            std.process.exit(1);
+        };
+        vm.registerObject(Value.range(range));
+
+        range.start = start_val;
+        range.end = end_val;
+        range.inclusive = inclusive_val;
+        range.is_marked = false;
+        return range;
+    }
+};
+
 pub const ObjString = struct {
     chars: []const u8,
     hash: u32,

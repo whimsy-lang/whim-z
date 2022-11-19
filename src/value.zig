@@ -7,6 +7,7 @@ const ObjFunction = @import("object.zig").ObjFunction;
 const ObjInstance = @import("object.zig").ObjInstance;
 const ObjList = @import("object.zig").ObjList;
 const ObjNative = @import("object.zig").ObjNative;
+const ObjRange = @import("object.zig").ObjRange;
 const ObjString = @import("object.zig").ObjString;
 const ObjUpvalue = @import("object.zig").ObjUpvalue;
 const Vm = @import("vm.zig").Vm;
@@ -22,6 +23,7 @@ pub const ValueType = enum {
     instance,
     list,
     native,
+    range,
     string,
     upvalue,
 };
@@ -38,6 +40,7 @@ pub const Value = struct {
         instance: *ObjInstance,
         list: *ObjList,
         native: *ObjNative,
+        range: *ObjRange,
         string: *ObjString,
         upvalue: *ObjUpvalue,
     },
@@ -80,6 +83,10 @@ pub const Value = struct {
 
     pub fn number(value: f64) Value {
         return .{ .as = .{ .number = value } };
+    }
+
+    pub fn range(value: *ObjRange) Value {
+        return .{ .as = .{ .range = value } };
     }
 
     pub fn string(value: *ObjString) Value {
@@ -126,6 +133,10 @@ pub const Value = struct {
         return self.as.number;
     }
 
+    pub fn asRange(self: Value) *ObjRange {
+        return self.as.range;
+    }
+
     pub fn asString(self: Value) *ObjString {
         return self.as.string;
     }
@@ -151,6 +162,7 @@ pub const Value = struct {
             .instance => self.asInstance() == other.asInstance(),
             .list => self.asList() == other.asList(),
             .native => self.asNative() == other.asNative(),
+            .range => self.asRange() == other.asRange(),
             .string => self.asString() == other.asString(),
             .upvalue => self.asUpvalue() == other.asUpvalue(),
         };
@@ -188,6 +200,12 @@ pub const Value = struct {
                 std.debug.print(")", .{});
             },
             .native => std.debug.print("<native fn>", .{}),
+            .range => {
+                const r = self.asRange();
+                r.start.print();
+                std.debug.print("{s}", .{if (r.inclusive) "..=" else ".."});
+                r.end.print();
+            },
             .string => std.debug.print("{s}", .{self.asString().chars}),
             .upvalue => std.debug.print("upvalue", .{}),
         }
@@ -250,6 +268,11 @@ pub const Value = struct {
                 inst.fields.mark(vm);
             },
             .list => markArray(&self.asList().items, vm),
+            .range => {
+                const r = self.asRange();
+                r.start.mark(vm);
+                r.end.mark(vm);
+            },
             .upvalue => self.asUpvalue().closed.mark(vm),
             else => unreachable,
         }
@@ -263,6 +286,7 @@ pub const Value = struct {
             .instance => self.asInstance().is_marked,
             .list => self.asList().is_marked,
             .native => self.asNative().is_marked,
+            .range => self.asRange().is_marked,
             .string => self.asString().is_marked,
             .upvalue => self.asUpvalue().is_marked,
 
@@ -278,6 +302,7 @@ pub const Value = struct {
             .instance => self.asInstance().is_marked = mark_val,
             .list => self.asList().is_marked = mark_val,
             .native => self.asNative().is_marked = mark_val,
+            .range => self.asRange().is_marked = mark_val,
             .string => self.asString().is_marked = mark_val,
             .upvalue => self.asUpvalue().is_marked = mark_val,
 

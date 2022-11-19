@@ -1,15 +1,16 @@
 const std = @import("std");
 
 pub const TokenType = enum {
-    // single character tokens
+    // symbols
     left_paren,
     right_paren,
     left_bracket,
     right_bracket,
     comma,
     dot,
+    dot_dot,
+    dot_dot_equal,
     semicolon,
-    // one or two character tokens
     colon,
     colon_colon,
     colon_equal,
@@ -280,7 +281,18 @@ pub const Lexer = struct {
                 '[' => return self.token(.left_bracket),
                 ']' => return self.token(.right_bracket),
                 ',' => return self.token(.comma),
-                '.' => return self.token(.dot),
+                '.' => switch (self.peek()) {
+                    '.' => {
+                        if (self.peekAt(1) == '=') {
+                            self.advanceMulti(2);
+                            return self.token(.dot_dot_equal);
+                        } else {
+                            _ = self.advance();
+                            return self.token(.dot_dot);
+                        }
+                    },
+                    else => return self.token(.dot),
+                },
                 ';' => return self.token(.semicolon),
                 ':' => switch (self.peek()) {
                     ':' => {

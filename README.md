@@ -227,7 +227,7 @@ compiled: *.whir
 * operator overloading on classes
 * sets
 * maps
-* ranges
+* ranges on lists
 * for loop
 * std library
   * functions for lists

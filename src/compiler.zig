@@ -24,6 +24,7 @@ const Precedence = enum {
     and_, // and
     equality, // == !=
     comparison, // < > <= >= is
+    range, // .. ..=
     term, // + -
     factor, // * / %
     unary, // ! -
@@ -463,6 +464,7 @@ pub const Compiler = struct {
             .left_bracket => indexer,
             .bang_equal, .equal_equal => binary,
             .less, .less_equal, .greater, .greater_equal, .is => binary,
+            .dot_dot, .dot_dot_equal => binary,
             .plus, .minus, .star, .slash, .percent => binary,
             .and_ => andOp,
             .or_ => orOp,
@@ -475,6 +477,7 @@ pub const Compiler = struct {
             .left_paren, .dot, .colon, .left_bracket => .call,
             .bang_equal, .equal_equal => .equality,
             .less, .less_equal, .greater, .greater_equal, .is => .comparison,
+            .dot_dot, .dot_dot_equal => .range,
             .plus, .minus => .term,
             .star, .slash, .percent => .factor,
             .and_ => .and_,
@@ -520,6 +523,8 @@ pub const Compiler = struct {
             .greater_equal => vm.emitOp(.greater_equal),
             .less => vm.emitOp(.less),
             .less_equal => vm.emitOp(.less_equal),
+            .dot_dot => vm.emitOp(.range),
+            .dot_dot_equal => vm.emitOp(.range_inclusive),
             .is => vm.emitOp(.is),
             .plus => vm.emitOp(.add),
             .minus => vm.emitOp(.subtract),
