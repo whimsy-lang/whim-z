@@ -2,7 +2,7 @@
 
 Simple embeddable programming language.
 
-[Zig](https://ziglang.org/) implementation, last compiled with 0.11.0-dev.63+8c4faa5f3.
+[Zig](https://ziglang.org/) implementation, last compiled with 0.11.0-dev.251+7c527c6df.
 
 Whimsy is based on [Crafting Interpreters](http://craftinginterpreters.com/) by Robert Nystrom.
 
