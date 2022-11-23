@@ -20,6 +20,7 @@ const ObjNative = @import("object.zig").ObjNative;
 const ObjRange = @import("object.zig").ObjRange;
 const ObjString = @import("object.zig").ObjString;
 const ObjUpvalue = @import("object.zig").ObjUpvalue;
+const whimsy_std = @import("std.zig");
 const Value = @import("value.zig").Value;
 
 pub const InterpretResult = enum {
@@ -74,6 +75,9 @@ pub const Vm = struct {
     type_string: ?*ObjString,
     super_string: ?*ObjString,
 
+    std_class: ?*ObjClass,
+    list_class: ?*ObjClass,
+
     frames: [frames_max]CallFrame,
     frame_count: usize,
     stack: [stack_max]Value,
@@ -95,18 +99,22 @@ pub const Vm = struct {
         self.globals = Map.init(self.allocator);
         self.strings = Map.init(self.allocator);
 
+        // strings
         self.empty_string = null;
         self.init_string = null;
         self.type_string = null;
         self.super_string = null;
+
+        // classes
+        self.std_class = null;
+        self.list_class = null;
 
         self.empty_string = ObjString.copy(self, "");
         self.init_string = ObjString.copy(self, "init");
         self.type_string = ObjString.copy(self, "type");
         self.super_string = ObjString.copy(self, "super");
 
-        self.defineNative("print", nativePrint);
-        self.defineNative("time", nativeTime);
+        whimsy_std.register(self);
     }
 
     pub fn deinit(self: *Vm) void {
@@ -118,22 +126,11 @@ pub const Vm = struct {
         self.type_string = null;
         self.super_string = null;
 
+        self.std_class = null;
+        self.list_class = null;
+
         GcAllocator.freeObjects(self);
         self.gc.deinit();
-    }
-
-    fn nativePrint(values: []Value) Value {
-        for (values) |value| {
-            value.print();
-        }
-        std.debug.print("\n", .{});
-        return Value.nil();
-    }
-
-    fn nativeTime(values: []Value) Value {
-        _ = values;
-        const time = @intToFloat(f64, std.time.nanoTimestamp()) / std.time.ns_per_s;
-        return Value.number(time);
     }
 
     pub fn registerObject(self: *Vm, object: Value) void {
@@ -169,15 +166,7 @@ pub const Vm = struct {
         self.resetStack();
     }
 
-    fn defineNative(self: *Vm, name: []const u8, native_fn: NativeFn) void {
-        self.push(Value.string(ObjString.copy(self, name)));
-        self.push(Value.native(ObjNative.init(self, native_fn)));
-        _ = self.globals.set(self.peek(1).asString(), self.peek(0));
-        _ = self.pop();
-        _ = self.pop();
-    }
-
-    fn peek(self: *Vm, offset: usize) Value {
+    pub fn peek(self: *Vm, offset: usize) Value {
         return (self.stack_top - (offset + 1))[0];
     }
 
@@ -286,8 +275,8 @@ pub const Vm = struct {
 
             self.runtimeError("Undefined property '{s}'.", .{name.chars});
             return false;
-        } else if (receiver.is(.class)) {
-            var class: ?*ObjClass = receiver.asClass();
+        } else if (receiver.treatAsClass()) {
+            var class: ?*ObjClass = receiver.correspondingClass(self);
 
             var value: Value = undefined;
             while (class) |cl| {
@@ -476,6 +465,10 @@ pub const Vm = struct {
             self.stack_top -= pop_count;
             self.push(list.items.items[@intCast(usize, index)]);
             return true;
+        } else if (object.is(.list) and key.is(.string) and key.asString() == self.type_string) {
+            self.stack_top -= pop_count;
+            self.push(Value.class(self.list_class.?));
+            return true;
         }
 
         // string
@@ -543,8 +536,8 @@ pub const Vm = struct {
                 return true;
             }
             class = instance.type;
-        } else if (object.is(.class)) {
-            class = object.asClass();
+        } else if (object.treatAsClass()) {
+            class = object.correspondingClass(self);
         } else {
             self.runtimeError("Only classes and instances have properties.", .{});
             return false;

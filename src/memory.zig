@@ -104,6 +104,9 @@ pub const GcAllocater = struct {
         if (vm.init_string) |s| Value.string(s).mark(vm);
         if (vm.type_string) |s| Value.string(s).mark(vm);
         if (vm.super_string) |s| Value.string(s).mark(vm);
+
+        if (vm.std_class) |c| Value.class(c).mark(vm);
+        if (vm.list_class) |c| Value.class(c).mark(vm);
     }
 
     fn traceReferences(vm: *Vm) void {

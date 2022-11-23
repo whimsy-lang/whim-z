@@ -168,6 +168,22 @@ pub const Value = struct {
         };
     }
 
+    pub fn treatAsClass(self: Value) bool {
+        return switch (self.getType()) {
+            .class, .list => true,
+            else => false,
+        };
+    }
+
+    pub fn correspondingClass(self: Value, vm: *Vm) *ObjClass {
+        return switch (self.getType()) {
+            .class => self.asClass(),
+            .list => vm.list_class.?,
+
+            else => unreachable,
+        };
+    }
+
     pub fn print(self: Value) void {
         switch (self.getType()) {
             .bool => std.debug.print("{s}", .{if (self.asBool()) "true" else "false"}),

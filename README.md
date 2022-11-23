@@ -221,8 +221,9 @@ compiled: *.whir
 * binary, octal, hex
 * `_` in number literals
 * native types
+* check the rest of `.class` in the vm and replace with `treatAsClass`
 * allow `is` on native types
-  * or more generally, have a `type` property on all Values, with full support (except inheritance?)
+  * or more generally, have a `type` property on all Values, with full support except inheritance?
 * strings as class keys
 * operator overloading on classes
 * sets
@@ -230,6 +231,6 @@ compiled: *.whir
 * ranges on lists
 * for loop
 * std library
-  * functions for lists
+  * functions for lists (add, remove)
   * type conversions
   * organize and expand existing functions
