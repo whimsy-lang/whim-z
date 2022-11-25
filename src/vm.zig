@@ -221,6 +221,17 @@ pub const Vm = struct {
         switch (callee.getType()) {
             .class => {
                 var class: ?*ObjClass = callee.asClass();
+                if (class == self.list_class) {
+                    const list = ObjList.init(self);
+                    (self.stack_top - (arg_count + 1))[0] = Value.list(list);
+                    list.items.appendSlice((self.stack_top - arg_count)[0..arg_count]) catch {
+                        std.debug.print("Could not allocate memory for list.", .{});
+                        std.process.exit(1);
+                    };
+                    self.stack_top -= arg_count;
+                    return true;
+                }
+
                 (self.stack_top - (arg_count + 1))[0] = Value.instance(ObjInstance.init(self, class.?));
 
                 var initializer: Value = undefined;
@@ -388,8 +399,8 @@ pub const Vm = struct {
         var class: ?*ObjClass = null;
         if (a.is(.instance)) {
             class = a.asInstance().type;
-        } else if (a.is(.class)) {
-            class = a.asClass();
+        } else if (a.treatAsClass()) {
+            class = a.correspondingClass(self);
         } else {
             self.runtimeError("Left operand of 'is' must by a class or instance.", .{});
             return false;
@@ -739,6 +750,10 @@ pub const Vm = struct {
                     }
                     const class = self.peek(1).asClass();
                     const super = self.peek(0).asClass();
+                    if (super == self.list_class) {
+                        self.runtimeError("Cannot inherit from a builtin type.", .{});
+                        return .runtime_error;
+                    }
                     class.super = super;
                     _ = class.fields.set(self.super_string.?, Value.class(super));
                     _ = self.pop();
