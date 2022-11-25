@@ -170,7 +170,10 @@ pub const Value = struct {
 
     pub fn treatAsClass(self: Value) bool {
         return switch (self.getType()) {
-            .class, .list => true,
+            .class => true,
+
+            .bool, .list, .nil, .number, .range, .string => true,
+
             else => false,
         };
     }
@@ -178,7 +181,13 @@ pub const Value = struct {
     pub fn correspondingClass(self: Value, vm: *Vm) *ObjClass {
         return switch (self.getType()) {
             .class => self.asClass(),
+
+            .bool => vm.bool_class.?,
             .list => vm.list_class.?,
+            .nil => vm.nil_class.?,
+            .number => vm.number_class.?,
+            .range => vm.range_class.?,
+            .string => vm.string_class.?,
 
             else => unreachable,
         };

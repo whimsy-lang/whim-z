@@ -75,8 +75,12 @@ pub const Vm = struct {
     type_string: ?*ObjString,
     super_string: ?*ObjString,
 
-    std_class: ?*ObjClass,
+    bool_class: ?*ObjClass,
     list_class: ?*ObjClass,
+    nil_class: ?*ObjClass,
+    number_class: ?*ObjClass,
+    range_class: ?*ObjClass,
+    string_class: ?*ObjClass,
 
     frames: [frames_max]CallFrame,
     frame_count: usize,
@@ -106,8 +110,12 @@ pub const Vm = struct {
         self.super_string = null;
 
         // classes
-        self.std_class = null;
+        self.bool_class = null;
         self.list_class = null;
+        self.nil_class = null;
+        self.number_class = null;
+        self.range_class = null;
+        self.string_class = null;
 
         self.empty_string = ObjString.copy(self, "");
         self.init_string = ObjString.copy(self, "init");
@@ -126,8 +134,12 @@ pub const Vm = struct {
         self.type_string = null;
         self.super_string = null;
 
-        self.std_class = null;
+        self.bool_class = null;
         self.list_class = null;
+        self.nil_class = null;
+        self.number_class = null;
+        self.range_class = null;
+        self.string_class = null;
 
         GcAllocator.freeObjects(self);
         self.gc.deinit();
@@ -231,6 +243,10 @@ pub const Vm = struct {
                     self.stack_top -= arg_count;
                     return true;
                 }
+                if (class == self.bool_class or class == self.nil_class or class == self.number_class or class == self.range_class or class == self.string_class) {
+                    self.runtimeError("Cannot use an initializer on a primitive type.", .{});
+                    return false;
+                }
 
                 (self.stack_top - (arg_count + 1))[0] = Value.instance(ObjInstance.init(self, class.?));
 
@@ -288,6 +304,13 @@ pub const Vm = struct {
             return false;
         } else if (receiver.treatAsClass()) {
             var class: ?*ObjClass = receiver.correspondingClass(self);
+
+            // type
+            if (name == self.type_string) {
+                const value = Value.class(class.?);
+                (self.stack_top - (arg_count + 1))[0] = value;
+                return self.callValue(value, arg_count);
+            }
 
             var value: Value = undefined;
             while (class) |cl| {
@@ -476,10 +499,6 @@ pub const Vm = struct {
             self.stack_top -= pop_count;
             self.push(list.items.items[@intCast(usize, index)]);
             return true;
-        } else if (object.is(.list) and key.is(.string) and key.asString() == self.type_string) {
-            self.stack_top -= pop_count;
-            self.push(Value.class(self.list_class.?));
-            return true;
         }
 
         // string
@@ -549,6 +568,13 @@ pub const Vm = struct {
             class = instance.type;
         } else if (object.treatAsClass()) {
             class = object.correspondingClass(self);
+
+            // type
+            if (key.is(.string) and key.asString() == self.type_string) {
+                self.stack_top -= pop_count;
+                self.push(Value.class(class.?));
+                return true;
+            }
         } else {
             self.runtimeError("Only classes and instances have properties.", .{});
             return false;
@@ -750,7 +776,13 @@ pub const Vm = struct {
                     }
                     const class = self.peek(1).asClass();
                     const super = self.peek(0).asClass();
-                    if (super == self.list_class) {
+                    if (super == self.bool_class or
+                        super == self.list_class or
+                        super == self.nil_class or
+                        super == self.number_class or
+                        super == self.range_class or
+                        super == self.string_class)
+                    {
                         self.runtimeError("Cannot inherit from a builtin type.", .{});
                         return .runtime_error;
                     }
