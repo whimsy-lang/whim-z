@@ -1,6 +1,15 @@
 // simple test file
 
-'test':len()
-3 is std.number
-1..3 is std.range;
-().type(1, 2, 3)
+c :: class
+    'first' :: 'yay'
+    if :: 7
+    else :: fn(self)
+        std.print(self)
+    /fn
+/class
+
+c.'test' := 42
+c.test
+c.first
+c.if
+c:else()

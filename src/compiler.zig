@@ -144,6 +144,24 @@ pub const Compiler = struct {
         errorAtCurrent(vm, message);
     }
 
+    fn isDottedIdentifier(tok_type: TokenType) bool {
+        return switch (tok_type) {
+            .identifier, .string => true,
+            .and_, .break_, .class, .continue_, .do, .elif, .else_, .false, .fn_, .for_, .if_, .in, .is, .loop, .nil, .or_, .return_, .then, .true => true,
+
+            else => false,
+        };
+    }
+
+    fn consumeDottedIdentifier(vm: *Vm, message: []const u8) void {
+        if (isDottedIdentifier(vm.parser.current.type)) {
+            advance(vm);
+            return;
+        }
+
+        errorAtCurrent(vm, message);
+    }
+
     fn check(vm: *Vm, expected: TokenType) bool {
         return vm.parser.current.type == expected;
     }
@@ -551,7 +569,7 @@ pub const Compiler = struct {
     }
 
     fn classField(vm: *Vm) void {
-        consume(vm, .identifier, "Expect field name.");
+        consumeDottedIdentifier(vm, "Expect field name.");
         const name = identifierConstant(vm, &vm.parser.previous);
 
         switch (vm.parser.current.type) {
@@ -608,7 +626,7 @@ pub const Compiler = struct {
     }
 
     fn dotPrimary(vm: *Vm) bool {
-        consume(vm, .identifier, "Expect property name after '.'.");
+        consumeDottedIdentifier(vm, "Expect property name after '.'.");
         const name = identifierConstant(vm, &vm.parser.previous);
 
         const op_type = vm.parser.current.type;
@@ -662,7 +680,7 @@ pub const Compiler = struct {
     }
 
     fn dot(vm: *Vm) void {
-        consume(vm, .identifier, "Expect property name after '.'.");
+        consumeDottedIdentifier(vm, "Expect property name after '.'.");
         const name = identifierConstant(vm, &vm.parser.previous);
         dotHelper(vm, name);
     }
@@ -802,7 +820,7 @@ pub const Compiler = struct {
     }
 
     fn method(vm: *Vm) void {
-        consume(vm, .identifier, "Expect method name after ':'.");
+        consumeDottedIdentifier(vm, "Expect method name after ':'.");
         const name = identifierConstant(vm, &vm.parser.previous);
         consume(vm, .left_paren, "Expect '(' after method name.");
         vm.emitOp(.dup);
@@ -849,8 +867,7 @@ pub const Compiler = struct {
     }
 
     fn string(vm: *Vm) void {
-        const value = vm.parser.previous.value;
-        emitConstant(vm, Value.string(ObjString.copyEscape(vm, value[1..(value.len - 1)])));
+        emitConstant(vm, Value.string(ObjString.copyEscape(vm, vm.parser.previous.value)));
     }
 
     fn variablePrimary(vm: *Vm) bool {

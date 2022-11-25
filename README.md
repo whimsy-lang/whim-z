@@ -220,8 +220,7 @@ compiled: *.whir
 
 * binary, octal, hex
 * `_` in number literals
-* native types
-* strings as class keys
+* native types - class, closure/function, native?
 * operator overloading on classes
 * sets
 * maps
@@ -230,4 +229,3 @@ compiled: *.whir
 * std library
   * functions for lists (add, remove)
   * type conversions
-  * organize and expand existing functions

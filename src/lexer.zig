@@ -248,6 +248,9 @@ pub const Lexer = struct {
     }
 
     fn string(self: *Lexer, first: u8) Token {
+        // discard opening quote
+        self.resetLength();
+
         while (self.peek() != first and !self.isAtEnd()) {
             if (self.peek() == '\n') self.line += 1;
             if (self.peek() == '\\' and self.peekAt(1) != 0 and self.peekAt(1) != '\n') _ = self.advance();
@@ -256,9 +259,13 @@ pub const Lexer = struct {
 
         if (self.isAtEnd()) return self.errorToken("Unterminated string.");
 
-        // closing quote
+        const tok = self.token(.string);
+
+        // discard closing quote
         _ = self.advance();
-        return self.token(.string);
+        self.resetLength();
+
+        return tok;
     }
 
     pub fn lexToken(self: *Lexer) Token {
