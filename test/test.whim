@@ -1,12 +1,3 @@
 // simple test file
 
-b :: class /class
-c :: class is b /class
-c.type
-c is b
-c is c
-b is c
-c is std.class
-
-f :: fn() /fn
-f.type
+(1, 2, 3, 4, 5)[1..4]

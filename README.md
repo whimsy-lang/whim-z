@@ -223,7 +223,6 @@ compiled: *.whir
 * operator overloading on classes
 * sets
 * maps
-* ranges on lists
 * for loop
 * std library
   * functions for lists (add, remove)

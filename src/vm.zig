@@ -520,6 +520,44 @@ pub const Vm = struct {
             self.stack_top -= pop_count;
             self.push(list.items.items[@intCast(usize, index)]);
             return true;
+        } else if (object.is(.list) and key.is(.range)) {
+            const list = object.asList();
+            const range = key.asRange();
+            if (range.start.is(.number) and range.end.is(.number)) {
+                const start = @floatToInt(isize, range.start.asNumber());
+                var end = @floatToInt(isize, range.end.asNumber());
+                if (range.inclusive) end += 1;
+
+                if (start < 0 or start > list.items.items.len) {
+                    self.runtimeError("Start {d} is out of bounds (0-{d}).", .{ start, list.items.items.len });
+                    return false;
+                }
+                if (end < 0 or end > list.items.items.len) {
+                    self.runtimeError("End {d} is out of bounds (0-{d}).", .{ end, list.items.items.len });
+                    return false;
+                }
+                if (end < start) {
+                    self.runtimeError("End {d} is before start {d}.", .{ end, start });
+                    return false;
+                }
+
+                const ustart = @intCast(usize, start);
+                const uend = @intCast(usize, end);
+
+                const new_list = ObjList.init(self);
+                self.push(Value.list(new_list));
+                new_list.items.appendSlice(list.items.items[ustart..uend]) catch {
+                    std.debug.print("Could not allocate memory for list.", .{});
+                    std.process.exit(1);
+                };
+
+                self.stack_top -= (pop_count + 1);
+                self.push(Value.list(new_list));
+                return true;
+            } else {
+                self.runtimeError("Only numeric ranges can be used to index a list.", .{});
+                return false;
+            }
         }
 
         // string
