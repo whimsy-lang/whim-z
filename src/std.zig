@@ -24,6 +24,8 @@ pub fn register(vm: *Vm) void {
 
     // std.list
     vm.list_class = defineInnerClass(vm, std_class, "list");
+    defineNative(vm, vm.list_class.?, "add", n_std_list_add);
+    defineNative(vm, vm.list_class.?, "delete", n_std_list_delete);
     defineNative(vm, vm.list_class.?, "len", n_std_list_len);
 
     // std.nil
@@ -84,6 +86,18 @@ fn n_std_time(values: []Value) Value {
 
 fn n_std_list_len(values: []Value) Value {
     return Value.number(@intToFloat(f64, values[0].asList().items.items.len));
+}
+
+fn n_std_list_add(values: []Value) Value {
+    values[0].asList().items.appendSlice(values[1..]) catch {
+        std.debug.print("Could not allocate memory for list.", .{});
+        std.process.exit(1);
+    };
+    return values[0];
+}
+
+fn n_std_list_delete(values: []Value) Value {
+    return values[0].asList().items.orderedRemove(@floatToInt(usize, values[1].asNumber()));
 }
 
 fn n_std_string_len(values: []Value) Value {

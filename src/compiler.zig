@@ -470,6 +470,7 @@ pub const Compiler = struct {
             .class => class,
             .false, .nil, .true => literal,
             .fn_ => function,
+            .if_ => ifExpression,
             else => null,
         };
     }
@@ -748,6 +749,40 @@ pub const Compiler = struct {
         if (count == 0 or list) {
             vm.emitOpByte(.list, count);
         }
+    }
+
+    fn ifExpression(vm: *Vm) void {
+        expression(vm);
+
+        // optional then
+        _ = match(vm, .then);
+
+        var then_jump = emitJump(vm, .jump_if_false_pop);
+
+        expression(vm);
+
+        var else_jump = emitJump(vm, .jump);
+        patchJump(vm, then_jump);
+
+        while (match(vm, .elif)) {
+            expression(vm);
+
+            // optional then
+            _ = match(vm, .then);
+
+            then_jump = emitJump(vm, .jump_if_false_pop);
+
+            expression(vm);
+
+            patchJump(vm, else_jump);
+            else_jump = emitJump(vm, .jump);
+            patchJump(vm, then_jump);
+        }
+
+        consume(vm, .else_, "Expect 'else' in if expression.");
+        expression(vm);
+
+        patchJump(vm, else_jump);
     }
 
     fn indexerPrimary(vm: *Vm) bool {

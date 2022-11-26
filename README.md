@@ -224,6 +224,4 @@ compiled: *.whir
 * sets
 * maps
 * for loop
-* std library
-  * functions for lists (add, remove)
-  * type conversions
+* std library type conversions
