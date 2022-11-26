@@ -1021,13 +1021,19 @@ pub const Vm = struct {
                     frame = &self.frames[self.frame_count - 1];
                 },
                 .class => self.push(Value.class(ObjClass.init(self, frame.readString()))),
-                .iterate => {
+                .iterator => {
                     // stack has object being iterated over on the top
                     // push index and current value on the stack
                     if (self.peek(0).is(.number)) {
                         self.push(Value.number(0));
                         self.push(Value.number(0));
                     }
+                },
+                .iterate_check => {
+                    // stack: [object being iterated over] [index] [current value]
+                },
+                .iterate_next => {
+                    // stack: [object being iterated over] [index] [current value]
                 },
                 .list => {
                     const count = frame.readByte();

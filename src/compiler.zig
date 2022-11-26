@@ -225,8 +225,8 @@ pub const Compiler = struct {
         vm.emitOpByte(op, index);
     }
 
-    fn emitLoop(vm: *Vm, loop_start: usize) void {
-        vm.emitOp(.jump_back);
+    fn emitLoop(vm: *Vm, op: OpCode, loop_start: usize) void {
+        vm.emitOp(op);
 
         const offset = vm.currentChunk().code.items.len - loop_start + 2;
         if (offset > std.math.maxInt(u16)) error_(vm, "Loop body too large.");
@@ -1084,7 +1084,7 @@ pub const Compiler = struct {
 
         const loop = &vm.compiler.?.loops[vm.compiler.?.loop_count - 1];
         scopePop(vm, loop.depth);
-        emitLoop(vm, loop.start);
+        emitLoop(vm, .jump_back, loop.start);
 
         patchJump(vm, skip_jump);
     }
@@ -1137,20 +1137,24 @@ pub const Compiler = struct {
 
         consume(vm, .identifier, "Expect variable name after 'for'.");
         declareLocal(vm, &Token{ .type = TokenType.identifier, .value = obj_name[0..], .line = vm.parser.previous.line }, true);
+        markInitialized(vm);
         declareLocal(vm, &Token{ .type = TokenType.identifier, .value = index_name[0..], .line = vm.parser.previous.line }, true);
+        markInitialized(vm);
         declareLocal(vm, &vm.parser.previous, true);
         consume(vm, .in, "Expect 'in' after variable name.");
 
         expression(vm);
         markInitialized(vm);
 
-        vm.emitOp(.iterate);
+        vm.emitOp(.iterator);
 
-        // var loop = &vm.compiler.?.loops[vm.compiler.?.loop_count];
-        // vm.compiler.?.loop_count += 1;
-        // loop.start = vm.currentChunk().code.items.len;
-        // loop.exit = -1;
-        // loop.depth = vm.compiler.?.scope_depth;
+        beginScope(vm);
+
+        var loop = &vm.compiler.?.loops[vm.compiler.?.loop_count];
+        vm.compiler.?.loop_count += 1;
+        loop.start = vm.currentChunk().code.items.len;
+        loop.exit = @intCast(isize, emitJump(vm, .iterate_check));
+        loop.depth = vm.compiler.?.scope_depth;
 
         while (vm.parser.current.type != .for_end and vm.parser.current.type != .eof) {
             statement(vm);
@@ -1158,13 +1162,14 @@ pub const Compiler = struct {
 
         endScope(vm);
 
-        // emitLoop(vm, loop.start);
+        emitLoop(vm, .iterate_next, loop.start);
+        patchJump(vm, @intCast(usize, loop.exit));
 
-        // if (loop.exit != -1) patchJump(vm, @intCast(usize, loop.exit));
+        endScope(vm);
 
         consume(vm, .for_end, "Expect '/for' after block.");
 
-        // vm.compiler.?.loop_count -= 1;
+        vm.compiler.?.loop_count -= 1;
     }
 
     fn ifStatement(vm: *Vm) void {
@@ -1247,7 +1252,7 @@ pub const Compiler = struct {
 
         endScope(vm);
 
-        emitLoop(vm, loop.start);
+        emitLoop(vm, .jump_back, loop.start);
 
         if (loop.exit != -1) patchJump(vm, @intCast(usize, loop.exit));
 
