@@ -76,6 +76,8 @@ pub const Vm = struct {
     super_string: ?*ObjString,
 
     bool_class: ?*ObjClass,
+    class_class: ?*ObjClass,
+    function_class: ?*ObjClass,
     list_class: ?*ObjClass,
     nil_class: ?*ObjClass,
     number_class: ?*ObjClass,
@@ -111,6 +113,8 @@ pub const Vm = struct {
 
         // classes
         self.bool_class = null;
+        self.class_class = null;
+        self.function_class = null;
         self.list_class = null;
         self.nil_class = null;
         self.number_class = null;
@@ -135,6 +139,8 @@ pub const Vm = struct {
         self.super_string = null;
 
         self.bool_class = null;
+        self.class_class = null;
+        self.function_class = null;
         self.list_class = null;
         self.nil_class = null;
         self.number_class = null;
@@ -243,7 +249,14 @@ pub const Vm = struct {
                     self.stack_top -= arg_count;
                     return true;
                 }
-                if (class == self.bool_class or class == self.nil_class or class == self.number_class or class == self.range_class or class == self.string_class) {
+                if (class == self.bool_class or
+                    class == self.class_class or
+                    class == self.function_class or
+                    class == self.nil_class or
+                    class == self.number_class or
+                    class == self.range_class or
+                    class == self.string_class)
+                {
                     self.runtimeError("Cannot use an initializer on a primitive type.", .{});
                     return false;
                 }
@@ -302,12 +315,13 @@ pub const Vm = struct {
 
             self.runtimeError("Undefined property '{s}'.", .{name.chars});
             return false;
-        } else if (receiver.treatAsClass()) {
-            var class: ?*ObjClass = receiver.correspondingClass(self);
+        } else if (receiver.hasStdClass()) {
+            const std_class = receiver.stdClass(self);
+            var class: ?*ObjClass = if (receiver.is(.class)) receiver.asClass() else std_class;
 
             // type
             if (name == self.type_string) {
-                const value = Value.class(class.?);
+                const value = Value.class(std_class);
                 (self.stack_top - (arg_count + 1))[0] = value;
                 return self.callValue(value, arg_count);
             }
@@ -422,8 +436,15 @@ pub const Vm = struct {
         var class: ?*ObjClass = null;
         if (a.is(.instance)) {
             class = a.asInstance().type;
-        } else if (a.treatAsClass()) {
-            class = a.correspondingClass(self);
+        } else if (a.is(.class)) {
+            class = a.asClass();
+            // myClass is std.class
+            if (target == self.class_class) {
+                self.push(Value.boolean(true));
+                return true;
+            }
+        } else if (a.hasStdClass()) {
+            class = a.stdClass(self);
         } else {
             self.runtimeError("Left operand of 'is' must by a class or instance.", .{});
             return false;
@@ -566,13 +587,14 @@ pub const Vm = struct {
                 return true;
             }
             class = instance.type;
-        } else if (object.treatAsClass()) {
-            class = object.correspondingClass(self);
+        } else if (object.hasStdClass()) {
+            const std_class = object.stdClass(self);
+            class = if (object.is(.class)) object.asClass() else std_class;
 
             // type
             if (key.is(.string) and key.asString() == self.type_string) {
                 self.stack_top -= pop_count;
-                self.push(Value.class(class.?));
+                self.push(Value.class(std_class));
                 return true;
             }
         } else {
@@ -777,6 +799,8 @@ pub const Vm = struct {
                     const class = self.peek(1).asClass();
                     const super = self.peek(0).asClass();
                     if (super == self.bool_class or
+                        super == self.class_class or
+                        super == self.function_class or
                         super == self.list_class or
                         super == self.nil_class or
                         super == self.number_class or

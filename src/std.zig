@@ -16,6 +16,12 @@ pub fn register(vm: *Vm) void {
     // std.bool
     vm.bool_class = defineInnerClass(vm, std_class, "bool");
 
+    // std.class
+    vm.class_class = defineInnerClass(vm, std_class, "class");
+
+    // std.function
+    vm.function_class = defineInnerClass(vm, std_class, "function");
+
     // std.list
     vm.list_class = defineInnerClass(vm, std_class, "list");
     defineNative(vm, vm.list_class.?, "len", n_std_list_len);

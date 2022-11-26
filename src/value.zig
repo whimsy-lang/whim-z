@@ -168,21 +168,18 @@ pub const Value = struct {
         };
     }
 
-    pub fn treatAsClass(self: Value) bool {
+    pub fn hasStdClass(self: Value) bool {
         return switch (self.getType()) {
-            .class => true,
-
-            .bool, .list, .nil, .number, .range, .string => true,
-
-            else => false,
+            .instance, .upvalue => false,
+            else => true,
         };
     }
 
-    pub fn correspondingClass(self: Value, vm: *Vm) *ObjClass {
+    pub fn stdClass(self: Value, vm: *Vm) *ObjClass {
         return switch (self.getType()) {
-            .class => self.asClass(),
-
             .bool => vm.bool_class.?,
+            .class => vm.class_class.?,
+            .closure, .function, .native => vm.function_class.?,
             .list => vm.list_class.?,
             .nil => vm.nil_class.?,
             .number => vm.number_class.?,

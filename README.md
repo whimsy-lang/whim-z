@@ -220,7 +220,6 @@ compiled: *.whir
 
 * binary, octal, hex
 * `_` in number literals
-* native types - class, closure/function, native?
 * operator overloading on classes
 * sets
 * maps

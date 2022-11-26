@@ -1,15 +1,12 @@
 // simple test file
 
-c :: class
-    'first' :: 'yay'
-    if :: 7
-    else :: fn(self)
-        std.print(self)
-    /fn
-/class
+b :: class /class
+c :: class is b /class
+c.type
+c is b
+c is c
+b is c
+c is std.class
 
-c.'test' := 42
-c.test
-c.first
-c.if
-c:else()
+f :: fn() /fn
+f.type

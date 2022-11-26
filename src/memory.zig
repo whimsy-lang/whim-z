@@ -106,6 +106,8 @@ pub const GcAllocater = struct {
         if (vm.super_string) |s| Value.string(s).mark(vm);
 
         if (vm.bool_class) |c| Value.class(c).mark(vm);
+        if (vm.class_class) |c| Value.class(c).mark(vm);
+        if (vm.function_class) |c| Value.class(c).mark(vm);
         if (vm.list_class) |c| Value.class(c).mark(vm);
         if (vm.nil_class) |c| Value.class(c).mark(vm);
         if (vm.number_class) |c| Value.class(c).mark(vm);

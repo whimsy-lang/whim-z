@@ -27,6 +27,7 @@ pub const ObjClass = struct {
         class.super = null;
         class.fields = Map.init(vm.allocator);
         _ = class.fields.add(vm.super_string.?, Value.nil(), true);
+        _ = class.fields.add(vm.type_string.?, Value.nil(), true);
         class.is_marked = false;
         return class;
     }
