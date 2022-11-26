@@ -1,6 +1,5 @@
 // simple test file
 
-std.print(if true 1 else 2)
-std.print(if false 1 else 2)
-std.print(if false 1 elif false 2 elif true 3 else 4)
-std.print(if false then 1 elif false then 2 elif true then 3 else 4)
+for x in 3
+    std.print(x)
+/for

@@ -1114,6 +1114,59 @@ pub const Compiler = struct {
         }
     }
 
+    fn forStatement(vm: *Vm) void {
+        if (vm.compiler.?.loop_count == max_loop) {
+            error_(vm, "Too many nested loops.");
+            return;
+        }
+
+        beginScope(vm);
+
+        // stack: [object being iterated over] [index] [current value]
+        const obj_name = std.fmt.allocPrint(vm.allocator, "$loop_obj_{d}", .{vm.compiler.?.loop_count}) catch {
+            std.debug.print("Could not allocate memory for iterator.", .{});
+            std.process.exit(1);
+        };
+        defer vm.allocator.free(obj_name);
+
+        const index_name = std.fmt.allocPrint(vm.allocator, "$loop_ind_{d}", .{vm.compiler.?.loop_count}) catch {
+            std.debug.print("Could not allocate memory for iterator.", .{});
+            std.process.exit(1);
+        };
+        defer vm.allocator.free(index_name);
+
+        consume(vm, .identifier, "Expect variable name after 'for'.");
+        declareLocal(vm, &Token{ .type = TokenType.identifier, .value = obj_name[0..], .line = vm.parser.previous.line }, true);
+        declareLocal(vm, &Token{ .type = TokenType.identifier, .value = index_name[0..], .line = vm.parser.previous.line }, true);
+        declareLocal(vm, &vm.parser.previous, true);
+        consume(vm, .in, "Expect 'in' after variable name.");
+
+        expression(vm);
+        markInitialized(vm);
+
+        vm.emitOp(.iterate);
+
+        // var loop = &vm.compiler.?.loops[vm.compiler.?.loop_count];
+        // vm.compiler.?.loop_count += 1;
+        // loop.start = vm.currentChunk().code.items.len;
+        // loop.exit = -1;
+        // loop.depth = vm.compiler.?.scope_depth;
+
+        while (vm.parser.current.type != .for_end and vm.parser.current.type != .eof) {
+            statement(vm);
+        }
+
+        endScope(vm);
+
+        // emitLoop(vm, loop.start);
+
+        // if (loop.exit != -1) patchJump(vm, @intCast(usize, loop.exit));
+
+        consume(vm, .for_end, "Expect '/for' after block.");
+
+        // vm.compiler.?.loop_count -= 1;
+    }
+
     fn ifStatement(vm: *Vm) void {
         expression(vm);
 
@@ -1225,7 +1278,7 @@ pub const Compiler = struct {
             block(vm, .do_end, "Expect '/do' after block.");
             endScope(vm);
         } else if (match(vm, .for_)) {
-            // todo
+            forStatement(vm);
         } else if (match(vm, .if_)) {
             ifStatement(vm);
         } else if (match(vm, .loop)) {

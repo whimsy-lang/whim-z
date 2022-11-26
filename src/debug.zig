@@ -5,7 +5,7 @@ const OpCode = @import("chunk.zig").OpCode;
 const value = @import("value.zig");
 
 pub const print_code = true;
-pub const trace_execution = true;
+pub const trace_execution = false;
 pub const stress_gc = false;
 pub const log_gc = false;
 
@@ -181,6 +181,7 @@ pub fn disassembleInstruction(chunk: *Chunk, offset: usize) usize {
         .close_upvalue => simpleInstruction("close upvalue", offset),
         .return_ => simpleInstruction("return", offset),
         .class => constantInstruction("class", chunk, offset),
+        .iterate => simpleInstruction("iterate", offset),
         .list => byteInstruction("list", chunk, offset),
         .range => simpleInstruction("range", offset),
         .range_inclusive => simpleInstruction("range (incl)", offset),
