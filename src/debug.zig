@@ -181,7 +181,6 @@ pub fn disassembleInstruction(chunk: *Chunk, offset: usize) usize {
         .close_upvalue => simpleInstruction("close upvalue", offset),
         .return_ => simpleInstruction("return", offset),
         .class => constantInstruction("class", chunk, offset),
-        .iterator => simpleInstruction("iterator", offset),
         .iterate_check => jumpInstruction("iterate check", 1, chunk, offset),
         .iterate_next => jumpInstruction("iterate next", -1, chunk, offset),
         .list => byteInstruction("list", chunk, offset),

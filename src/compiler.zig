@@ -1143,15 +1143,17 @@ pub const Compiler = struct {
         consume(vm, .identifier, "Expect variable name after 'for'.");
         placeholderLocal(vm);
         placeholderLocal(vm);
+
+        beginScope(vm);
+
         declareLocal(vm, &vm.parser.previous, true);
         consume(vm, .in, "Expect 'in' after variable name.");
 
         expression(vm);
         markInitialized(vm);
 
-        vm.emitOp(.iterator);
-
-        beginScope(vm);
+        // push starting index 0 on the stack
+        emitNumber(vm, 0);
 
         var loop = &vm.compiler.?.loops[vm.compiler.?.loop_count];
         vm.compiler.?.loop_count += 1;

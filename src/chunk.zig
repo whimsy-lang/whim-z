@@ -158,7 +158,6 @@ pub const OpCode = enum(u8) {
     close_upvalue,
     return_,
     class,
-    iterator,
     iterate_check,
     iterate_next,
     list,

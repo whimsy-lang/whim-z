@@ -480,26 +480,6 @@ pub const Vm = struct {
         self.push(Value.string(result));
     }
 
-    fn getIteratorValue(self: *Vm, object: Value, index: usize) Value {
-        return switch (object.getType()) {
-            .list => {
-                var list = object.asList();
-                return if (index < list.items.items.len)
-                    list.items.items[index]
-                else
-                    Value.nil();
-            },
-            .string => {
-                var str = object.asString();
-                return if (index < str.chars.len)
-                    Value.string(ObjString.copy(self, str.chars[index .. index + 1]))
-                else
-                    Value.nil();
-            },
-            else => unreachable,
-        };
-    }
-
     fn defineOnValue(self: *Vm, object: Value, key: Value, value: Value, constant: bool) bool {
         if (!key.is(.string)) {
             self.runtimeError("Key must be a string.", .{});
@@ -1041,61 +1021,60 @@ pub const Vm = struct {
                     frame = &self.frames[self.frame_count - 1];
                 },
                 .class => self.push(Value.class(ObjClass.init(self, frame.readString()))),
-                .iterator => {
-                    // before: [object being iterated over]
-                    // after:  [object being iterated over] [index] [current value]
-                    const obj = self.peek(0);
-                    switch (obj.getType()) {
-                        .list => {
-                            self.push(Value.number(0));
-                            self.push(self.getIteratorValue(obj, 0));
-                        },
-                        .number => {
-                            self.push(Value.number(0));
-                            self.push(Value.number(0));
-                        },
-                        .range => {
-                            self.push(Value.number(0));
-                            self.push(obj.asRange().start);
-                        },
-                        .string => {
-                            self.push(Value.number(0));
-                            self.push(self.getIteratorValue(obj, 0));
-                        },
-                        else => {
-                            self.runtimeError("Only lists, numbers, ranges, and strings can be iterated on.", .{});
-                            return .runtime_error;
-                        },
-                    }
-                },
                 .iterate_check => {
                     const offset = frame.readShort();
 
-                    // stack: [object being iterated over] [index] [current value]
-                    const obj = self.peek(2);
-                    const index = self.peek(1).asNumber();
-                    const val = self.peek(0);
+                    // stack: [object being iterated over] [index]
+                    // if index is valid, push the current value onto the stack
+                    // if index is not valid, jump by offset
+
+                    const obj = self.peek(1);
+                    const index = self.peek(0).asNumber();
+                    const uindex = @floatToInt(usize, index);
                     switch (obj.getType()) {
                         .list => {
-                            if (index >= @intToFloat(f64, obj.asList().items.items.len)) frame.ip += offset;
+                            const list = obj.asList();
+                            if (uindex < list.items.items.len) {
+                                self.push(list.items.items[uindex]);
+                            } else {
+                                frame.ip += offset;
+                            }
                         },
                         .number => {
-                            if (index >= obj.asNumber()) frame.ip += offset;
+                            if (index < obj.asNumber()) {
+                                self.push(self.peek(0));
+                            } else {
+                                frame.ip += offset;
+                            }
                         },
                         .range => {
                             const range = obj.asRange();
-                            if (val.is(.number)) {
-                                const num = val.asNumber();
+                            if (range.start.is(.number)) {
+                                const val = range.start.asNumber() + index;
                                 const end = range.end.asNumber();
-                                if ((!range.inclusive and num >= end) or (range.inclusive and num > end)) frame.ip += offset;
-                            } else if (val.is(.string)) {
-                                const chr = val.asString().chars[0];
+                                if ((!range.inclusive and val < end) or (range.inclusive and val <= end)) {
+                                    self.push(Value.number(val));
+                                } else {
+                                    frame.ip += offset;
+                                }
+                            } else {
+                                const val = @intCast(u8, range.start.asString().chars[0] + uindex);
                                 const end = range.end.asString().chars[0];
-                                if ((!range.inclusive and chr >= end) or (range.inclusive and chr > end)) frame.ip += offset;
+                                if ((!range.inclusive and val < end) or (range.inclusive and val <= end)) {
+                                    const next_char = [_]u8{val};
+                                    self.push(Value.string(ObjString.copy(self, &next_char)));
+                                } else {
+                                    frame.ip += offset;
+                                }
                             }
                         },
                         .string => {
-                            if (index >= @intToFloat(f64, obj.asString().chars.len)) frame.ip += offset;
+                            const str = obj.asString();
+                            if (uindex < str.chars.len) {
+                                self.push(Value.string(ObjString.copy(self, str.chars[uindex .. uindex + 1])));
+                            } else {
+                                frame.ip += offset;
+                            }
                         },
                         else => {
                             self.runtimeError("Only lists, numbers, ranges, and strings can be iterated on.", .{});
@@ -1104,31 +1083,10 @@ pub const Vm = struct {
                     }
                 },
                 .iterate_next => {
+                    // stack: [object being iterated over] [index]
+                    self.push(Value.number(self.pop().asNumber() + 1));
+
                     const offset = frame.readShort();
-
-                    // stack: [object being iterated over] [index] [current value]
-                    const val = self.pop();
-                    const f_index = self.pop().asNumber() + 1;
-                    const index = @floatToInt(usize, f_index);
-                    self.push(Value.number(f_index));
-                    const obj = self.peek(1);
-                    switch (obj.getType()) {
-                        .list, .string => self.push(self.getIteratorValue(obj, index)),
-                        .number => self.push(self.peek(0)),
-                        .range => {
-                            if (val.is(.number)) {
-                                self.push(Value.number(val.asNumber() + 1));
-                            } else if (val.is(.string)) {
-                                const next_char = [_]u8{val.asString().chars[0] + 1};
-                                self.push(Value.string(ObjString.copy(self, &next_char)));
-                            }
-                        },
-                        else => {
-                            self.runtimeError("Only lists, numbers, ranges, and strings can be iterated on.", .{});
-                            return .runtime_error;
-                        },
-                    }
-
                     frame.ip -= offset;
                 },
                 .list => {

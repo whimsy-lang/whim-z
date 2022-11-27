@@ -1,6 +1,16 @@
 // simple test file
 
-for c in 'test'
-    continue c == 't'
-    std.print(c)
+l :: ()
+
+for x in 2..=5
+    continue x == 3
+    l:add(
+        fn()
+            std.print(x)
+        /fn
+    )
 /for
+
+l[0]()
+l[1]()
+l[2]()
