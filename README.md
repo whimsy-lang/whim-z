@@ -223,5 +223,4 @@ compiled: *.whir
 * operator overloading on classes
 * sets
 * maps
-* for loop
 * std library type conversions

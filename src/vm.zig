@@ -480,6 +480,26 @@ pub const Vm = struct {
         self.push(Value.string(result));
     }
 
+    fn getIteratorValue(self: *Vm, object: Value, index: usize) Value {
+        return switch (object.getType()) {
+            .list => {
+                var list = object.asList();
+                return if (index < list.items.items.len)
+                    list.items.items[index]
+                else
+                    Value.nil();
+            },
+            .string => {
+                var str = object.asString();
+                return if (index < str.chars.len)
+                    Value.string(ObjString.copy(self, str.chars[index .. index + 1]))
+                else
+                    Value.nil();
+            },
+            else => unreachable,
+        };
+    }
+
     fn defineOnValue(self: *Vm, object: Value, key: Value, value: Value, constant: bool) bool {
         if (!key.is(.string)) {
             self.runtimeError("Key must be a string.", .{});
@@ -1022,18 +1042,94 @@ pub const Vm = struct {
                 },
                 .class => self.push(Value.class(ObjClass.init(self, frame.readString()))),
                 .iterator => {
-                    // stack has object being iterated over on the top
-                    // push index and current value on the stack
-                    if (self.peek(0).is(.number)) {
-                        self.push(Value.number(0));
-                        self.push(Value.number(0));
+                    // before: [object being iterated over]
+                    // after:  [object being iterated over] [index] [current value]
+                    const obj = self.peek(0);
+                    switch (obj.getType()) {
+                        .list => {
+                            self.push(Value.number(0));
+                            self.push(self.getIteratorValue(obj, 0));
+                        },
+                        .number => {
+                            self.push(Value.number(0));
+                            self.push(Value.number(0));
+                        },
+                        .range => {
+                            self.push(Value.number(0));
+                            self.push(obj.asRange().start);
+                        },
+                        .string => {
+                            self.push(Value.number(0));
+                            self.push(self.getIteratorValue(obj, 0));
+                        },
+                        else => {
+                            self.runtimeError("Only lists, numbers, ranges, and strings can be iterated on.", .{});
+                            return .runtime_error;
+                        },
                     }
                 },
                 .iterate_check => {
+                    const offset = frame.readShort();
+
                     // stack: [object being iterated over] [index] [current value]
+                    const obj = self.peek(2);
+                    const index = self.peek(1).asNumber();
+                    const val = self.peek(0);
+                    switch (obj.getType()) {
+                        .list => {
+                            if (index >= @intToFloat(f64, obj.asList().items.items.len)) frame.ip += offset;
+                        },
+                        .number => {
+                            if (index >= obj.asNumber()) frame.ip += offset;
+                        },
+                        .range => {
+                            const range = obj.asRange();
+                            if (val.is(.number)) {
+                                const num = val.asNumber();
+                                const end = range.end.asNumber();
+                                if ((!range.inclusive and num >= end) or (range.inclusive and num > end)) frame.ip += offset;
+                            } else if (val.is(.string)) {
+                                const chr = val.asString().chars[0];
+                                const end = range.end.asString().chars[0];
+                                if ((!range.inclusive and chr >= end) or (range.inclusive and chr > end)) frame.ip += offset;
+                            }
+                        },
+                        .string => {
+                            if (index >= @intToFloat(f64, obj.asString().chars.len)) frame.ip += offset;
+                        },
+                        else => {
+                            self.runtimeError("Only lists, numbers, ranges, and strings can be iterated on.", .{});
+                            return .runtime_error;
+                        },
+                    }
                 },
                 .iterate_next => {
+                    const offset = frame.readShort();
+
                     // stack: [object being iterated over] [index] [current value]
+                    const val = self.pop();
+                    const f_index = self.pop().asNumber() + 1;
+                    const index = @floatToInt(usize, f_index);
+                    self.push(Value.number(f_index));
+                    const obj = self.peek(1);
+                    switch (obj.getType()) {
+                        .list, .string => self.push(self.getIteratorValue(obj, index)),
+                        .number => self.push(self.peek(0)),
+                        .range => {
+                            if (val.is(.number)) {
+                                self.push(Value.number(val.asNumber() + 1));
+                            } else if (val.is(.string)) {
+                                const next_char = [_]u8{val.asString().chars[0] + 1};
+                                self.push(Value.string(ObjString.copy(self, &next_char)));
+                            }
+                        },
+                        else => {
+                            self.runtimeError("Only lists, numbers, ranges, and strings can be iterated on.", .{});
+                            return .runtime_error;
+                        },
+                    }
+
+                    frame.ip -= offset;
                 },
                 .list => {
                     const count = frame.readByte();

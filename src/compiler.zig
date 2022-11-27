@@ -55,6 +55,7 @@ pub const Compiler = struct {
         start: usize,
         exit: isize,
         depth: isize,
+        iterator: bool,
     };
 
     const FunctionType = enum {
@@ -363,6 +364,21 @@ pub const Compiler = struct {
         }
 
         addLocal(vm, identifier.*, constant);
+    }
+
+    fn placeholderLocal(vm: *Vm) void {
+        var comp = vm.compiler.?;
+        if (comp.local_count == u8_count) {
+            error_(vm, "Too many local variables in block.");
+            return;
+        }
+
+        var local = &comp.locals[comp.local_count];
+        comp.local_count += 1;
+        local.name = Token{ .type = .identifier, .value = "", .line = 0 };
+        local.constant = false;
+        local.depth = comp.scope_depth;
+        local.is_captured = false;
     }
 
     fn resolveLocal(self: *Compiler, identifier: *Token) isize {
@@ -1084,7 +1100,7 @@ pub const Compiler = struct {
 
         const loop = &vm.compiler.?.loops[vm.compiler.?.loop_count - 1];
         scopePop(vm, loop.depth);
-        emitLoop(vm, .jump_back, loop.start);
+        emitLoop(vm, if (loop.iterator) .iterate_next else .jump_back, loop.start);
 
         patchJump(vm, skip_jump);
     }
@@ -1123,23 +1139,10 @@ pub const Compiler = struct {
         beginScope(vm);
 
         // stack: [object being iterated over] [index] [current value]
-        const obj_name = std.fmt.allocPrint(vm.allocator, "$loop_obj_{d}", .{vm.compiler.?.loop_count}) catch {
-            std.debug.print("Could not allocate memory for iterator.", .{});
-            std.process.exit(1);
-        };
-        defer vm.allocator.free(obj_name);
-
-        const index_name = std.fmt.allocPrint(vm.allocator, "$loop_ind_{d}", .{vm.compiler.?.loop_count}) catch {
-            std.debug.print("Could not allocate memory for iterator.", .{});
-            std.process.exit(1);
-        };
-        defer vm.allocator.free(index_name);
 
         consume(vm, .identifier, "Expect variable name after 'for'.");
-        declareLocal(vm, &Token{ .type = TokenType.identifier, .value = obj_name[0..], .line = vm.parser.previous.line }, true);
-        markInitialized(vm);
-        declareLocal(vm, &Token{ .type = TokenType.identifier, .value = index_name[0..], .line = vm.parser.previous.line }, true);
-        markInitialized(vm);
+        placeholderLocal(vm);
+        placeholderLocal(vm);
         declareLocal(vm, &vm.parser.previous, true);
         consume(vm, .in, "Expect 'in' after variable name.");
 
@@ -1155,6 +1158,7 @@ pub const Compiler = struct {
         loop.start = vm.currentChunk().code.items.len;
         loop.exit = @intCast(isize, emitJump(vm, .iterate_check));
         loop.depth = vm.compiler.?.scope_depth;
+        loop.iterator = true;
 
         while (vm.parser.current.type != .for_end and vm.parser.current.type != .eof) {
             statement(vm);
@@ -1245,6 +1249,7 @@ pub const Compiler = struct {
         loop.start = vm.currentChunk().code.items.len;
         loop.exit = -1;
         loop.depth = vm.compiler.?.scope_depth;
+        loop.iterator = false;
 
         while (vm.parser.current.type != .loop_end and vm.parser.current.type != .eof) {
             statement(vm);

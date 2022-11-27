@@ -1,5 +1,6 @@
 // simple test file
 
-for x in 3
-    std.print(x)
+for c in 'test'
+    continue c == 't'
+    std.print(c)
 /for
