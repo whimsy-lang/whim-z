@@ -53,6 +53,7 @@ func(first, second)
 
 // property access by string or identifier, if propName :: 'property' then these are equivalent:
 i.property
+i.'property'
 i['property']
 i[propName]
 
@@ -209,7 +210,6 @@ compiled: *.whir
 * have exit jumps jump straight to the end instead of chaining
 * don't emit (nil and return) if the last line is already a return
 * ip in a local and flag it as a register
-* error reporting from native code
 * closures only for functions that need it?
 * generational gc
 * setting a property by string with a class or function value should set the name if it is null

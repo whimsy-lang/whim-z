@@ -70,7 +70,8 @@ fn defineNative(vm: *Vm, class: *ObjClass, name: []const u8, native_fn: NativeFn
     _ = vm.pop();
 }
 
-fn n_std_print(values: []Value) Value {
+fn n_std_print(vm: *Vm, values: []Value) Value {
+    _ = vm;
     for (values) |value| {
         value.print();
     }
@@ -78,17 +79,28 @@ fn n_std_print(values: []Value) Value {
     return Value.nil();
 }
 
-fn n_std_time(values: []Value) Value {
-    _ = values;
+fn n_std_time(vm: *Vm, values: []Value) Value {
+    if (values.len != 0) {
+        return vm.nativeError("std.time takes 0 arguments", .{});
+    }
     const time = @intToFloat(f64, std.time.nanoTimestamp()) / std.time.ns_per_s;
     return Value.number(time);
 }
 
-fn n_std_list_len(values: []Value) Value {
+fn n_std_list_len(vm: *Vm, values: []Value) Value {
+    if (values.len != 1 or !values[0].is(.list)) {
+        return vm.nativeError("std.list.len takes a list", .{});
+    }
     return Value.number(@intToFloat(f64, values[0].asList().items.items.len));
 }
 
-fn n_std_list_add(values: []Value) Value {
+fn n_std_list_add(vm: *Vm, values: []Value) Value {
+    if (values.len < 2) {
+        return vm.nativeError("std.list.add takes a list and at least one item to add", .{});
+    }
+    if (!values[0].is(.list)) {
+        return vm.nativeError("std.list.add's first argument must be a list", .{});
+    }
     values[0].asList().items.appendSlice(values[1..]) catch {
         std.debug.print("Could not allocate memory for list.", .{});
         std.process.exit(1);
@@ -96,10 +108,19 @@ fn n_std_list_add(values: []Value) Value {
     return values[0];
 }
 
-fn n_std_list_delete(values: []Value) Value {
+fn n_std_list_delete(vm: *Vm, values: []Value) Value {
+    if (values.len != 2) {
+        return vm.nativeError("std.list.delete takes a list and the index to delete", .{});
+    }
+    if (!values[0].is(.list) or !values[1].is(.number)) {
+        return vm.nativeError("std.list.delete arguments must be a list and number", .{});
+    }
     return values[0].asList().items.orderedRemove(@floatToInt(usize, values[1].asNumber()));
 }
 
-fn n_std_string_len(values: []Value) Value {
+fn n_std_string_len(vm: *Vm, values: []Value) Value {
+    if (values.len != 1 or !values[0].is(.string)) {
+        return vm.nativeError("std.string.len takes a string", .{});
+    }
     return Value.number(@intToFloat(f64, values[0].asString().chars.len));
 }

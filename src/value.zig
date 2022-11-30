@@ -244,9 +244,9 @@ pub const Value = struct {
 
         self.setMarked(true);
 
-        // don't bother queueing up native functions or strings since they
+        // don't bother queueing up strings or native functions since they
         // do not have references to check
-        if (self.is(.native) or self.is(.string)) return;
+        if (self.is(.string) or self.is(.native)) return;
 
         vm.gc.gray_stack.append(self) catch {
             std.debug.print("Could not allocate memory for garbage collection.", .{});

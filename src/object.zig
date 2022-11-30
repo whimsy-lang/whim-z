@@ -157,7 +157,7 @@ pub const ObjList = struct {
     }
 };
 
-pub const NativeFn = *const fn ([]Value) Value;
+pub const NativeFn = *const fn (*Vm, []Value) Value;
 
 pub const ObjNative = struct {
     function: NativeFn,

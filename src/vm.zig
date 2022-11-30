@@ -88,6 +88,7 @@ pub const Vm = struct {
     frame_count: usize,
     stack: [stack_max]Value,
     stack_top: [*]Value,
+    has_native_error: bool,
 
     lexer: Lexer,
     parser: Parser,
@@ -215,6 +216,15 @@ pub const Vm = struct {
         self.emitByte(byte);
     }
 
+    pub fn nativeError(self: *Vm, comptime fmt: []const u8, args: anytype) Value {
+        self.has_native_error = true;
+        const chars = std.fmt.allocPrint(self.allocator, fmt, args) catch {
+            std.debug.print("Could not allocate memory for error.", .{});
+            std.process.exit(1);
+        };
+        return Value.string(ObjString.take(self, chars));
+    }
+
     fn call(self: *Vm, closure: *ObjClosure, arg_count: u8, pop_one: bool) bool {
         if (arg_count != closure.function.arity) {
             self.runtimeError("Expected {d} arguments but got {d}.", .{ closure.function.arity, arg_count });
@@ -280,10 +290,15 @@ pub const Vm = struct {
             },
             .closure => return self.call(callee.asClosure(), arg_count, true),
             .native => {
+                self.has_native_error = false;
                 const native = callee.asNative().function;
-                const result = native((self.stack_top - arg_count)[0..arg_count]);
+                const result = native(self, (self.stack_top - arg_count)[0..arg_count]);
                 self.stack_top -= arg_count + 1;
                 self.push(result);
+                if (self.has_native_error) {
+                    self.runtimeError("{s}", .{result.asString().chars});
+                    return false;
+                }
                 return true;
             },
             else => {},
