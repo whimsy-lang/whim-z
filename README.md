@@ -218,6 +218,9 @@ compiled: *.whir
 ### Language Features
 
 * operator overloading on classes
+  * explore generic operator support
+* range step
+* assignment on ranges for lists and strings
 * sets
 * maps
 * std library type conversions
