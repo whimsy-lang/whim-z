@@ -1,16 +1,10 @@
 // simple test file
 
-l :: ()
-
-for x in 2..=5
-    continue x == 3
-    l:add(
-        fn()
-            std.print(x)
-        /fn
-    )
-/for
-
-l[0]()
-l[1]()
-l[2]()
+0123
+1234567890
+123.45
+0b11.1
+0o7.4
+0xf.08
+0xC
+0Xd

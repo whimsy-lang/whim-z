@@ -132,6 +132,22 @@ pub const Lexer = struct {
         return isAlpha(c) or isDigit(c);
     }
 
+    fn isBinary(c: u8) bool {
+        return c == '0' or c == '1' or c == '_';
+    }
+
+    fn isOctal(c: u8) bool {
+        return (c >= '0' and c <= '7') or c == '_';
+    }
+
+    fn isDecimal(c: u8) bool {
+        return isDigit(c) or c == '_';
+    }
+
+    fn isHex(c: u8) bool {
+        return isDecimal(c) or (c >= 'a' and c <= 'f') or (c >= 'A' and c <= 'F');
+    }
+
     fn checkKeyword(cur_part: []const u8, rest: []const u8, token_type: TokenType) TokenType {
         if (std.mem.eql(u8, cur_part, rest)) {
             return token_type;
@@ -234,14 +250,35 @@ pub const Lexer = struct {
         return self.token(self.identifierType());
     }
 
-    fn number(self: *Lexer) Token {
-        while (isDigit(self.peek())) _ = self.advance();
+    const numDigitFn = *const fn (u8) bool;
 
-        if (self.peek() == '.' and isDigit(self.peekAt(1))) {
+    fn number(self: *Lexer, first: u8) Token {
+        var check: numDigitFn = isDecimal;
+        if (first == '0') {
+            switch (self.peek()) {
+                'b', 'B' => {
+                    _ = self.advance();
+                    check = isBinary;
+                },
+                'o', 'O' => {
+                    _ = self.advance();
+                    check = isOctal;
+                },
+                'x', 'X' => {
+                    _ = self.advance();
+                    check = isHex;
+                },
+                else => {},
+            }
+        }
+
+        while (check(self.peek())) _ = self.advance();
+
+        if (self.peek() == '.' and check(self.peekAt(1))) {
             // accept the .
             _ = self.advance();
 
-            while (isDigit(self.peek())) _ = self.advance();
+            while (check(self.peek())) _ = self.advance();
         }
 
         return self.token(.number);
@@ -275,7 +312,7 @@ pub const Lexer = struct {
             const c = self.advance();
 
             if (isAlpha(c)) return self.identifier();
-            if (isDigit(c)) return self.number();
+            if (isDigit(c)) return self.number(c);
 
             switch (c) {
                 '\n' => {

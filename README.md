@@ -217,8 +217,6 @@ compiled: *.whir
 
 ### Language Features
 
-* binary, octal, hex
-* `_` in number literals
 * operator overloading on classes
 * sets
 * maps

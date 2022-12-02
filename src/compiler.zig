@@ -288,6 +288,56 @@ pub const Compiler = struct {
         }
     }
 
+    fn parseNum(str: []const u8) f64 {
+        var index: usize = 0;
+        var base: f64 = 10;
+        var result: f64 = 0;
+        if (str.len >= 2 and str[0] == '0') {
+            switch (str[1]) {
+                'b', 'B' => {
+                    index = 2;
+                    base = 2;
+                },
+                'o', 'O' => {
+                    index = 2;
+                    base = 8;
+                },
+                'x', 'X' => {
+                    index = 2;
+                    base = 16;
+                },
+                else => {},
+            }
+        }
+
+        var place: f64 = 0; // place after the decimal
+        var fractional_div = base;
+        while (index < str.len) : (index += 1) {
+            const c = str[index];
+            switch (c) {
+                '0'...'9', 'a'...'f', 'A'...'F' => {
+                    const val = @intToFloat(f64, switch (c) {
+                        '0'...'9' => c - '0',
+                        'a'...'f' => c - 'a' + 10,
+                        'A'...'F' => c - 'A' + 10,
+                        else => unreachable,
+                    });
+                    if (place == 0) {
+                        result *= base;
+                        result += val;
+                    } else {
+                        result += val / fractional_div;
+                        place += 1;
+                        fractional_div *= base;
+                    }
+                },
+                '.' => place = 1,
+                else => {},
+            }
+        }
+        return result;
+    }
+
     fn endCompiler(vm: *Vm) *ObjFunction {
         emitReturn(vm);
         const func = vm.compiler.?.function.?;
@@ -888,7 +938,7 @@ pub const Compiler = struct {
 
     fn negate(vm: *Vm) void {
         if (match(vm, .number)) {
-            const value = std.fmt.parseFloat(f64, vm.parser.previous.value) catch 0;
+            const value = parseNum(vm.parser.previous.value);
             emitNumber(vm, -value);
         } else {
             // compile the operand
@@ -904,7 +954,7 @@ pub const Compiler = struct {
     }
 
     fn number(vm: *Vm) void {
-        const value = std.fmt.parseFloat(f64, vm.parser.previous.value) catch 0;
+        const value = parseNum(vm.parser.previous.value);
         emitNumber(vm, value);
     }
 
