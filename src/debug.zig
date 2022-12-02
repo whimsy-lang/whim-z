@@ -136,7 +136,6 @@ pub fn disassembleInstruction(chunk: *Chunk, offset: usize) usize {
         .jump_back => jumpInstruction("jump back", -1, chunk, offset),
         .jump_if_true => jumpInstruction("jump if true", 1, chunk, offset),
         .jump_if_false => jumpInstruction("jump if false", 1, chunk, offset),
-        .jump_if_true_pop => jumpInstruction("jump if true (pop)", 1, chunk, offset),
         .jump_if_false_pop => jumpInstruction("jump if false (pop)", 1, chunk, offset),
 
         .call_0 => simpleInstruction("call (0)", offset),

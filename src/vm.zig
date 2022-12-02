@@ -958,10 +958,6 @@ pub const Vm = struct {
                     const offset = frame.readShort();
                     if (self.peek(0).isFalsey()) frame.ip += offset;
                 },
-                .jump_if_true_pop => {
-                    const offset = frame.readShort();
-                    if (!self.pop().isFalsey()) frame.ip += offset;
-                },
                 .jump_if_false_pop => {
                     const offset = frame.readShort();
                     if (self.pop().isFalsey()) frame.ip += offset;

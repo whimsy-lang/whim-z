@@ -113,7 +113,6 @@ pub const OpCode = enum(u8) {
     jump_back,
     jump_if_true,
     jump_if_false,
-    jump_if_true_pop,
     jump_if_false_pop,
 
     call_0,
