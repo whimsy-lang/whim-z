@@ -3,14 +3,14 @@ const Allocator = std.mem.Allocator;
 
 const Chunk = @import("chunk.zig").Chunk;
 const debug = @import("debug.zig");
-const Map = @import("map.zig").Map;
+const StringMap = @import("string_map.zig").StringMap;
 const Value = @import("value.zig").Value;
 const Vm = @import("vm.zig").Vm;
 
 pub const ObjClass = struct {
     name: ?*ObjString,
     super: ?*ObjClass,
-    fields: Map,
+    fields: StringMap,
     is_marked: bool,
 
     pub fn init(vm: *Vm, class_name: *ObjString) *ObjClass {
@@ -25,7 +25,7 @@ pub const ObjClass = struct {
 
         class.name = if (class_name != vm.empty_string) class_name else null;
         class.super = null;
-        class.fields = Map.init(vm.allocator);
+        class.fields = StringMap.init(vm.allocator);
         _ = class.fields.add(vm.super_string.?, Value.nil(), true);
         _ = class.fields.add(vm.type_string.?, Value.nil(), true);
         class.is_marked = false;
@@ -108,7 +108,7 @@ pub const ObjFunction = struct {
 
 pub const ObjInstance = struct {
     type: *ObjClass,
-    fields: Map,
+    fields: StringMap,
     is_marked: bool,
 
     pub fn init(vm: *Vm, class: *ObjClass) *ObjInstance {
@@ -122,7 +122,7 @@ pub const ObjInstance = struct {
         vm.registerObject(Value.instance(instance));
 
         instance.type = class;
-        instance.fields = Map.init(vm.allocator);
+        instance.fields = StringMap.init(vm.allocator);
         _ = instance.fields.add(vm.type_string.?, Value.class(class), true);
         instance.is_marked = false;
         return instance;
@@ -234,7 +234,7 @@ pub const ObjString = struct {
     }
 
     pub fn take(vm: *Vm, chars: []const u8) *ObjString {
-        const hash = calcHash(chars);
+        const hash = Value.calcHash(chars);
         const interned = vm.strings.findString(chars, hash);
         if (interned) |intr| {
             vm.allocator.free(chars);
@@ -245,7 +245,7 @@ pub const ObjString = struct {
     }
 
     pub fn copy(vm: *Vm, chars: []const u8) *ObjString {
-        const hash = calcHash(chars);
+        const hash = Value.calcHash(chars);
         const interned = vm.strings.findString(chars, hash);
         if (interned) |intr| return intr;
 
@@ -291,16 +291,6 @@ pub const ObjString = struct {
             index += 1;
         }
         return take(vm, heap_chars);
-    }
-
-    fn calcHash(chars: []const u8) u32 {
-        var hash: u32 = 2166136261;
-        var i: usize = 0;
-        while (i < chars.len) : (i += 1) {
-            hash ^= chars[i];
-            hash *%= 16777619;
-        }
-        return hash;
     }
 };
 

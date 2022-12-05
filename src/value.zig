@@ -12,6 +12,11 @@ const ObjString = @import("object.zig").ObjString;
 const ObjUpvalue = @import("object.zig").ObjUpvalue;
 const Vm = @import("vm.zig").Vm;
 
+pub const ValueContainer = struct {
+    value: Value,
+    constant: bool = false,
+};
+
 pub const ValueType = enum {
     empty,
 
@@ -342,5 +347,49 @@ pub const Value = struct {
 
             else => unreachable,
         }
+    }
+
+    pub fn hash(self: Value) u32 {
+        // std.debug.print("hashing: ", .{});
+        // self.print();
+        // std.debug.print("\n", .{});
+
+        return switch (self.getType()) {
+            .empty => unreachable,
+
+            .bool => calcPtrHash(&self.asBool()),
+            .nil => 0,
+            .number => calcPtrHash(&self.asNumber()),
+
+            .class => calcPtrHash(&self.asClass()),
+            .closure => calcPtrHash(&self.asClosure()),
+            .function => calcPtrHash(&self.asFunction()),
+            .instance => calcPtrHash(&self.asInstance()),
+            .list => calcPtrHash(&self.asList()),
+            .native => calcPtrHash(&self.asNative()),
+            .range => calcPtrHash(&self.asRange()),
+            .string => self.asString().hash,
+            .upvalue => calcPtrHash(&self.asUpvalue()),
+        };
+    }
+
+    fn calcPtrHash(ptr: anytype) u32 {
+        const bytes = std.mem.asBytes(ptr);
+        return calcHash(bytes);
+    }
+
+    pub fn calcHash(bytes: []const u8) u32 {
+        // for (bytes) |b| {
+        //     std.debug.print("{d} ", .{b});
+        // }
+        // std.debug.print("\n", .{});
+
+        var result: u32 = 2166136261;
+        var i: usize = 0;
+        while (i < bytes.len) : (i += 1) {
+            result ^= bytes[i];
+            result *%= 16777619;
+        }
+        return result;
     }
 };

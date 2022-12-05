@@ -7,8 +7,6 @@ const Compiler = @import("compiler.zig").Compiler;
 const Parser = @import("compiler.zig").Parser;
 const debug = @import("debug.zig");
 const Lexer = @import("lexer.zig").Lexer;
-const Map = @import("map.zig").Map;
-const ValueContainer = @import("map.zig").ValueContainer;
 const GcAllocator = @import("memory.zig").GcAllocater;
 const NativeFn = @import("object.zig").NativeFn;
 const ObjClass = @import("object.zig").ObjClass;
@@ -21,7 +19,9 @@ const ObjRange = @import("object.zig").ObjRange;
 const ObjString = @import("object.zig").ObjString;
 const ObjUpvalue = @import("object.zig").ObjUpvalue;
 const whimsy_std = @import("std.zig");
+const StringMap = @import("string_map.zig").StringMap;
 const Value = @import("value.zig").Value;
+const ValueContainer = @import("value.zig").ValueContainer;
 
 pub const InterpretResult = enum {
     ok,
@@ -66,8 +66,8 @@ pub const Vm = struct {
     gc: GcAllocator,
     allocator: Allocator,
     objects: std.ArrayList(Value),
-    globals: Map,
-    strings: Map,
+    globals: StringMap,
+    strings: StringMap,
     open_upvalues: ?*ObjUpvalue,
 
     empty_string: ?*ObjString,
@@ -103,8 +103,8 @@ pub const Vm = struct {
         self.compiler = null;
 
         self.resetStack();
-        self.globals = Map.init(self.allocator);
-        self.strings = Map.init(self.allocator);
+        self.globals = StringMap.init(self.allocator);
+        self.strings = StringMap.init(self.allocator);
 
         // strings
         self.empty_string = null;
@@ -503,7 +503,7 @@ pub const Vm = struct {
 
         const key_str = key.asString();
 
-        var fields: *Map = undefined;
+        var fields: *StringMap = undefined;
         if (object.is(.instance)) {
             const instance = object.asInstance();
             fields = &instance.fields;

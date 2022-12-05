@@ -174,17 +174,17 @@ a
 
 // Type       Type Name
 // ---------  ---------
-// f64        Number
-// string     String        "", ''
-// boolean    Bool          true, false
-// nil        Nil           nil
-// function   Function      fn
-// class      Class         class
+// f64        number
+// string     string        "", ''
+// boolean    bool          true, false
+// nil        nil           nil
+// function   function      fn
+// class      class         class
 // ---------  ---------
-// list       List          ()
-// set        Set           [val1, val2]
-// map        Map           [key :: const, key := var, 'string key' :: val]
-// range      Range         from..to : step
+// list       list          ()
+// set        set           [val1, val2]
+// map        map           [key :: const, key := var, 'string key' :: val]
+// range      range         from..to : step
 
 // Operators: + - * / % ! == != and or :: := = += -= *= /= %= is
 
@@ -203,7 +203,6 @@ compiled: *.whir
 * error handling
 * compiler arrays should not be a fixed size
 * strings - flexible array members
-* support other key types for hash tables
 * string hash set (instead of table with nil values) for interning
 * utf8
 * separate sized jumps
