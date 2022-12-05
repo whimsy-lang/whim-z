@@ -29,49 +29,65 @@ pub const GcAllocater = struct {
     }
 
     pub fn allocator(self: *GcAllocater) Allocator {
-        return Allocator.init(self, alloc, resize, free);
+        return .{
+            .ptr = self,
+            .vtable = &.{
+                .alloc = alloc,
+                .resize = resize,
+                .free = free,
+            },
+        };
     }
 
-    fn alloc(self: *GcAllocater, len: usize, ptr_align: u29, len_align: u29, ret_addr: usize) error{OutOfMemory}![]u8 {
+    fn alloc(ctx: *anyopaque, len: usize, log2_ptr_align: u8, ret_addr: usize) ?[*]u8 {
+        const self = @ptrCast(*GcAllocater, @alignCast(@alignOf(GcAllocater), ctx));
+
         if ((self.bytes_allocated + len > self.next_gc) or debug.stress_gc) {
-            try collectGarbage(self.vm);
+            collectGarbage(self.vm);
         }
-        const out = try self.vm.parent_allocator.rawAlloc(len, ptr_align, len_align, ret_addr);
-        const before = self.bytes_allocated;
-        self.bytes_allocated += out.len;
-        if (debug.log_gc) {
-            std.debug.print("  {d} -> {d}\n", .{ before, self.bytes_allocated });
+        const result = self.vm.parent_allocator.rawAlloc(len, log2_ptr_align, ret_addr);
+        if (result == null) {
+            std.debug.print("alloc failure\n", .{});
+            std.process.exit(1);
+        } else {
+            const before = self.bytes_allocated;
+            self.bytes_allocated += len;
+            if (debug.log_gc) {
+                std.debug.print("  {d} -> {d}\n", .{ before, self.bytes_allocated });
+            }
         }
-        return out;
+        return result;
     }
 
-    fn resize(self: *GcAllocater, buf: []u8, buf_align: u29, new_len: usize, len_align: u29, ret_addr: usize) ?usize {
+    fn resize(ctx: *anyopaque, buf: []u8, log2_buf_align: u8, new_len: usize, ret_addr: usize) bool {
+        const self = @ptrCast(*GcAllocater, @alignCast(@alignOf(GcAllocater), ctx));
+
         if (new_len > buf.len) {
             if ((self.bytes_allocated + (new_len - buf.len) > self.next_gc) or debug.stress_gc) {
-                collectGarbage(self.vm) catch {
-                    return null;
-                };
+                collectGarbage(self.vm);
             }
         }
 
-        if (self.vm.parent_allocator.rawResize(buf, buf_align, new_len, len_align, ret_addr)) |resized_len| {
+        if (self.vm.parent_allocator.rawResize(buf, log2_buf_align, new_len, ret_addr)) {
             const before = self.bytes_allocated;
-            if (resized_len > buf.len) {
-                self.bytes_allocated += resized_len - buf.len;
+            if (new_len > buf.len) {
+                self.bytes_allocated += new_len - buf.len;
             } else {
-                self.bytes_allocated -= buf.len - resized_len;
+                self.bytes_allocated -= buf.len - new_len;
             }
             if (debug.log_gc) {
                 std.debug.print("  {d} -> {d}\n", .{ before, self.bytes_allocated });
             }
-            return resized_len;
+            return true;
         }
 
-        return null;
+        return false;
     }
 
-    fn free(self: *GcAllocater, buf: []u8, buf_align: u29, ret_addr: usize) void {
-        self.vm.parent_allocator.rawFree(buf, buf_align, ret_addr);
+    fn free(ctx: *anyopaque, buf: []u8, log2_buf_align: u8, ret_addr: usize) void {
+        const self = @ptrCast(*GcAllocater, @alignCast(@alignOf(GcAllocater), ctx));
+
+        self.vm.parent_allocator.rawFree(buf, log2_buf_align, ret_addr);
         const before = self.bytes_allocated;
         self.bytes_allocated -= buf.len;
         if (debug.log_gc) {
@@ -135,7 +151,7 @@ pub const GcAllocater = struct {
         }
     }
 
-    fn collectGarbage(vm: *Vm) !void {
+    fn collectGarbage(vm: *Vm) void {
         const before = vm.gc.bytes_allocated;
         if (debug.log_gc) {
             std.debug.print("-- gc begin\n", .{});
