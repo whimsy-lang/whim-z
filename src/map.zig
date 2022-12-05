@@ -49,7 +49,7 @@ pub const Map = struct {
         };
         for (entries) |*entry| {
             entry.key = null;
-            entry.value = .{ .value = Value.nil() };
+            entry.value = .{ .value = Value.empty() };
         }
 
         self.count = 0;
@@ -73,7 +73,7 @@ pub const Map = struct {
         while (true) {
             const entry = &entries[index];
             if (entry.key == null) {
-                if (entry.value.value.is(.nil)) {
+                if (entry.value.value.is(.empty)) {
                     // empty entry
                     return if (tombstone != null) tombstone.? else entry;
                 } else {
@@ -97,7 +97,7 @@ pub const Map = struct {
             const entry = &self.entries[index];
             if (entry.key == null) {
                 // stop if we find an empty non-tombstone entry
-                if (entry.value.value.is(.nil)) return null;
+                if (entry.value.value.is(.empty)) return null;
             } else if (entry.key.?.hash == hash and std.mem.eql(u8, entry.key.?.chars, chars)) {
                 // found string
                 return entry.key;
@@ -122,7 +122,7 @@ pub const Map = struct {
         const is_new_key = entry.key == null;
         if (is_new_key) {
             // only increment if it's a new key and not a tombstone
-            if (entry.value.value.is(.nil)) self.count += 1;
+            if (entry.value.value.is(.empty)) self.count += 1;
             entry.key = key;
             entry.value.value = value;
             entry.value.constant = constant;
@@ -157,7 +157,7 @@ pub const Map = struct {
         const entry = findEntry(self.entries, key);
         const is_new_key = entry.key == null;
         // only increment if it's a new key and not a tombstone
-        if (is_new_key and entry.value.value.is(.nil)) self.count += 1;
+        if (is_new_key and entry.value.value.is(.empty)) self.count += 1;
 
         entry.key = key;
         entry.value.value = value;

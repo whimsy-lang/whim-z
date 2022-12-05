@@ -1,0 +1,44 @@
+// map performance test
+
+// zig build -Drelease-fast run -- test/map.whim
+
+// main     empty   value
+// 2.649    2.37    
+// 2.397    2.656   
+// 2.493    2.637   
+// 2.671    2.529   
+// 2.429    2.528   
+
+start :: std.time()
+
+c :: class
+    first :: 1
+    second :: 2
+    third :: 3
+    fourth :: 4
+    fifth :: 5
+/class
+
+do
+    i := 0
+    count := 0
+    loop break i > 10000000
+        i += 1
+        count += c.first
+        count += c.second
+        count += c.third
+        count += c.fourth
+        count += c.fifth
+
+        count -= c.first
+        count -= c.second
+        count -= c.third
+        count -= c.fourth
+        count -= c.fifth
+    /loop
+
+    std.print('i: ', i)
+    std.print('count: ', count)
+/do
+
+std.print('elapsed: ', std.time() - start)

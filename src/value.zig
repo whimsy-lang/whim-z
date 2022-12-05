@@ -13,6 +13,8 @@ const ObjUpvalue = @import("object.zig").ObjUpvalue;
 const Vm = @import("vm.zig").Vm;
 
 pub const ValueType = enum {
+    empty,
+
     bool,
     nil,
     number,
@@ -30,6 +32,8 @@ pub const ValueType = enum {
 
 pub const Value = struct {
     as: union(ValueType) {
+        empty: void,
+
         bool: bool,
         nil: void,
         number: f64,
@@ -59,6 +63,10 @@ pub const Value = struct {
 
     pub fn closure(value: *ObjClosure) Value {
         return .{ .as = .{ .closure = value } };
+    }
+
+    pub fn empty() Value {
+        return .{ .as = .empty };
     }
 
     pub fn function(value: *ObjFunction) Value {
@@ -152,6 +160,8 @@ pub const Value = struct {
     pub fn equal(self: Value, other: Value) bool {
         if (!self.is(other.getType())) return false;
         return switch (self.getType()) {
+            .empty => true,
+
             .bool => self.asBool() == other.asBool(),
             .nil => true,
             .number => self.asNumber() == other.asNumber(),
@@ -170,7 +180,7 @@ pub const Value = struct {
 
     pub fn hasStdClass(self: Value) bool {
         return switch (self.getType()) {
-            .instance, .upvalue => false,
+            .empty, .instance, .upvalue => false,
             else => true,
         };
     }
@@ -192,6 +202,8 @@ pub const Value = struct {
 
     pub fn print(self: Value) void {
         switch (self.getType()) {
+            .empty => std.debug.print("empty", .{}),
+
             .bool => std.debug.print("{s}", .{if (self.asBool()) "true" else "false"}),
             .nil => std.debug.print("nil", .{}),
             .number => std.debug.print("{d}", .{self.asNumber()}),
