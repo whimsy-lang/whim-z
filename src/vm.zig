@@ -603,6 +603,16 @@ pub const Vm = struct {
             }
         }
 
+        // set
+        if (object.is(.set)) {
+            const set = object.asSet();
+            var value: Value = undefined;
+            const found = set.items.get(key, &value);
+            self.stack_top -= pop_count;
+            self.push(Value.boolean(found));
+            return true;
+        }
+
         // string
         if (object.is(.string) and key.is(.number)) {
             const string = object.asString();
@@ -1155,6 +1165,16 @@ pub const Vm = struct {
                         self.runtimeError("Operands must both be numbers or strings of length 1.", .{});
                         return .runtime_error;
                     }
+                },
+                .set => {
+                    const count = frame.readByte();
+                    const set = ObjSet.init(self);
+                    self.push(Value.set(set));
+                    for ((self.stack_top - (count + 1))[0..count]) |val| {
+                        _ = set.items.add(val, Value.nil(), true);
+                    }
+                    self.stack_top -= (count + 1);
+                    self.push(Value.set(set));
                 },
             }
         }

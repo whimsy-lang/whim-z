@@ -118,12 +118,11 @@ list[2] = 42   // this has now changed from a string to an int
 
 // sets are unordered and unindexed collections of any type denoted with []
 // sets cannot contain duplicates
-// Set() is the empty set
+// std.set() is the empty set
 set := [1, 3, "hi"]
-set.add("yay")
-set.contains(3)
-set[key]  // equivalent to set.contains[key]
-set.remove('hi')
+set:add("yay")
+set[key]  // returns whether the set contains the key
+set:remove('hi')
 
 // maps are unordered indexable collections of key/value pairs denoted with []
 // [] is an empty map
@@ -145,6 +144,7 @@ map.someFn()  // 'hello'
 
 // Ranges
 [from]..[to(exclusive)] [: step]
+[from]..=[to(inclusive)] [: step]
 // step defaults to 1
 1..3      // 1, 2
 1..4: 2   // 1, 3
@@ -220,6 +220,5 @@ compiled: *.whir
   * explore generic operator support
 * range step
 * assignment on ranges for lists and strings
-* sets
 * maps
 * std library type conversions

@@ -528,6 +528,7 @@ pub const Compiler = struct {
     fn getPrefix(tok_type: TokenType) ?ParseFn {
         return switch (tok_type) {
             .left_paren => grouping,
+            .left_bracket => bracketExpression,
             .bang => not,
             .minus => negate,
             .identifier => variable,
@@ -617,6 +618,27 @@ pub const Compiler = struct {
             .slash => vm.emitOp(.divide),
             .percent => vm.emitOp(.remainder),
             else => unreachable,
+        }
+    }
+
+    fn bracketExpression(vm: *Vm) void {
+        var count: u8 = 0;
+        if (!check(vm, .right_bracket)) {
+            while (true) {
+                expression(vm);
+                if (count == std.math.maxInt(u8)) {
+                    error_(vm, "Can't have more than 255 starting set items.");
+                }
+                count += 1;
+                if (!(match(vm, .comma) and !check(vm, .right_bracket))) break;
+            }
+        }
+        consume(vm, .right_bracket, "Expect ']' after expression.");
+
+        if (count > 0) {
+            vm.emitOpByte(.set, count);
+        } else {
+            error_(vm, "Map shorthand not yet implemented.");
         }
     }
 

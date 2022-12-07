@@ -185,6 +185,7 @@ pub fn disassembleInstruction(chunk: *Chunk, offset: usize) usize {
         .list => byteInstruction("list", chunk, offset),
         .range => simpleInstruction("range", offset),
         .range_inclusive => simpleInstruction("range (incl)", offset),
+        .set => byteInstruction("set", chunk, offset),
     };
 }
 

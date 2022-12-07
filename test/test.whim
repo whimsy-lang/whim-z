@@ -1,8 +1,12 @@
 // simple test file
 
-s :: [1, 2, 'hello', nil]
+s :: [1, 1, 2, 'hello', nil, 1]
 std.print(s)
 s:add(3, 4)
 std.print(s)
+std.print(s[1])
+std.print(s[nil])
 s:remove('hello', nil)
-std.print(s)
+std.print(s);
+std.print(s[1])
+std.print(s[nil])
