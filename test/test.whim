@@ -1,10 +1,8 @@
 // simple test file
 
-0123
-1234567890
-123.45
-0b11.1
-0o7.4
-0xf.08
-0xC
-0Xd
+s :: [1, 2, 'hello', nil]
+std.print(s)
+s:add(3, 4)
+std.print(s)
+s:remove('hello', nil)
+std.print(s)

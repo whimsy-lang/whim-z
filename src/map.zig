@@ -142,7 +142,7 @@ pub const Map = struct {
         return is_new_key;
     }
 
-    fn delete(self: *Map, key: Value) bool {
+    pub fn delete(self: *Map, key: Value) bool {
         if (self.count == 0) return false;
 
         // find the entry

@@ -14,8 +14,10 @@ const ObjClosure = @import("object.zig").ObjClosure;
 const ObjFunction = @import("object.zig").ObjFunction;
 const ObjInstance = @import("object.zig").ObjInstance;
 const ObjList = @import("object.zig").ObjList;
+const ObjMap = @import("object.zig").ObjMap;
 const ObjNative = @import("object.zig").ObjNative;
 const ObjRange = @import("object.zig").ObjRange;
+const ObjSet = @import("object.zig").ObjSet;
 const ObjString = @import("object.zig").ObjString;
 const ObjUpvalue = @import("object.zig").ObjUpvalue;
 const whimsy_std = @import("std.zig");
@@ -268,10 +270,22 @@ pub const Vm = struct {
                     return true;
                 }
                 if (class == self.map_class) {
-                    // TODO
+                    if (arg_count != 0) {
+                        self.runtimeError("Expected 0 arguments but got {d}.", .{arg_count});
+                        return false;
+                    }
+                    const map = ObjMap.init(self);
+                    (self.stack_top - 1)[0] = Value.map(map);
+                    return true;
                 }
                 if (class == self.set_class) {
-                    // TODO
+                    const set = ObjSet.init(self);
+                    (self.stack_top - (arg_count + 1))[0] = Value.set(set);
+                    for ((self.stack_top - arg_count)[0..arg_count]) |val| {
+                        _ = set.items.add(val, Value.nil(), true);
+                    }
+                    self.stack_top -= arg_count;
+                    return true;
                 }
                 if (class == self.bool_class or
                     class == self.class_class or

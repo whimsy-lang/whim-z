@@ -265,7 +265,21 @@ pub const Value = struct {
                 std.debug.print(")", .{});
             },
             .map => {
-                // TODO
+                std.debug.print("[", .{});
+                var first = true;
+                for (self.asMap().items.entries) |entry| {
+                    if (!entry.key.is(.empty)) {
+                        if (first) {
+                            first = false;
+                        } else {
+                            std.debug.print(", ", .{});
+                        }
+                        entry.key.print();
+                        std.debug.print(" {s} ", .{if (entry.value.constant) "::" else ":="});
+                        entry.value.value.print();
+                    }
+                }
+                std.debug.print("]", .{});
             },
             .native => std.debug.print("<native fn>", .{}),
             .range => {
@@ -275,7 +289,19 @@ pub const Value = struct {
                 r.end.print();
             },
             .set => {
-                // TODO
+                std.debug.print("[", .{});
+                var first = true;
+                for (self.asSet().items.entries) |entry| {
+                    if (!entry.key.is(.empty)) {
+                        if (first) {
+                            first = false;
+                        } else {
+                            std.debug.print(", ", .{});
+                        }
+                        entry.key.print();
+                    }
+                }
+                std.debug.print("]", .{});
             },
             .string => std.debug.print("{s}", .{self.asString().chars}),
             .upvalue => std.debug.print("upvalue", .{}),
@@ -316,10 +342,10 @@ pub const Value = struct {
 
         switch (self.getType()) {
             .class => {
-                const clas = self.asClass();
-                if (clas.name) |name| Value.string(name).mark(vm);
-                if (clas.super) |super| Value.class(super).mark(vm);
-                clas.fields.mark(vm);
+                const cl = self.asClass();
+                if (cl.name) |name| Value.string(name).mark(vm);
+                if (cl.super) |super| Value.class(super).mark(vm);
+                cl.fields.mark(vm);
             },
             .closure => {
                 const clos = self.asClosure();
@@ -339,17 +365,13 @@ pub const Value = struct {
                 inst.fields.mark(vm);
             },
             .list => markArray(&self.asList().items, vm),
-            .map => {
-                // TODO
-            },
+            .map => self.asMap().items.mark(vm),
             .range => {
                 const r = self.asRange();
                 r.start.mark(vm);
                 r.end.mark(vm);
             },
-            .set => {
-                // TODO
-            },
+            .set => self.asSet().items.mark(vm),
             .upvalue => self.asUpvalue().closed.mark(vm),
             else => unreachable,
         }
