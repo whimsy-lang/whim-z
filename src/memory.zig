@@ -125,9 +125,11 @@ pub const GcAllocater = struct {
         if (vm.class_class) |c| Value.class(c).mark(vm);
         if (vm.function_class) |c| Value.class(c).mark(vm);
         if (vm.list_class) |c| Value.class(c).mark(vm);
+        if (vm.map_class) |c| Value.class(c).mark(vm);
         if (vm.nil_class) |c| Value.class(c).mark(vm);
         if (vm.number_class) |c| Value.class(c).mark(vm);
         if (vm.range_class) |c| Value.class(c).mark(vm);
+        if (vm.set_class) |c| Value.class(c).mark(vm);
         if (vm.string_class) |c| Value.class(c).mark(vm);
     }
 
@@ -205,8 +207,18 @@ pub const GcAllocater = struct {
                 list.deinit();
                 vm.allocator.destroy(list);
             },
+            .map => {
+                const map = object.asMap();
+                map.deinit();
+                vm.allocator.destroy(map);
+            },
             .native => vm.allocator.destroy(object.asNative()),
             .range => vm.allocator.destroy(object.asRange()),
+            .set => {
+                const set = object.asSet();
+                set.deinit();
+                vm.allocator.destroy(set);
+            },
             .string => {
                 const string = object.asString();
                 string.deinit(vm.allocator);

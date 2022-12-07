@@ -79,9 +79,11 @@ pub const Vm = struct {
     class_class: ?*ObjClass,
     function_class: ?*ObjClass,
     list_class: ?*ObjClass,
+    map_class: ?*ObjClass,
     nil_class: ?*ObjClass,
     number_class: ?*ObjClass,
     range_class: ?*ObjClass,
+    set_class: ?*ObjClass,
     string_class: ?*ObjClass,
 
     frames: [frames_max]CallFrame,
@@ -117,9 +119,11 @@ pub const Vm = struct {
         self.class_class = null;
         self.function_class = null;
         self.list_class = null;
+        self.map_class = null;
         self.nil_class = null;
         self.number_class = null;
         self.range_class = null;
+        self.set_class = null;
         self.string_class = null;
 
         self.empty_string = ObjString.copy(self, "");
@@ -134,18 +138,22 @@ pub const Vm = struct {
         self.globals.deinit();
         self.strings.deinit();
 
+        // strings
         self.empty_string = null;
         self.init_string = null;
         self.type_string = null;
         self.super_string = null;
 
+        // classes
         self.bool_class = null;
         self.class_class = null;
         self.function_class = null;
         self.list_class = null;
+        self.map_class = null;
         self.nil_class = null;
         self.number_class = null;
         self.range_class = null;
+        self.set_class = null;
         self.string_class = null;
 
         GcAllocator.freeObjects(self);
@@ -258,6 +266,12 @@ pub const Vm = struct {
                     };
                     self.stack_top -= arg_count;
                     return true;
+                }
+                if (class == self.map_class) {
+                    // TODO
+                }
+                if (class == self.set_class) {
+                    // TODO
                 }
                 if (class == self.bool_class or
                     class == self.class_class or
@@ -855,9 +869,11 @@ pub const Vm = struct {
                         super == self.class_class or
                         super == self.function_class or
                         super == self.list_class or
+                        super == self.map_class or
                         super == self.nil_class or
                         super == self.number_class or
                         super == self.range_class or
+                        super == self.set_class or
                         super == self.string_class)
                     {
                         self.runtimeError("Cannot inherit from a builtin type.", .{});

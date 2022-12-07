@@ -3,6 +3,7 @@ const Allocator = std.mem.Allocator;
 
 const Chunk = @import("chunk.zig").Chunk;
 const debug = @import("debug.zig");
+const Map = @import("map.zig").Map;
 const StringMap = @import("string_map.zig").StringMap;
 const Value = @import("value.zig").Value;
 const Vm = @import("vm.zig").Vm;
@@ -157,6 +158,30 @@ pub const ObjList = struct {
     }
 };
 
+pub const ObjMap = struct {
+    items: Map,
+    is_marked: bool,
+
+    pub fn init(vm: *Vm) *ObjMap {
+        if (debug.log_gc) {
+            std.debug.print("allocate for map\n", .{});
+        }
+        const map = vm.allocator.create(ObjMap) catch {
+            std.debug.print("Could not allocate memory for map.", .{});
+            std.process.exit(1);
+        };
+        vm.registerObject(Value.map(map));
+
+        map.items = Map.init(vm.allocator);
+        map.is_marked = false;
+        return map;
+    }
+
+    pub fn deinit(self: *ObjMap) void {
+        self.items.deinit();
+    }
+};
+
 pub const NativeFn = *const fn (*Vm, []Value) Value;
 
 pub const ObjNative = struct {
@@ -200,6 +225,30 @@ pub const ObjRange = struct {
         range.inclusive = inclusive_val;
         range.is_marked = false;
         return range;
+    }
+};
+
+pub const ObjSet = struct {
+    items: Map,
+    is_marked: bool,
+
+    pub fn init(vm: *Vm) *ObjSet {
+        if (debug.log_gc) {
+            std.debug.print("allocate for set\n", .{});
+        }
+        const set = vm.allocator.create(ObjSet) catch {
+            std.debug.print("Could not allocate memory for set.", .{});
+            std.process.exit(1);
+        };
+        vm.registerObject(Value.set(set));
+
+        set.items = Map.init(vm.allocator);
+        set.is_marked = false;
+        return set;
+    }
+
+    pub fn deinit(self: *ObjSet) void {
+        self.items.deinit();
     }
 };
 

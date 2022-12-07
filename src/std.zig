@@ -28,6 +28,9 @@ pub fn register(vm: *Vm) void {
     defineNative(vm, vm.list_class.?, "delete", n_std_list_delete);
     defineNative(vm, vm.list_class.?, "len", n_std_list_len);
 
+    // std.map
+    vm.map_class = defineInnerClass(vm, std_class, "map");
+
     // std.nil
     vm.nil_class = defineInnerClass(vm, std_class, "nil");
 
@@ -36,6 +39,9 @@ pub fn register(vm: *Vm) void {
 
     // std.range
     vm.range_class = defineInnerClass(vm, std_class, "range");
+
+    // std.set
+    vm.set_class = defineInnerClass(vm, std_class, "set");
 
     // std.string
     vm.string_class = defineInnerClass(vm, std_class, "string");

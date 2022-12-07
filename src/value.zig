@@ -6,8 +6,10 @@ const ObjClosure = @import("object.zig").ObjClosure;
 const ObjFunction = @import("object.zig").ObjFunction;
 const ObjInstance = @import("object.zig").ObjInstance;
 const ObjList = @import("object.zig").ObjList;
+const ObjMap = @import("object.zig").ObjMap;
 const ObjNative = @import("object.zig").ObjNative;
 const ObjRange = @import("object.zig").ObjRange;
+const ObjSet = @import("object.zig").ObjSet;
 const ObjString = @import("object.zig").ObjString;
 const ObjUpvalue = @import("object.zig").ObjUpvalue;
 const Vm = @import("vm.zig").Vm;
@@ -29,8 +31,10 @@ pub const ValueType = enum {
     function,
     instance,
     list,
+    map,
     native,
     range,
+    set,
     string,
     upvalue,
 };
@@ -48,8 +52,10 @@ pub const Value = struct {
         function: *ObjFunction,
         instance: *ObjInstance,
         list: *ObjList,
+        map: *ObjMap,
         native: *ObjNative,
         range: *ObjRange,
+        set: *ObjSet,
         string: *ObjString,
         upvalue: *ObjUpvalue,
     },
@@ -86,6 +92,10 @@ pub const Value = struct {
         return .{ .as = .{ .list = value } };
     }
 
+    pub fn map(value: *ObjMap) Value {
+        return .{ .as = .{ .map = value } };
+    }
+
     pub fn native(value: *ObjNative) Value {
         return .{ .as = .{ .native = value } };
     }
@@ -100,6 +110,10 @@ pub const Value = struct {
 
     pub fn range(value: *ObjRange) Value {
         return .{ .as = .{ .range = value } };
+    }
+
+    pub fn set(value: *ObjSet) Value {
+        return .{ .as = .{ .set = value } };
     }
 
     pub fn string(value: *ObjString) Value {
@@ -138,6 +152,10 @@ pub const Value = struct {
         return self.as.list;
     }
 
+    pub fn asMap(self: Value) *ObjMap {
+        return self.as.map;
+    }
+
     pub fn asNative(self: Value) *ObjNative {
         return self.as.native;
     }
@@ -148,6 +166,10 @@ pub const Value = struct {
 
     pub fn asRange(self: Value) *ObjRange {
         return self.as.range;
+    }
+
+    pub fn asSet(self: Value) *ObjSet {
+        return self.as.set;
     }
 
     pub fn asString(self: Value) *ObjString {
@@ -176,8 +198,10 @@ pub const Value = struct {
             .function => self.asFunction() == other.asFunction(),
             .instance => self.asInstance() == other.asInstance(),
             .list => self.asList() == other.asList(),
+            .map => self.asMap() == other.asMap(),
             .native => self.asNative() == other.asNative(),
             .range => self.asRange() == other.asRange(),
+            .set => self.asSet() == other.asSet(),
             .string => self.asString() == other.asString(),
             .upvalue => self.asUpvalue() == other.asUpvalue(),
         };
@@ -196,9 +220,11 @@ pub const Value = struct {
             .class => vm.class_class.?,
             .closure, .function, .native => vm.function_class.?,
             .list => vm.list_class.?,
+            .map => vm.map_class.?,
             .nil => vm.nil_class.?,
             .number => vm.number_class.?,
             .range => vm.range_class.?,
+            .set => vm.set_class.?,
             .string => vm.string_class.?,
 
             else => unreachable,
@@ -238,12 +264,18 @@ pub const Value = struct {
                 }
                 std.debug.print(")", .{});
             },
+            .map => {
+                // TODO
+            },
             .native => std.debug.print("<native fn>", .{}),
             .range => {
                 const r = self.asRange();
                 r.start.print();
                 std.debug.print("{s}", .{if (r.inclusive) "..=" else ".."});
                 r.end.print();
+            },
+            .set => {
+                // TODO
             },
             .string => std.debug.print("{s}", .{self.asString().chars}),
             .upvalue => std.debug.print("upvalue", .{}),
@@ -307,10 +339,16 @@ pub const Value = struct {
                 inst.fields.mark(vm);
             },
             .list => markArray(&self.asList().items, vm),
+            .map => {
+                // TODO
+            },
             .range => {
                 const r = self.asRange();
                 r.start.mark(vm);
                 r.end.mark(vm);
+            },
+            .set => {
+                // TODO
             },
             .upvalue => self.asUpvalue().closed.mark(vm),
             else => unreachable,
@@ -324,8 +362,10 @@ pub const Value = struct {
             .function => self.asFunction().is_marked,
             .instance => self.asInstance().is_marked,
             .list => self.asList().is_marked,
+            .map => self.asMap().is_marked,
             .native => self.asNative().is_marked,
             .range => self.asRange().is_marked,
+            .set => self.asSet().is_marked,
             .string => self.asString().is_marked,
             .upvalue => self.asUpvalue().is_marked,
 
@@ -340,8 +380,10 @@ pub const Value = struct {
             .function => self.asFunction().is_marked = mark_val,
             .instance => self.asInstance().is_marked = mark_val,
             .list => self.asList().is_marked = mark_val,
+            .map => self.asMap().is_marked = mark_val,
             .native => self.asNative().is_marked = mark_val,
             .range => self.asRange().is_marked = mark_val,
+            .set => self.asSet().is_marked = mark_val,
             .string => self.asString().is_marked = mark_val,
             .upvalue => self.asUpvalue().is_marked = mark_val,
 
@@ -366,8 +408,10 @@ pub const Value = struct {
             .function => calcPtrHash(&self.asFunction()),
             .instance => calcPtrHash(&self.asInstance()),
             .list => calcPtrHash(&self.asList()),
+            .map => calcPtrHash(&self.asMap()),
             .native => calcPtrHash(&self.asNative()),
             .range => calcPtrHash(&self.asRange()),
+            .set => calcPtrHash(&self.asSet()),
             .string => self.asString().hash,
             .upvalue => calcPtrHash(&self.asUpvalue()),
         };
