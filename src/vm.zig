@@ -524,6 +524,15 @@ pub const Vm = struct {
     }
 
     fn defineOnValue(self: *Vm, object: Value, key: Value, value: Value, constant: bool) bool {
+        if (object.is(.map)) {
+            const map = object.asMap();
+            if (!map.items.add(key, value, constant)) {
+                self.runtimeError("Map already contains key.", .{});
+                return false;
+            }
+            return true;
+        }
+
         if (!key.is(.string)) {
             self.runtimeError("Key must be a string.", .{});
             return false;
@@ -601,6 +610,19 @@ pub const Vm = struct {
                 self.runtimeError("Only numeric ranges can be used to index a list.", .{});
                 return false;
             }
+        }
+
+        // map
+        if (object.is(.map)) {
+            const map = object.asMap();
+            var value: Value = undefined;
+            if (!map.items.get(key, &value)) {
+                self.runtimeError("Map does not contain key.", .{});
+                return false;
+            }
+            self.stack_top -= pop_count;
+            self.push(value);
+            return true;
         }
 
         // set
@@ -716,6 +738,23 @@ pub const Vm = struct {
                 return false;
             }
             list.items.items[@intCast(usize, index)] = value;
+            return true;
+        }
+
+        if (object.is(.map)) {
+            const map = object.asMap();
+
+            var vc: *ValueContainer = undefined;
+            if (!map.items.getPtr(key, &vc)) {
+                self.runtimeError("Map does not contain key.", .{});
+                return false;
+            }
+            if (vc.constant) {
+                self.runtimeError("Map item is constant.", .{});
+                return false;
+            }
+            vc.value = value;
+
             return true;
         }
 
@@ -922,11 +961,13 @@ pub const Vm = struct {
                     self.stack_top -= 2;
                 },
 
-                .define_indexer_const, .define_indexer_var => {
-                    if (!self.defineOnValue(self.peek(2), self.peek(1), self.peek(0), op == .define_indexer_const)) {
+                .define_indexer_const, .define_indexer_const_pop, .define_indexer_var, .define_indexer_var_pop => {
+                    const constant = (op == .define_indexer_const) or (op == .define_indexer_const_pop);
+                    const pop_count: usize = if (op == .define_indexer_const_pop or op == .define_indexer_var_pop) 3 else 2;
+                    if (!self.defineOnValue(self.peek(2), self.peek(1), self.peek(0), constant)) {
                         return .runtime_error;
                     }
-                    self.stack_top -= 3;
+                    self.stack_top -= pop_count;
                 },
                 .get_indexer, .get_indexer_pop => {
                     const pop_count: usize = if (op == .get_indexer_pop) 2 else 0;
@@ -1150,6 +1191,16 @@ pub const Vm = struct {
                     };
                     self.stack_top -= (count + 1);
                     self.push(Value.list(list));
+                },
+                .map => self.push(Value.map(ObjMap.init(self))),
+                .map_with_const, .map_with_var => {
+                    const val = self.peek(0);
+                    const key = self.peek(1);
+                    const map = ObjMap.init(self);
+                    self.push(Value.map(map));
+                    _ = map.items.add(key, val, op == .map_with_const);
+                    self.stack_top -= 3;
+                    self.push(Value.map(map));
                 },
                 .range, .range_inclusive => {
                     const b = self.peek(0);

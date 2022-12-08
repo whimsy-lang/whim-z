@@ -503,8 +503,12 @@ pub const Compiler = struct {
         }
     }
 
-    fn defineIndexer(vm: *Vm, constant: bool) void {
-        vm.emitOp(if (constant) .define_indexer_const else .define_indexer_var);
+    fn defineIndexer(vm: *Vm, constant: bool, pop: bool) void {
+        if (pop) {
+            vm.emitOp(if (constant) .define_indexer_const_pop else .define_indexer_var_pop);
+        } else {
+            vm.emitOp(if (constant) .define_indexer_const else .define_indexer_var);
+        }
     }
 
     fn getPrefixPrimary(tok_type: TokenType) ?PrimaryParseFn {
@@ -622,23 +626,43 @@ pub const Compiler = struct {
     }
 
     fn bracketExpression(vm: *Vm) void {
-        var count: u8 = 0;
+        var count: usize = 0;
+        var map = false;
         if (!check(vm, .right_bracket)) {
             while (true) {
                 expression(vm);
-                if (count == std.math.maxInt(u8)) {
+                if (check(vm, .colon_colon) or check(vm, .colon_equal)) {
+                    const constant = vm.parser.current.type == .colon_colon;
+                    advance(vm); // accept :: :=
+                    expression(vm);
+
+                    if (count == 0) {
+                        // first map item
+                        map = true;
+                        vm.emitOp(if (constant) .map_with_const else .map_with_var);
+                    } else if (map) {
+                        // map item
+                        defineIndexer(vm, constant, false);
+                    } else {
+                        error_(vm, "Sets cannot contain key/value pairs.");
+                    }
+                } else if (map) {
+                    error_(vm, "All map entries must be a key/value pair.");
+                } else if (count == std.math.maxInt(u8)) {
+                    // set item, check count
                     error_(vm, "Can't have more than 255 starting set items.");
                 }
+
                 count += 1;
                 if (!(match(vm, .comma) and !check(vm, .right_bracket))) break;
             }
         }
         consume(vm, .right_bracket, "Expect ']' after expression.");
 
-        if (count > 0) {
-            vm.emitOpByte(.set, count);
-        } else {
-            error_(vm, "Map shorthand not yet implemented.");
+        if (count == 0) {
+            vm.emitOp(.map);
+        } else if (!map) {
+            vm.emitOpByte(.set, @intCast(u8, count));
         }
     }
 
@@ -885,7 +909,7 @@ pub const Compiler = struct {
 
                 advance(vm); // accept :: :=
                 expression(vm);
-                defineIndexer(vm, constant);
+                defineIndexer(vm, constant, true);
 
                 return true;
             },

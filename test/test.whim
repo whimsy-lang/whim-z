@@ -1,12 +1,20 @@
 // simple test file
 
-s :: [1, 1, 2, 'hello', nil, 1]
-std.print(s)
-s:add(3, 4)
-std.print(s)
-std.print(s[1])
-std.print(s[nil])
-s:remove('hello', nil)
-std.print(s);
-std.print(s[1])
-std.print(s[nil])
+m :: [1 :: 'init', 'two' := 2, 'three' := 'yay']
+std.print(m)
+m['three'] = 3
+std.print(m)
+m.three = 33
+std.print(m)
+std.print(m[1], m['three'], m.three, m.'three')
+std.print(m:length())
+m[7] :: 'seven'
+std.print(m)
+std.print(m:length())
+m:remove(1, 'three')
+std.print(m)
+std.print(m:length())
+m['two'] += 7
+std.print(m)
+m.two *= 2
+std.print(m)

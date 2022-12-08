@@ -30,6 +30,8 @@ pub fn register(vm: *Vm) void {
 
     // std.map
     vm.map_class = defineInnerClass(vm, std_class, "map");
+    defineNative(vm, vm.map_class.?, "length", n_std_map_length);
+    defineNative(vm, vm.map_class.?, "remove", n_std_map_remove);
 
     // std.nil
     vm.nil_class = defineInnerClass(vm, std_class, "nil");
@@ -125,6 +127,33 @@ fn n_std_list_remove(vm: *Vm, values: []Value) Value {
         return vm.nativeError("std.list.remove arguments must be a list and number", .{});
     }
     return values[0].asList().items.orderedRemove(@floatToInt(usize, values[1].asNumber()));
+}
+
+fn n_std_map_length(vm: *Vm, values: []Value) Value {
+    var length: usize = 0;
+    if (values.len != 1 or !values[0].is(.map)) {
+        return vm.nativeError("std.map.length takes a map", .{});
+    }
+    for (values[0].asMap().items.entries) |entry| {
+        if (!entry.key.is(.empty)) {
+            length += 1;
+        }
+    }
+    return Value.number(@intToFloat(f64, length));
+}
+
+fn n_std_map_remove(vm: *Vm, values: []Value) Value {
+    if (values.len < 2) {
+        return vm.nativeError("std.map.remove takes a map and at least one key to remove", .{});
+    }
+    if (!values[0].is(.map)) {
+        return vm.nativeError("std.map.remove's first argument must be a map", .{});
+    }
+    const map = values[0].asMap();
+    for (values[1..]) |val| {
+        _ = map.items.delete(val);
+    }
+    return values[0];
 }
 
 fn n_std_set_add(vm: *Vm, values: []Value) Value {

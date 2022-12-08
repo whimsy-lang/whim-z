@@ -220,5 +220,4 @@ compiled: *.whir
   * explore generic operator support
 * range step
 * assignment on ranges for lists and strings
-* maps
 * std library type conversions
