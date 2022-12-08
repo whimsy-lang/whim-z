@@ -414,10 +414,6 @@ pub const Value = struct {
     }
 
     pub fn hash(self: Value) u32 {
-        // std.debug.print("hashing: ", .{});
-        // self.print();
-        // std.debug.print("\n", .{});
-
         return switch (self.getType()) {
             .empty => unreachable,
 
@@ -445,11 +441,6 @@ pub const Value = struct {
     }
 
     pub fn calcHash(bytes: []const u8) u32 {
-        // for (bytes) |b| {
-        //     std.debug.print("{d} ", .{b});
-        // }
-        // std.debug.print("\n", .{});
-
         var result: u32 = 2166136261;
         var i: usize = 0;
         while (i < bytes.len) : (i += 1) {
