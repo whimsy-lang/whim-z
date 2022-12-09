@@ -907,10 +907,10 @@ pub const Vm = struct {
                     frame.closure.upvalues[index].?.location.* = self.pop();
                 },
 
-                .define_property_const, .define_property_const_pop, .define_property_var, .define_property_var_pop => {
+                .define_const_by_const, .define_const_by_const_pop, .define_var_by_const, .define_var_by_const_pop => {
                     const name = frame.readString();
-                    const constant = (op == .define_property_const) or (op == .define_property_const_pop);
-                    const do_pop = (op == .define_property_const_pop) or (op == .define_property_var_pop);
+                    const constant = (op == .define_const_by_const) or (op == .define_const_by_const_pop);
+                    const do_pop = (op == .define_const_by_const_pop) or (op == .define_var_by_const_pop);
                     if (!self.defineOnValue(self.peek(1), Value.string(name), self.peek(0), constant)) {
                         return .runtime_error;
                     }
@@ -946,14 +946,14 @@ pub const Vm = struct {
                     _ = class.fields.set(self.super_string.?, Value.class(super));
                     _ = self.pop();
                 },
-                .get_property, .get_property_pop => {
+                .get_by_const, .get_by_const_pop => {
                     const name = frame.readString();
-                    const pop_count: usize = if (op == .get_property_pop) 1 else 0;
+                    const pop_count: usize = if (op == .get_by_const_pop) 1 else 0;
                     if (!self.getOnValue(self.peek(0), Value.string(name), pop_count)) {
                         return .runtime_error;
                     }
                 },
-                .set_property => {
+                .set_by_const => {
                     const name = frame.readString();
                     if (!self.setOnValue(self.peek(1), Value.string(name), self.peek(0))) {
                         return .runtime_error;
@@ -961,21 +961,21 @@ pub const Vm = struct {
                     self.stack_top -= 2;
                 },
 
-                .define_indexer_const, .define_indexer_const_pop, .define_indexer_var, .define_indexer_var_pop => {
-                    const constant = (op == .define_indexer_const) or (op == .define_indexer_const_pop);
-                    const pop_count: usize = if (op == .define_indexer_const_pop or op == .define_indexer_var_pop) 3 else 2;
+                .define_const, .define_const_pop, .define_var, .define_var_pop => {
+                    const constant = (op == .define_const) or (op == .define_const_pop);
+                    const pop_count: usize = if (op == .define_const_pop or op == .define_var_pop) 3 else 2;
                     if (!self.defineOnValue(self.peek(2), self.peek(1), self.peek(0), constant)) {
                         return .runtime_error;
                     }
                     self.stack_top -= pop_count;
                 },
-                .get_indexer, .get_indexer_pop => {
-                    const pop_count: usize = if (op == .get_indexer_pop) 2 else 0;
+                .get, .get_pop => {
+                    const pop_count: usize = if (op == .get_pop) 2 else 0;
                     if (!self.getOnValue(self.peek(1), self.peek(0), pop_count)) {
                         return .runtime_error;
                     }
                 },
-                .set_indexer => {
+                .set => {
                     if (!self.setOnValue(self.peek(2), self.peek(1), self.peek(0))) {
                         return .runtime_error;
                     }

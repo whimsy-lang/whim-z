@@ -497,17 +497,17 @@ pub const Compiler = struct {
 
     fn defineProperty(vm: *Vm, name: u8, constant: bool, pop: bool) void {
         if (pop) {
-            vm.emitOpByte(if (constant) .define_property_const_pop else .define_property_var_pop, name);
+            vm.emitOpByte(if (constant) .define_const_by_const_pop else .define_var_by_const_pop, name);
         } else {
-            vm.emitOpByte(if (constant) .define_property_const else .define_property_var, name);
+            vm.emitOpByte(if (constant) .define_const_by_const else .define_var_by_const, name);
         }
     }
 
     fn defineIndexer(vm: *Vm, constant: bool, pop: bool) void {
         if (pop) {
-            vm.emitOp(if (constant) .define_indexer_const_pop else .define_indexer_var_pop);
+            vm.emitOp(if (constant) .define_const_pop else .define_var_pop);
         } else {
-            vm.emitOp(if (constant) .define_indexer_const else .define_indexer_var);
+            vm.emitOp(if (constant) .define_const else .define_var);
         }
     }
 
@@ -734,7 +734,7 @@ pub const Compiler = struct {
                 vm.emitByte(arg_count);
             }
         } else {
-            vm.emitOpByte(.get_property_pop, name);
+            vm.emitOpByte(.get_by_const_pop, name);
         }
     }
 
@@ -764,7 +764,7 @@ pub const Compiler = struct {
 
                 if (op_type != .equal) {
                     // emit get
-                    vm.emitOpByte(.get_property, name);
+                    vm.emitOpByte(.get_by_const, name);
                 }
 
                 advance(vm); // accept = += -= *= /= %=
@@ -781,7 +781,7 @@ pub const Compiler = struct {
                 }
 
                 // emit set
-                vm.emitOpByte(.set_property, name);
+                vm.emitOpByte(.set_by_const, name);
 
                 return true;
             },
@@ -918,7 +918,7 @@ pub const Compiler = struct {
 
                 if (op_type != .equal) {
                     // emit get
-                    vm.emitOp(.get_indexer);
+                    vm.emitOp(.get);
                 }
 
                 advance(vm); // accept = += -= *= /= %=
@@ -935,21 +935,21 @@ pub const Compiler = struct {
                 }
 
                 // emit set
-                vm.emitOp(.set_indexer);
+                vm.emitOp(.set);
 
                 return true;
             },
             else => {},
         }
         // not an assignment, so get the indexer
-        vm.emitOp(.get_indexer_pop);
+        vm.emitOp(.get_pop);
         return false;
     }
 
     fn indexer(vm: *Vm) void {
         expression(vm);
         consume(vm, .right_bracket, "Expect ']' after expression.");
-        vm.emitOp(.get_indexer_pop);
+        vm.emitOp(.get_pop);
     }
 
     fn literal(vm: *Vm) void {
