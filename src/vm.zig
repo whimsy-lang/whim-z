@@ -908,10 +908,10 @@ pub const Vm = struct {
                 },
 
                 .define_const_by_const, .define_const_by_const_pop, .define_var_by_const, .define_var_by_const_pop => {
-                    const name = frame.readString();
+                    const key = frame.readConstant();
                     const constant = (op == .define_const_by_const) or (op == .define_const_by_const_pop);
                     const do_pop = (op == .define_const_by_const_pop) or (op == .define_var_by_const_pop);
-                    if (!self.defineOnValue(self.peek(1), Value.string(name), self.peek(0), constant)) {
+                    if (!self.defineOnValue(self.peek(1), key, self.peek(0), constant)) {
                         return .runtime_error;
                     }
                     _ = self.pop();
@@ -947,15 +947,15 @@ pub const Vm = struct {
                     _ = self.pop();
                 },
                 .get_by_const, .get_by_const_pop => {
-                    const name = frame.readString();
+                    const key = frame.readConstant();
                     const pop_count: usize = if (op == .get_by_const_pop) 1 else 0;
-                    if (!self.getOnValue(self.peek(0), Value.string(name), pop_count)) {
+                    if (!self.getOnValue(self.peek(0), key, pop_count)) {
                         return .runtime_error;
                     }
                 },
                 .set_by_const => {
-                    const name = frame.readString();
-                    if (!self.setOnValue(self.peek(1), Value.string(name), self.peek(0))) {
+                    const key = frame.readConstant();
+                    if (!self.setOnValue(self.peek(1), key, self.peek(0))) {
                         return .runtime_error;
                     }
                     self.stack_top -= 2;
