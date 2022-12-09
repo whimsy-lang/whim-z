@@ -167,7 +167,7 @@ pub const OpCode = enum(u8) {
     map_with_var,
     range,
     range_inclusive,
-    set,
+    new_set,
 };
 
 pub const Chunk = struct {

@@ -662,7 +662,7 @@ pub const Compiler = struct {
         if (count == 0) {
             vm.emitOp(.map);
         } else if (!map) {
-            vm.emitOpByte(.set, @intCast(u8, count));
+            vm.emitOpByte(.new_set, @intCast(u8, count));
         }
     }
 

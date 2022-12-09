@@ -190,7 +190,7 @@ pub fn disassembleInstruction(chunk: *Chunk, offset: usize) usize {
         .map_with_var => simpleInstruction("map with var", offset),
         .range => simpleInstruction("range", offset),
         .range_inclusive => simpleInstruction("range (incl)", offset),
-        .set => byteInstruction("set", chunk, offset),
+        .new_set => byteInstruction("new set", chunk, offset),
     };
 }
 

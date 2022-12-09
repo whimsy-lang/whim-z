@@ -1217,7 +1217,7 @@ pub const Vm = struct {
                         return .runtime_error;
                     }
                 },
-                .set => {
+                .new_set => {
                     const count = frame.readByte();
                     const set = ObjSet.init(self);
                     self.push(Value.set(set));
