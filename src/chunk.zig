@@ -167,6 +167,8 @@ pub const OpCode = enum(u8) {
     map_with_var,
     range,
     range_inclusive,
+    range_step,
+    range_inclusive_step,
     new_set,
 };
 

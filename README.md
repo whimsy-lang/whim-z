@@ -143,12 +143,12 @@ map.var       // 3
 map.someFn()  // 'hello'
 
 // Ranges
-[from]..[to(exclusive)] [: step]
-[from]..=[to(inclusive)] [: step]
+[from]..[to(exclusive)] [by step]
+[from]..=[to(inclusive)] [by step]
 // step defaults to 1
-1..3      // 1, 2
-1..4: 2   // 1, 3
-4..1: -1  // 4, 3, 2
+1..3        // 1, 2
+1..4 by 2   // 1, 3
+4..1 by -1  // 4, 3, 2
 
 // looping
 loop
@@ -184,7 +184,7 @@ a
 // list       list          ()
 // set        set           [val1, val2]
 // map        map           [key :: const, key := var, 'string key' :: val]
-// range      range         from..to : step
+// range      range         from..to by step, from..=to by step
 
 // Operators: + - * / % ! == != and or :: := = += -= *= /= %= is
 
@@ -216,8 +216,7 @@ compiled: *.whir
 
 ### Language Features
 
-* operator overloading on classes
+* operator overloading
   * explore generic operator support
-* range step
 * assignment on ranges for lists and strings
 * std library type conversions

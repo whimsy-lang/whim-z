@@ -189,7 +189,9 @@ pub fn disassembleInstruction(chunk: *Chunk, offset: usize) usize {
         .map_with_const => simpleInstruction("map with const", offset),
         .map_with_var => simpleInstruction("map with var", offset),
         .range => simpleInstruction("range", offset),
-        .range_inclusive => simpleInstruction("range (incl)", offset),
+        .range_inclusive => simpleInstruction("range incl", offset),
+        .range_step => simpleInstruction("range w step", offset),
+        .range_inclusive_step => simpleInstruction("range incl w step", offset),
         .new_set => byteInstruction("new set", chunk, offset),
     };
 }

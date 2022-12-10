@@ -287,6 +287,7 @@ pub const Value = struct {
                 r.start.print();
                 std.debug.print("{s}", .{if (r.inclusive) "..=" else ".."});
                 r.end.print();
+                if (r.step != 1) std.debug.print(" by {d}", .{r.step});
             },
             .set => {
                 std.debug.print("[", .{});

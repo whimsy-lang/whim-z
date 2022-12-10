@@ -207,10 +207,11 @@ pub const ObjNative = struct {
 pub const ObjRange = struct {
     start: Value,
     end: Value,
+    step: f64,
     inclusive: bool,
     is_marked: bool,
 
-    pub fn init(vm: *Vm, start_val: Value, end_val: Value, inclusive_val: bool) *ObjRange {
+    pub fn init(vm: *Vm, start_val: Value, end_val: Value, step_val: f64, inclusive_val: bool) *ObjRange {
         if (debug.log_gc) {
             std.debug.print("allocate for range\n", .{});
         }
@@ -222,6 +223,7 @@ pub const ObjRange = struct {
 
         range.start = start_val;
         range.end = end_val;
+        range.step = step_val;
         range.inclusive = inclusive_val;
         range.is_marked = false;
         return range;

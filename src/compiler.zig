@@ -148,7 +148,7 @@ pub const Compiler = struct {
     fn isDottedIdentifier(tok_type: TokenType) bool {
         return switch (tok_type) {
             .identifier, .string => true,
-            .and_, .break_, .class, .continue_, .do, .elif, .else_, .false, .fn_, .for_, .if_, .in, .is, .loop, .nil, .or_, .return_, .then, .true => true,
+            .and_, .break_, .by, .class, .continue_, .do, .elif, .else_, .false, .fn_, .for_, .if_, .in, .is, .loop, .nil, .or_, .return_, .then, .true => true,
 
             else => false,
         };
@@ -554,7 +554,7 @@ pub const Compiler = struct {
             .left_bracket => indexer,
             .bang_equal, .equal_equal => binary,
             .less, .less_equal, .greater, .greater_equal, .is => binary,
-            .dot_dot, .dot_dot_equal => binary,
+            .dot_dot, .dot_dot_equal => range,
             .plus, .minus, .star, .slash, .percent => binary,
             .and_ => andOp,
             .or_ => orOp,
@@ -613,8 +613,6 @@ pub const Compiler = struct {
             .greater_equal => vm.emitOp(.greater_equal),
             .less => vm.emitOp(.less),
             .less_equal => vm.emitOp(.less_equal),
-            .dot_dot => vm.emitOp(.range),
-            .dot_dot_equal => vm.emitOp(.range_inclusive),
             .is => vm.emitOp(.is),
             .plus => vm.emitOp(.add),
             .minus => vm.emitOp(.subtract),
@@ -1011,6 +1009,28 @@ pub const Compiler = struct {
         parsePrecedence(vm, .or_);
 
         patchJump(vm, end_jump);
+    }
+
+    fn range(vm: *Vm) void {
+        const op_type = vm.parser.previous.type;
+        const precedence = getPrecedence(op_type);
+        parsePrecedence(vm, @intToEnum(Precedence, @enumToInt(precedence) + 1));
+
+        if (match(vm, .by)) {
+            expression(vm);
+
+            switch (op_type) {
+                .dot_dot => vm.emitOp(.range_step),
+                .dot_dot_equal => vm.emitOp(.range_inclusive_step),
+                else => unreachable,
+            }
+        } else {
+            switch (op_type) {
+                .dot_dot => vm.emitOp(.range),
+                .dot_dot_equal => vm.emitOp(.range_inclusive),
+                else => unreachable,
+            }
+        }
     }
 
     fn string(vm: *Vm) void {

@@ -1,20 +1,34 @@
 // simple test file
 
-m :: [1 :: 'init', 'two' := 2, 'three' := 'yay']
-std.print(m)
-m['three'] = 3
-std.print(m)
-m.three = 33
-std.print(m)
-std.print(m[1], m['three'], m.three, m.'three')
-std.print(m:length())
-m[7] :: 'seven'
-std.print(m)
-std.print(m:length())
-m:remove(1, 'three')
-std.print(m)
-std.print(m:length())
-m['two'] += 7
-std.print(m)
-m.two *= 2
-std.print(m)
+for x in 'a'..'g'
+    std.print(x)
+/for
+std.print()
+for x in 'a'..='g'
+    std.print(x)
+/for
+std.print()
+for x in 'a'..'g' by 2
+    std.print(x)
+/for
+std.print()
+for x in 'a'..='g' by 2
+    std.print(x)
+/for
+std.print()
+
+for x in 'g'..'a' by -1
+    std.print(x)
+/for
+std.print()
+for x in 'g'..='a' by -1
+    std.print(x)
+/for
+std.print()
+for x in 'g'..'a' by -2
+    std.print(x)
+/for
+std.print()
+for x in 'g'..='a' by -2
+    std.print(x)
+/for

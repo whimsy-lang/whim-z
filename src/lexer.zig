@@ -39,6 +39,7 @@ pub const TokenType = enum {
     // keywords
     and_,
     break_,
+    by,
     class,
     continue_,
     do,
@@ -196,7 +197,13 @@ pub const Lexer = struct {
         const cur = self.source[self.start..self.current];
         switch (cur[0]) {
             'a' => return checkKeyword(cur[1..], "nd", .and_),
-            'b' => return checkKeyword(cur[1..], "reak", .break_),
+            'b' => if (cur.len > 1) {
+                switch (cur[1]) {
+                    'r' => return checkKeyword(cur[2..], "eak", .break_),
+                    'y' => if (cur.len == 2) return .by,
+                    else => {},
+                }
+            },
             'c' => if (cur.len > 1) {
                 switch (cur[1]) {
                     'l' => return checkKeyword(cur[2..], "ass", .class),
