@@ -524,35 +524,33 @@ pub const Vm = struct {
     }
 
     fn defineOnValue(self: *Vm, object: Value, key: Value, value: Value, constant: bool) bool {
-        if (object.is(.map)) {
-            const map = object.asMap();
-            if (!map.items.add(key, value, constant)) {
-                self.runtimeError("Map already contains key.", .{});
+        return switch (object.getType()) {
+            .class => defineOnStringMap(self, &object.asClass().fields, key, value, constant),
+            .instance => defineOnStringMap(self, &object.asInstance().fields, key, value, constant),
+            .map => defineOnMap(self, object.asMap(), key, value, constant),
+            else => {
+                self.runtimeError("Only classes, instances, and maps have properties.", .{});
                 return false;
-            }
-            return true;
-        }
+            },
+        };
+    }
 
+    fn defineOnMap(self: *Vm, map: *ObjMap, key: Value, value: Value, constant: bool) bool {
+        if (!map.items.add(key, value, constant)) {
+            self.runtimeError("Map already contains key.", .{});
+            return false;
+        }
+        return true;
+    }
+
+    fn defineOnStringMap(self: *Vm, str_map: *StringMap, key: Value, value: Value, constant: bool) bool {
         if (!key.is(.string)) {
             self.runtimeError("Key must be a string.", .{});
             return false;
         }
 
         const key_str = key.asString();
-
-        var fields: *StringMap = undefined;
-        if (object.is(.instance)) {
-            const instance = object.asInstance();
-            fields = &instance.fields;
-        } else if (object.is(.class)) {
-            const class = object.asClass();
-            fields = &class.fields;
-        } else {
-            self.runtimeError("Only classes and instances have properties.", .{});
-            return false;
-        }
-
-        if (!fields.add(key_str, value, constant)) {
+        if (!str_map.add(key_str, value, constant)) {
             self.runtimeError("Property '{s}' already exists.", .{key_str.chars});
             return false;
         }
@@ -561,177 +559,243 @@ pub const Vm = struct {
     }
 
     fn getOnValue(self: *Vm, object: Value, key: Value, pop_count: usize) bool {
-        // list
-        if (object.is(.list) and key.is(.number)) {
-            const list = object.asList();
-            const index = @floatToInt(isize, key.asNumber());
-            if (index < 0 or index >= list.items.items.len) {
-                self.runtimeError("Index {d} is out of bounds (0-{d}).", .{ index, list.items.items.len - 1 });
+        return switch (object.getType()) {
+            .list => getOnList(self, object.asList(), key, pop_count),
+            .map => getOnMap(self, object.asMap(), key, pop_count),
+            .set => getOnSet(self, object.asSet(), key, pop_count),
+            .string => getOnString(self, object.asString(), key, pop_count),
+            else => {
+                // class/instance
+                if (!key.is(.string)) {
+                    self.runtimeError("Class and instance keys must be a string.", .{});
+                    return false;
+                }
+
+                const key_str = key.asString();
+
+                var class: ?*ObjClass = null;
+                if (object.is(.instance)) {
+                    const instance = object.asInstance();
+                    var value: Value = undefined;
+                    if (instance.fields.get(key_str, &value)) {
+                        self.stack_top -= pop_count;
+                        self.push(value);
+                        return true;
+                    }
+                    class = instance.type;
+                } else if (object.hasStdClass()) {
+                    const std_class = object.stdClass(self);
+                    class = if (object.is(.class)) object.asClass() else std_class;
+
+                    // type
+                    if (key_str == self.type_string) {
+                        self.stack_top -= pop_count;
+                        self.push(Value.class(std_class));
+                        return true;
+                    }
+                } else {
+                    self.runtimeError("Only classes and instances have properties.", .{});
+                    return false;
+                }
+
+                while (class) |cl| {
+                    var value: Value = undefined;
+                    if (cl.fields.get(key_str, &value)) {
+                        self.stack_top -= pop_count;
+                        self.push(value);
+                        return true;
+                    }
+                    class = cl.super;
+                }
+
+                self.runtimeError("Undefined property '{s}'.", .{key_str.chars});
                 return false;
-            }
-            self.stack_top -= pop_count;
-            self.push(list.items.items[@intCast(usize, index)]);
-            return true;
-        } else if (object.is(.list) and key.is(.range)) {
-            const list = object.asList();
-            const range = key.asRange();
-            if (range.start.is(.number) and range.end.is(.number) and range.step == 1) {
-                const start = @floatToInt(isize, range.start.asNumber());
-                var end = @floatToInt(isize, range.end.asNumber());
-                if (range.inclusive) end += 1;
+            },
+        };
+    }
 
-                if (start < 0 or start > list.items.items.len) {
-                    self.runtimeError("Start {d} is out of bounds (0-{d}).", .{ start, list.items.items.len });
+    fn getOnList(self: *Vm, list: *ObjList, key: Value, pop_count: usize) bool {
+        return switch (key.getType()) {
+            .number => {
+                const index = @floatToInt(isize, key.asNumber());
+                if (index < 0 or index >= list.items.items.len) {
+                    self.runtimeError("Index {d} is out of bounds (0-{d}).", .{ index, list.items.items.len - 1 });
                     return false;
                 }
-                if (end < 0 or end > list.items.items.len) {
-                    self.runtimeError("End {d} is out of bounds (0-{d}).", .{ end, list.items.items.len });
-                    return false;
-                }
-                if (end < start) {
-                    self.runtimeError("End {d} is before start {d}.", .{ end, start });
-                    return false;
-                }
-
-                const ustart = @intCast(usize, start);
-                const uend = @intCast(usize, end);
-
-                const new_list = ObjList.init(self);
-                self.push(Value.list(new_list));
-                new_list.items.appendSlice(list.items.items[ustart..uend]) catch {
-                    std.debug.print("Could not allocate memory for list.", .{});
-                    std.process.exit(1);
-                };
-
-                self.stack_top -= (pop_count + 1);
-                self.push(Value.list(new_list));
-                return true;
-            } else {
-                self.runtimeError("Only numeric ranges with a step of 1 can be used to index a list.", .{});
-                return false;
-            }
-        }
-
-        // map
-        if (object.is(.map)) {
-            const map = object.asMap();
-            var value: Value = undefined;
-            if (!map.items.get(key, &value)) {
-                self.runtimeError("Map does not contain key.", .{});
-                return false;
-            }
-            self.stack_top -= pop_count;
-            self.push(value);
-            return true;
-        }
-
-        // set
-        if (object.is(.set)) {
-            const set = object.asSet();
-            var value: Value = undefined;
-            const found = set.items.get(key, &value);
-            self.stack_top -= pop_count;
-            self.push(Value.boolean(found));
-            return true;
-        }
-
-        // string
-        if (object.is(.string) and key.is(.number)) {
-            const string = object.asString();
-            const index = @floatToInt(isize, key.asNumber());
-
-            if (index < 0 or index >= string.chars.len) {
-                self.runtimeError("Index {d} is out of bounds (0-{d}).", .{ index, string.chars.len - 1 });
-                return false;
-            }
-
-            self.stack_top -= pop_count;
-            const uindex = @intCast(usize, index);
-            self.push(Value.string(ObjString.copy(self, string.chars[uindex .. uindex + 1])));
-            return true;
-        } else if (object.is(.string) and key.is(.range)) {
-            const string = object.asString();
-            const range = key.asRange();
-            if (range.start.is(.number) and range.end.is(.number) and range.step == 1) {
-                const start = @floatToInt(isize, range.start.asNumber());
-                var end = @floatToInt(isize, range.end.asNumber());
-                if (range.inclusive) end += 1;
-
-                if (start < 0 or start > string.chars.len) {
-                    self.runtimeError("Start {d} is out of bounds (0-{d}).", .{ start, string.chars.len });
-                    return false;
-                }
-                if (end < 0 or end > string.chars.len) {
-                    self.runtimeError("End {d} is out of bounds (0-{d}).", .{ end, string.chars.len });
-                    return false;
-                }
-                if (end < start) {
-                    self.runtimeError("End {d} is before start {d}.", .{ end, start });
-                    return false;
-                }
-
-                const ustart = @intCast(usize, start);
-                const uend = @intCast(usize, end);
-
                 self.stack_top -= pop_count;
-                self.push(Value.string(ObjString.copy(self, string.chars[ustart..uend])));
+                self.push(list.items.items[@intCast(usize, index)]);
                 return true;
-            } else {
-                self.runtimeError("Only numeric ranges with a step of 1 can be used to index a string.", .{});
-                return false;
-            }
-        }
+            },
+            .range => {
+                const range = key.asRange();
+                if (range.start.is(.number) and range.step == 1) {
+                    const start = @floatToInt(isize, range.start.asNumber());
+                    var end = @floatToInt(isize, range.end.asNumber());
+                    if (range.inclusive) end += 1;
 
-        // class/instance
-        if (!key.is(.string)) {
-            self.runtimeError("Key must be a string.", .{});
+                    if (start < 0 or start > list.items.items.len) {
+                        self.runtimeError("Start {d} is out of bounds (0-{d}).", .{ start, list.items.items.len });
+                        return false;
+                    }
+                    if (end < 0 or end > list.items.items.len) {
+                        self.runtimeError("End {d} is out of bounds (0-{d}).", .{ end, list.items.items.len });
+                        return false;
+                    }
+                    if (end < start) {
+                        self.runtimeError("End {d} is before start {d}.", .{ end, start });
+                        return false;
+                    }
+
+                    const ustart = @intCast(usize, start);
+                    const uend = @intCast(usize, end);
+
+                    const new_list = ObjList.init(self);
+                    self.push(Value.list(new_list));
+                    new_list.items.appendSlice(list.items.items[ustart..uend]) catch {
+                        std.debug.print("Could not allocate memory for list.", .{});
+                        std.process.exit(1);
+                    };
+
+                    self.stack_top -= (pop_count + 1);
+                    self.push(Value.list(new_list));
+                    return true;
+                } else {
+                    self.runtimeError("Only numeric ranges with a step of 1 can be used to index a list.", .{});
+                    return false;
+                }
+            },
+            else => {
+                self.runtimeError("Only numbers and ranges can be used to index a list.", .{});
+                return false;
+            },
+        };
+    }
+
+    fn getOnMap(self: *Vm, map: *ObjMap, key: Value, pop_count: usize) bool {
+        var value: Value = undefined;
+        if (!map.items.get(key, &value)) {
+            self.runtimeError("Map does not contain key.", .{});
             return false;
         }
+        self.stack_top -= pop_count;
+        self.push(value);
+        return true;
+    }
 
-        const key_str = key.asString();
+    fn getOnSet(self: *Vm, set: *ObjSet, key: Value, pop_count: usize) bool {
+        var value: Value = undefined;
+        const found = set.items.get(key, &value);
+        self.stack_top -= pop_count;
+        self.push(Value.boolean(found));
+        return true;
+    }
 
-        var class: ?*ObjClass = null;
-        if (object.is(.instance)) {
-            const instance = object.asInstance();
-            var value: Value = undefined;
-            if (instance.fields.get(key_str, &value)) {
+    fn getOnString(self: *Vm, string: *ObjString, key: Value, pop_count: usize) bool {
+        return switch (key.getType()) {
+            .number => {
+                const index = @floatToInt(isize, key.asNumber());
+
+                if (index < 0 or index >= string.chars.len) {
+                    self.runtimeError("Index {d} is out of bounds (0-{d}).", .{ index, string.chars.len - 1 });
+                    return false;
+                }
+
                 self.stack_top -= pop_count;
-                self.push(value);
+                const uindex = @intCast(usize, index);
+                self.push(Value.string(ObjString.copy(self, string.chars[uindex .. uindex + 1])));
                 return true;
-            }
-            class = instance.type;
-        } else if (object.hasStdClass()) {
-            const std_class = object.stdClass(self);
-            class = if (object.is(.class)) object.asClass() else std_class;
+            },
+            .range => {
+                const range = key.asRange();
+                if (range.start.is(.number) and range.step == 1) {
+                    const start = @floatToInt(isize, range.start.asNumber());
+                    var end = @floatToInt(isize, range.end.asNumber());
+                    if (range.inclusive) end += 1;
 
-            // type
-            if (key.is(.string) and key.asString() == self.type_string) {
-                self.stack_top -= pop_count;
-                self.push(Value.class(std_class));
-                return true;
-            }
-        } else {
-            self.runtimeError("Only classes and instances have properties.", .{});
-            return false;
-        }
+                    if (start < 0 or start > string.chars.len) {
+                        self.runtimeError("Start {d} is out of bounds (0-{d}).", .{ start, string.chars.len });
+                        return false;
+                    }
+                    if (end < 0 or end > string.chars.len) {
+                        self.runtimeError("End {d} is out of bounds (0-{d}).", .{ end, string.chars.len });
+                        return false;
+                    }
+                    if (end < start) {
+                        self.runtimeError("End {d} is before start {d}.", .{ end, start });
+                        return false;
+                    }
 
-        while (class) |cl| {
-            var value: Value = undefined;
-            if (cl.fields.get(key_str, &value)) {
-                self.stack_top -= pop_count;
-                self.push(value);
-                return true;
-            }
-            class = cl.super;
-        }
+                    const ustart = @intCast(usize, start);
+                    const uend = @intCast(usize, end);
 
-        self.runtimeError("Undefined property '{s}'.", .{key_str.chars});
-        return false;
+                    self.stack_top -= pop_count;
+                    self.push(Value.string(ObjString.copy(self, string.chars[ustart..uend])));
+                    return true;
+                } else {
+                    self.runtimeError("Only numeric ranges with a step of 1 can be used to index a string.", .{});
+                    return false;
+                }
+            },
+            else => {
+                self.runtimeError("Only numbers and ranges can be used to index a string.", .{});
+                return false;
+            },
+        };
     }
 
     fn setOnValue(self: *Vm, object: Value, key: Value, value: Value) bool {
-        if (object.is(.list) and key.is(.number)) {
-            const list = object.asList();
+        return switch (object.getType()) {
+            .list => setOnList(self, object.asList(), key, value),
+            .map => setOnMap(self, object.asMap(), key, value),
+            else => {
+                // class/instance
+                if (!key.is(.string)) {
+                    self.runtimeError("Class and instance keys must be a string.", .{});
+                    return false;
+                }
+
+                const key_str = key.asString();
+
+                var vc: *ValueContainer = undefined;
+                var found = false;
+                var class: ?*ObjClass = null;
+                if (object.is(.instance)) {
+                    const instance = object.asInstance();
+                    if (instance.fields.getPtr(key_str, &vc)) {
+                        found = true;
+                    }
+                    class = instance.type;
+                } else if (object.is(.class)) {
+                    class = object.asClass();
+                } else {
+                    self.runtimeError("Only classes and instances have properties.", .{});
+                    return false;
+                }
+
+                while (!found and class != null) {
+                    if (class.?.fields.getPtr(key_str, &vc)) {
+                        found = true;
+                    }
+                    class = class.?.super;
+                }
+
+                if (!found) {
+                    self.runtimeError("Undefined property '{s}'.", .{key_str.chars});
+                    return false;
+                }
+                if (vc.constant) {
+                    self.runtimeError("Property '{s}' is constant.", .{key_str.chars});
+                    return false;
+                }
+
+                vc.value = value;
+                return true;
+            },
+        };
+    }
+
+    fn setOnList(self: *Vm, list: *ObjList, key: Value, value: Value) bool {
+        if (key.is(.number)) {
             const index = @floatToInt(isize, key.asNumber());
             if (index < 0 or index >= list.items.items.len) {
                 self.runtimeError("Index {d} is out of bounds (0-{d}).", .{ index, list.items.items.len - 1 });
@@ -741,60 +805,22 @@ pub const Vm = struct {
             return true;
         }
 
-        if (object.is(.map)) {
-            const map = object.asMap();
+        self.runtimeError("List index must be a number.", .{});
+        return false;
+    }
 
-            var vc: *ValueContainer = undefined;
-            if (!map.items.getPtr(key, &vc)) {
-                self.runtimeError("Map does not contain key.", .{});
-                return false;
-            }
-            if (vc.constant) {
-                self.runtimeError("Map item is constant.", .{});
-                return false;
-            }
-            vc.value = value;
-
-            return true;
-        }
-
-        if (!key.is(.string)) {
-            self.runtimeError("Key must be a string.", .{});
+    fn setOnMap(self: *Vm, map: *ObjMap, key: Value, value: Value) bool {
+        var vc: *ValueContainer = undefined;
+        if (!map.items.getPtr(key, &vc)) {
+            self.runtimeError("Map does not contain key.", .{});
             return false;
         }
-
-        const key_str = key.asString();
-
-        var current: *ValueContainer = undefined;
-        var found = false;
-        var class: ?*ObjClass = null;
-        if (object.is(.instance)) {
-            const instance = object.asInstance();
-            if (instance.fields.getPtr(key_str, &current)) {
-                found = true;
-            }
-            class = instance.type;
-        } else if (object.is(.class)) {
-            class = object.asClass();
-        }
-
-        while (!found and class != null) {
-            if (class.?.fields.getPtr(key_str, &current)) {
-                found = true;
-            }
-            class = class.?.super;
-        }
-
-        if (!found) {
-            self.runtimeError("Undefined property '{s}'.", .{key_str.chars});
+        if (vc.constant) {
+            self.runtimeError("Map item is constant.", .{});
             return false;
         }
-        if (current.constant) {
-            self.runtimeError("Property '{s}' is constant.", .{key_str.chars});
-            return false;
-        }
+        vc.value = value;
 
-        current.value = value;
         return true;
     }
 

@@ -1,34 +1,8 @@
 // simple test file
 
-for x in 'a'..'g'
-    std.print(x)
-/for
-std.print()
-for x in 'a'..='g'
-    std.print(x)
-/for
-std.print()
-for x in 'a'..'g' by 2
-    std.print(x)
-/for
-std.print()
-for x in 'a'..='g' by 2
-    std.print(x)
-/for
-std.print()
+c :: class /class
+i :: c()
+c.first := 1
+i.yay := 42
 
-for x in 'g'..'a' by -1
-    std.print(x)
-/for
-std.print()
-for x in 'g'..='a' by -1
-    std.print(x)
-/for
-std.print()
-for x in 'g'..'a' by -2
-    std.print(x)
-/for
-std.print()
-for x in 'g'..='a' by -2
-    std.print(x)
-/for
+std.print(i.first, i.yay)
