@@ -634,6 +634,12 @@ pub const Compiler = struct {
     }
 
     fn class(vm: *Vm) void {
+        if (match(vm, .is)) {
+            expression(vm);
+        } else {
+            vm.emitOp(.nil);
+        }
+
         vm.emitOp(.class);
         if (vm.compiler.?.encountered_identifier) |name| {
             const name_const = makeConstant(vm, Value.string(ObjString.copy(vm, name)));
@@ -641,11 +647,6 @@ pub const Compiler = struct {
         } else {
             const name_const = makeConstant(vm, Value.string(vm.empty_string.?));
             vm.emitByte(name_const);
-        }
-
-        if (match(vm, .is)) {
-            expression(vm);
-            vm.emitOp(.define_super);
         }
 
         while (!check(vm, .class_end) and !check(vm, .eof)) {

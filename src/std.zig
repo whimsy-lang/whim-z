@@ -55,7 +55,7 @@ pub fn register(vm: *Vm) void {
 
 fn defineClass(vm: *Vm, name: []const u8) *ObjClass {
     vm.push(Value.string(ObjString.copy(vm, name)));
-    const class = ObjClass.init(vm, vm.peek(0).asString());
+    const class = ObjClass.init(vm, vm.peek(0).asString(), null);
     vm.push(Value.class(class));
     _ = vm.globals.add(vm.peek(1).asString(), Value.class(class), true);
     _ = vm.pop();
@@ -65,7 +65,7 @@ fn defineClass(vm: *Vm, name: []const u8) *ObjClass {
 
 fn defineInnerClass(vm: *Vm, outer: *ObjClass, name: []const u8) *ObjClass {
     vm.push(Value.string(ObjString.copy(vm, name)));
-    const inner = ObjClass.init(vm, vm.peek(0).asString());
+    const inner = ObjClass.init(vm, vm.peek(0).asString(), null);
     vm.push(Value.class(inner));
     _ = outer.fields.add(vm.peek(1).asString(), Value.class(inner), true);
     _ = vm.pop();

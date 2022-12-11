@@ -14,7 +14,7 @@ pub const ObjClass = struct {
     fields: StringMap,
     is_marked: bool,
 
-    pub fn init(vm: *Vm, class_name: *ObjString) *ObjClass {
+    pub fn init(vm: *Vm, class_name: *ObjString, super_class: ?*ObjClass) *ObjClass {
         if (debug.log_gc) {
             std.debug.print("allocate for class\n", .{});
         }
@@ -25,9 +25,9 @@ pub const ObjClass = struct {
         vm.registerObject(Value.class(class));
 
         class.name = if (class_name != vm.empty_string) class_name else null;
-        class.super = null;
+        class.super = super_class;
         class.fields = StringMap.init(vm.allocator);
-        _ = class.fields.add(vm.super_string.?, Value.nil(), true);
+        _ = class.fields.add(vm.super_string.?, if (super_class) |s| Value.class(s) else Value.nil(), true);
         _ = class.fields.add(vm.type_string.?, Value.nil(), true);
         class.is_marked = false;
         return class;

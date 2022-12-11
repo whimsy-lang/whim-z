@@ -913,35 +913,6 @@ pub const Vm = struct {
                     _ = self.pop();
                     if (do_pop) _ = self.pop();
                 },
-                .define_super => {
-                    if (!self.peek(1).is(.class)) {
-                        self.runtimeError("Only classes can have a superclass.", .{});
-                        return .runtime_error;
-                    }
-                    if (!self.peek(0).is(.class)) {
-                        self.runtimeError("Superclass must be a class.", .{});
-                        return .runtime_error;
-                    }
-                    const class = self.peek(1).asClass();
-                    const super = self.peek(0).asClass();
-                    if (super == self.bool_class or
-                        super == self.class_class or
-                        super == self.function_class or
-                        super == self.list_class or
-                        super == self.map_class or
-                        super == self.nil_class or
-                        super == self.number_class or
-                        super == self.range_class or
-                        super == self.set_class or
-                        super == self.string_class)
-                    {
-                        self.runtimeError("Cannot inherit from a builtin type.", .{});
-                        return .runtime_error;
-                    }
-                    class.super = super;
-                    _ = class.fields.set(self.super_string.?, Value.class(super));
-                    _ = self.pop();
-                },
                 .get_by_const, .get_by_const_pop => {
                     const key = frame.readConstant();
                     const pop_count: usize = if (op == .get_by_const_pop) 1 else 0;
@@ -1092,7 +1063,33 @@ pub const Vm = struct {
                     self.push(result);
                     frame = &self.frames[self.frame_count - 1];
                 },
-                .class => self.push(Value.class(ObjClass.init(self, frame.readString()))),
+                .class => {
+                    var super: ?*ObjClass = null;
+                    if (self.peek(0).is(.class)) {
+                        super = self.peek(0).asClass();
+                        if (super == self.bool_class or
+                            super == self.class_class or
+                            super == self.function_class or
+                            super == self.list_class or
+                            super == self.map_class or
+                            super == self.nil_class or
+                            super == self.number_class or
+                            super == self.range_class or
+                            super == self.set_class or
+                            super == self.string_class)
+                        {
+                            self.runtimeError("Cannot inherit from a builtin type.", .{});
+                            return .runtime_error;
+                        }
+                    } else if (!self.peek(0).is(.nil)) {
+                        self.runtimeError("Superclass must be a class or nil.", .{});
+                        return .runtime_error;
+                    }
+
+                    const class = ObjClass.init(self, frame.readString(), super);
+                    _ = self.pop();
+                    self.push(Value.class(class));
+                },
                 .iterate_check => {
                     const offset = frame.readShort();
 

@@ -51,7 +51,6 @@ pub fn disassembleInstruction(chunk: *Chunk, offset: usize) usize {
         .define_const_by_const_pop => constantInstruction("def const by c (pop)", chunk, offset),
         .define_var_by_const => constantInstruction("def var by c", chunk, offset),
         .define_var_by_const_pop => constantInstruction("def var by c (pop)", chunk, offset),
-        .define_super => simpleInstruction("def super", offset),
         .get_by_const => constantInstruction("get by c", chunk, offset),
         .get_by_const_pop => constantInstruction("get by c (pop)", chunk, offset),
         .set_by_const => constantInstruction("set by c", chunk, offset),

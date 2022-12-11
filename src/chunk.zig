@@ -28,7 +28,6 @@ pub const OpCode = enum(u8) {
     define_const_by_const_pop,
     define_var_by_const,
     define_var_by_const_pop,
-    define_super,
     get_by_const,
     get_by_const_pop,
     set_by_const,
