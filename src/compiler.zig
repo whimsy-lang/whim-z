@@ -636,13 +636,8 @@ pub const Compiler = struct {
     }
 
     fn call(vm: *Vm) void {
-        const max = @enumToInt(OpCode.call_16) - @enumToInt(OpCode.call_0);
         const arg_count = argumentList(vm);
-        if (arg_count <= max) {
-            vm.emitByte(@enumToInt(OpCode.call_0) + arg_count);
-        } else {
-            vm.emitOpByte(.call, arg_count);
-        }
+        vm.emitOpByte(.call, arg_count);
     }
 
     fn classField(vm: *Vm) void {
