@@ -910,11 +910,6 @@ pub const Vm = struct {
                     const index = frame.readByte();
                     self.push(frame.closure.upvalues[index].?.location.*);
                 },
-
-                .set_upvalue_0, .set_upvalue_1, .set_upvalue_2, .set_upvalue_3 => {
-                    const index = @enumToInt(op) - @enumToInt(OpCode.set_upvalue_0);
-                    frame.closure.upvalues[index].?.location.* = self.pop();
-                },
                 .set_upvalue => {
                     const index = frame.readByte();
                     frame.closure.upvalues[index].?.location.* = self.pop();

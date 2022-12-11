@@ -192,17 +192,6 @@ pub const Compiler = struct {
         vm.currentChunk().code.items[offset + 1] = @intCast(u8, jump & 0xff);
     }
 
-    fn emitSet(vm: *Vm, op: OpCode, index: u8) void {
-        if (op == .set_upvalue) {
-            const max = @enumToInt(OpCode.set_upvalue_3) - @enumToInt(OpCode.set_upvalue_0);
-            if (index <= max) {
-                vm.emitByte(@enumToInt(OpCode.set_upvalue_0) + index);
-                return;
-            }
-        }
-        vm.emitOpByte(op, index);
-    }
-
     fn emitLoop(vm: *Vm, op: OpCode, loop_start: usize) void {
         vm.emitOp(op);
 
@@ -1097,7 +1086,7 @@ pub const Compiler = struct {
                     else => {},
                 }
 
-                emitSet(vm, set_op, @intCast(u8, arg));
+                vm.emitOpByte(set_op, @intCast(u8, arg));
 
                 return true;
             },
