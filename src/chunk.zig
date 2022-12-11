@@ -24,14 +24,6 @@ pub const OpCode = enum(u8) {
     get_upvalue,
     set_upvalue,
 
-    define_const_by_const,
-    define_const_by_const_pop,
-    define_var_by_const,
-    define_var_by_const_pop,
-    get_by_const,
-    get_by_const_pop,
-    set_by_const,
-
     define_const,
     define_const_pop,
     define_var,
@@ -39,6 +31,10 @@ pub const OpCode = enum(u8) {
     get,
     get_pop,
     set,
+
+    get_by_const,
+    get_by_const_pop,
+    set_by_const,
 
     equal,
     not_equal,

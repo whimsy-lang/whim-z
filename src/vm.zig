@@ -903,31 +903,6 @@ pub const Vm = struct {
                     frame.closure.upvalues[index].?.location.* = self.pop();
                 },
 
-                .define_const_by_const, .define_const_by_const_pop, .define_var_by_const, .define_var_by_const_pop => {
-                    const key = frame.readConstant();
-                    const constant = (op == .define_const_by_const) or (op == .define_const_by_const_pop);
-                    const do_pop = (op == .define_const_by_const_pop) or (op == .define_var_by_const_pop);
-                    if (!self.defineOnValue(self.peek(1), key, self.peek(0), constant)) {
-                        return .runtime_error;
-                    }
-                    _ = self.pop();
-                    if (do_pop) _ = self.pop();
-                },
-                .get_by_const, .get_by_const_pop => {
-                    const key = frame.readConstant();
-                    const pop_count: usize = if (op == .get_by_const_pop) 1 else 0;
-                    if (!self.getOnValue(self.peek(0), key, pop_count)) {
-                        return .runtime_error;
-                    }
-                },
-                .set_by_const => {
-                    const key = frame.readConstant();
-                    if (!self.setOnValue(self.peek(1), key, self.peek(0))) {
-                        return .runtime_error;
-                    }
-                    self.stack_top -= 2;
-                },
-
                 .define_const, .define_const_pop, .define_var, .define_var_pop => {
                     const constant = (op == .define_const) or (op == .define_const_pop);
                     const pop_count: usize = if (op == .define_const_pop or op == .define_var_pop) 3 else 2;
@@ -947,6 +922,21 @@ pub const Vm = struct {
                         return .runtime_error;
                     }
                     self.stack_top -= 3;
+                },
+
+                .get_by_const, .get_by_const_pop => {
+                    const key = frame.readConstant();
+                    const pop_count: usize = if (op == .get_by_const_pop) 1 else 0;
+                    if (!self.getOnValue(self.peek(0), key, pop_count)) {
+                        return .runtime_error;
+                    }
+                },
+                .set_by_const => {
+                    const key = frame.readConstant();
+                    if (!self.setOnValue(self.peek(1), key, self.peek(0))) {
+                        return .runtime_error;
+                    }
+                    self.stack_top -= 2;
                 },
 
                 .equal => {

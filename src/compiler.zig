@@ -435,14 +435,6 @@ pub const Compiler = struct {
         vm.emitOpByte(if (constant) .define_global_const else .define_global_var, global);
     }
 
-    fn defineByConst(vm: *Vm, name: u8, constant: bool, pop: bool) void {
-        if (pop) {
-            vm.emitOpByte(if (constant) .define_const_by_const_pop else .define_var_by_const_pop, name);
-        } else {
-            vm.emitOpByte(if (constant) .define_const_by_const else .define_var_by_const, name);
-        }
-    }
-
     fn define(vm: *Vm, constant: bool, pop: bool) void {
         if (pop) {
             vm.emitOp(if (constant) .define_const_pop else .define_var_pop);
@@ -617,6 +609,7 @@ pub const Compiler = struct {
     fn classField(vm: *Vm) void {
         consumeDottedIdentifier(vm, "Expect field name.");
         const name = identifierConstant(vm, &vm.parser.previous);
+        vm.emitOpByte(.constant, name);
 
         switch (vm.parser.current.type) {
             .colon_colon, .colon_equal => {
@@ -627,7 +620,7 @@ pub const Compiler = struct {
 
                 advance(vm); // accept :: :=
                 expression(vm);
-                defineByConst(vm, name, constant, false);
+                define(vm, constant, false);
             },
             else => error_(vm, "Expect '::' or ':=' declaration."),
         }
@@ -679,9 +672,10 @@ pub const Compiler = struct {
                 vm.compiler.?.encountered_identifier = vm.parser.previous.value;
                 vm.compiler.?.is_method = false;
 
+                vm.emitOpByte(.constant, name);
                 advance(vm); // accept :: :=
                 expression(vm);
-                defineByConst(vm, name, constant, true);
+                define(vm, constant, true);
 
                 return true;
             },

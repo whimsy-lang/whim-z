@@ -220,4 +220,3 @@ compiled: *.whir
   * explore generic operator support
 * assignment on ranges for lists and strings
 * std library type conversions
-* simplify define / defineByConst

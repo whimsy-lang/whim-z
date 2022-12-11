@@ -1,18 +1,13 @@
 // simple test file
 
+/*
 
-c :: class one :: 1 two :: 2 /class
+c :: class one :: 1 /class
 c['first'] := 1
 c.second := 2
-c['first'] = 1
-c.second = 2
-c['first'] += 1
-c.second += 2
-std.print(c['first'])
-std.print(c.second)
 
+*/
 
-/*
 
 // zig build -Drelease-fast run -- test/test.whim
 
@@ -25,38 +20,31 @@ do
         start :: std.time()
         o += 1
         i := 0
-        loop break i > 5000000
+        loop break i > 100000
             i += 1
-            c.one = 1
-            c.two = 2
-            c.one = 1
-            c.two = 2
-            c.one = 1
-            c.two = 2
-            c.one = 1
-            c.two = 2
-            c.one += 1
-            c.two += 2
-            c.one += 1
-            c.two += 2
-            c.one += 1
-            c.two += 2
-            c.one += 1
-            c.two += 2
-            c.one += 1
-            c.two += 2
-            c.one
-            c.two
-            c.one
-            c.two
-            c.one
-            c.two
-            c.one
-            c.two
+            inst :: class
+                o :: 1
+                t :: 2
+                th :: 3
+                f :: 4
+                fi :: 5
+                s :: 6
+                se :: 7
+                e :: 8
+            /class()
+
+            inst.one := 1
+            inst.two := 1
+            inst.three := 1
+            inst.four := 1
+            inst.five := 1
+            inst.six := 1
+            inst.seven := 1
+            inst.eight := 1
+            inst.nine := 1
         /loop
         std.print(std.time() - start)
     /loop
 /do
 
 std.print('overall: ', std.time() - overall_start)
-*/
