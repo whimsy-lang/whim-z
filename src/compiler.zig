@@ -435,15 +435,7 @@ pub const Compiler = struct {
         vm.emitOpByte(if (constant) .define_global_const else .define_global_var, global);
     }
 
-    fn defineProperty(vm: *Vm, name: u8, constant: bool, pop: bool) void {
-        if (pop) {
-            vm.emitOpByte(if (constant) .define_const_by_const_pop else .define_var_by_const_pop, name);
-        } else {
-            vm.emitOpByte(if (constant) .define_const_by_const else .define_var_by_const, name);
-        }
-    }
-
-    fn defineIndexer(vm: *Vm, constant: bool, pop: bool) void {
+    fn define(vm: *Vm, constant: bool, pop: bool) void {
         if (pop) {
             vm.emitOp(if (constant) .define_const_pop else .define_var_pop);
         } else {
@@ -580,7 +572,7 @@ pub const Compiler = struct {
                         vm.emitOp(if (constant) .map_with_const else .map_with_var);
                     } else if (map) {
                         // map item
-                        defineIndexer(vm, constant, false);
+                        define(vm, constant, false);
                     } else {
                         error_(vm, "Sets cannot contain key/value pairs.");
                     }
@@ -617,6 +609,7 @@ pub const Compiler = struct {
     fn classField(vm: *Vm) void {
         consumeDottedIdentifier(vm, "Expect field name.");
         const name = identifierConstant(vm, &vm.parser.previous);
+        vm.emitOpByte(.constant, name);
 
         switch (vm.parser.current.type) {
             .colon_colon, .colon_equal => {
@@ -627,7 +620,7 @@ pub const Compiler = struct {
 
                 advance(vm); // accept :: :=
                 expression(vm);
-                defineProperty(vm, name, constant, false);
+                define(vm, constant, false);
             },
             else => error_(vm, "Expect '::' or ':=' declaration."),
         }
@@ -662,7 +655,8 @@ pub const Compiler = struct {
             vm.emitOpByte(.invoke, name);
             vm.emitByte(arg_count);
         } else {
-            vm.emitOpByte(.get_by_const_pop, name);
+            vm.emitOpByte(.constant, name);
+            vm.emitOp(.get_pop);
         }
     }
 
@@ -674,6 +668,8 @@ pub const Compiler = struct {
         switch (op_type) {
             .colon_colon, .colon_equal => {
                 // declaration
+                vm.emitOpByte(.constant, name);
+
                 const constant = op_type == .colon_colon;
 
                 vm.compiler.?.encountered_identifier = vm.parser.previous.value;
@@ -681,18 +677,20 @@ pub const Compiler = struct {
 
                 advance(vm); // accept :: :=
                 expression(vm);
-                defineProperty(vm, name, constant, true);
+                define(vm, constant, true);
 
                 return true;
             },
             .equal, .plus_equal, .minus_equal, .star_equal, .slash_equal, .percent_equal => {
                 // assignment
+                vm.emitOpByte(.constant, name);
+
                 vm.compiler.?.encountered_identifier = vm.parser.previous.value;
                 vm.compiler.?.is_method = false;
 
                 if (op_type != .equal) {
                     // emit get
-                    vm.emitOpByte(.get_by_const, name);
+                    vm.emitOp(.get);
                 }
 
                 advance(vm); // accept = += -= *= /= %=
@@ -709,7 +707,7 @@ pub const Compiler = struct {
                 }
 
                 // emit set
-                vm.emitOpByte(.set_by_const, name);
+                vm.emitOp(.set);
 
                 return true;
             },
@@ -837,7 +835,7 @@ pub const Compiler = struct {
 
                 advance(vm); // accept :: :=
                 expression(vm);
-                defineIndexer(vm, constant, true);
+                define(vm, constant, true);
 
                 return true;
             },
