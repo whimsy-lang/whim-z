@@ -1059,15 +1059,6 @@ pub const Vm = struct {
                     }
                     frame = &self.frames[self.frame_count - 1];
                 },
-
-                .invoke_0, .invoke_1, .invoke_2, .invoke_3, .invoke_4, .invoke_5, .invoke_6, .invoke_7, .invoke_8, .invoke_9, .invoke_10, .invoke_11, .invoke_12, .invoke_13, .invoke_14, .invoke_15, .invoke_16 => {
-                    const name = frame.readString();
-                    const arg_count = @enumToInt(op) - @enumToInt(OpCode.invoke_0);
-                    if (!self.invoke(name, arg_count)) {
-                        return .runtime_error;
-                    }
-                    frame = &self.frames[self.frame_count - 1];
-                },
                 .invoke => {
                     const name = frame.readString();
                     const arg_count = frame.readByte();
