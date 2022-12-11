@@ -24,12 +24,17 @@ pub const ObjClass = struct {
         };
         vm.registerObject(Value.class(class));
 
+        vm.push(Value.class(class));
+
         class.name = if (class_name != vm.empty_string) class_name else null;
         class.super = super_class;
         class.fields = StringMap.init(vm.allocator);
         _ = class.fields.add(vm.super_string.?, if (super_class) |s| Value.class(s) else Value.nil(), true);
         _ = class.fields.add(vm.type_string.?, Value.nil(), true);
         class.is_marked = false;
+
+        _ = vm.pop();
+
         return class;
     }
 
@@ -86,11 +91,16 @@ pub const ObjFunction = struct {
         };
         vm.registerObject(Value.function(function));
 
+        vm.push(Value.function(function));
+
         function.arity = 0;
         function.upvalue_count = 0;
         function.name = null;
         function.chunk = Chunk.init(vm.allocator);
         function.is_marked = false;
+
+        _ = vm.pop();
+
         return function;
     }
 
@@ -122,10 +132,15 @@ pub const ObjInstance = struct {
         };
         vm.registerObject(Value.instance(instance));
 
+        vm.push(Value.instance(instance));
+
         instance.type = class;
         instance.fields = StringMap.init(vm.allocator);
         _ = instance.fields.add(vm.type_string.?, Value.class(class), true);
         instance.is_marked = false;
+
+        _ = vm.pop();
+
         return instance;
     }
 
@@ -148,8 +163,13 @@ pub const ObjList = struct {
         };
         vm.registerObject(Value.list(list));
 
+        vm.push(Value.list(list));
+
         list.items = std.ArrayList(Value).init(vm.allocator);
         list.is_marked = false;
+
+        _ = vm.pop();
+
         return list;
     }
 
@@ -172,8 +192,13 @@ pub const ObjMap = struct {
         };
         vm.registerObject(Value.map(map));
 
+        vm.push(Value.map(map));
+
         map.items = Map.init(vm.allocator);
         map.is_marked = false;
+
+        _ = vm.pop();
+
         return map;
     }
 
@@ -244,8 +269,13 @@ pub const ObjSet = struct {
         };
         vm.registerObject(Value.set(set));
 
+        vm.push(Value.set(set));
+
         set.items = Map.init(vm.allocator);
         set.is_marked = false;
+
+        _ = vm.pop();
+
         return set;
     }
 
@@ -269,12 +299,13 @@ pub const ObjString = struct {
         };
         vm.registerObject(Value.string(string));
 
+        vm.push(Value.string(string));
+
         string.chars = chars;
         string.hash = hash;
         string.is_marked = false;
-
-        vm.push(Value.string(string));
         _ = vm.strings.set(string, Value.nil());
+
         _ = vm.pop();
 
         return string;

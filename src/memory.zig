@@ -179,7 +179,9 @@ pub const GcAllocater = struct {
 
     fn freeObject(vm: *Vm, object: Value) void {
         if (debug.log_gc) {
-            std.debug.print("free {any}\n", .{object.getType()});
+            std.debug.print("free {any}: ", .{object.getType()});
+            object.print();
+            std.debug.print("\n", .{});
         }
         switch (object.getType()) {
             .class => {
