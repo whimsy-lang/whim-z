@@ -435,7 +435,7 @@ pub const Compiler = struct {
         vm.emitOpByte(if (constant) .define_global_const else .define_global_var, global);
     }
 
-    fn defineProperty(vm: *Vm, name: u8, constant: bool, pop: bool) void {
+    fn defineByConst(vm: *Vm, name: u8, constant: bool, pop: bool) void {
         if (pop) {
             vm.emitOpByte(if (constant) .define_const_by_const_pop else .define_var_by_const_pop, name);
         } else {
@@ -443,7 +443,7 @@ pub const Compiler = struct {
         }
     }
 
-    fn defineIndexer(vm: *Vm, constant: bool, pop: bool) void {
+    fn define(vm: *Vm, constant: bool, pop: bool) void {
         if (pop) {
             vm.emitOp(if (constant) .define_const_pop else .define_var_pop);
         } else {
@@ -580,7 +580,7 @@ pub const Compiler = struct {
                         vm.emitOp(if (constant) .map_with_const else .map_with_var);
                     } else if (map) {
                         // map item
-                        defineIndexer(vm, constant, false);
+                        define(vm, constant, false);
                     } else {
                         error_(vm, "Sets cannot contain key/value pairs.");
                     }
@@ -627,7 +627,7 @@ pub const Compiler = struct {
 
                 advance(vm); // accept :: :=
                 expression(vm);
-                defineProperty(vm, name, constant, false);
+                defineByConst(vm, name, constant, false);
             },
             else => error_(vm, "Expect '::' or ':=' declaration."),
         }
@@ -681,7 +681,7 @@ pub const Compiler = struct {
 
                 advance(vm); // accept :: :=
                 expression(vm);
-                defineProperty(vm, name, constant, true);
+                defineByConst(vm, name, constant, true);
 
                 return true;
             },
@@ -837,7 +837,7 @@ pub const Compiler = struct {
 
                 advance(vm); // accept :: :=
                 expression(vm);
-                defineIndexer(vm, constant, true);
+                define(vm, constant, true);
 
                 return true;
             },
