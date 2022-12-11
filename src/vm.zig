@@ -897,10 +897,6 @@ pub const Vm = struct {
                     value.value = self.pop();
                 },
 
-                .get_local_0, .get_local_1, .get_local_2, .get_local_3, .get_local_4, .get_local_5, .get_local_6, .get_local_7, .get_local_8, .get_local_9, .get_local_10, .get_local_11, .get_local_12, .get_local_13, .get_local_14, .get_local_15 => {
-                    const index = @enumToInt(op) - @enumToInt(OpCode.get_local_0);
-                    self.push(frame.slots[index]);
-                },
                 .get_local => {
                     const index = frame.readByte();
                     self.push(frame.slots[index]);

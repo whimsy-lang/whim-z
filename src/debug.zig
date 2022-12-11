@@ -5,7 +5,7 @@ const OpCode = @import("chunk.zig").OpCode;
 const value = @import("value.zig");
 
 pub const print_code = true;
-pub const trace_execution = true;
+pub const trace_execution = false;
 pub const stress_gc = false;
 pub const log_gc = false;
 
@@ -53,22 +53,6 @@ pub fn disassembleInstruction(chunk: *Chunk, offset: usize) usize {
         .get_global => constantInstruction("get global", chunk, offset),
         .set_global => constantInstruction("set global", chunk, offset),
 
-        .get_local_0 => simpleInstruction("get local 0", offset),
-        .get_local_1 => simpleInstruction("get local 1", offset),
-        .get_local_2 => simpleInstruction("get local 2", offset),
-        .get_local_3 => simpleInstruction("get local 3", offset),
-        .get_local_4 => simpleInstruction("get local 4", offset),
-        .get_local_5 => simpleInstruction("get local 5", offset),
-        .get_local_6 => simpleInstruction("get local 6", offset),
-        .get_local_7 => simpleInstruction("get local 7", offset),
-        .get_local_8 => simpleInstruction("get local 8", offset),
-        .get_local_9 => simpleInstruction("get local 9", offset),
-        .get_local_10 => simpleInstruction("get local 10", offset),
-        .get_local_11 => simpleInstruction("get local 11", offset),
-        .get_local_12 => simpleInstruction("get local 12", offset),
-        .get_local_13 => simpleInstruction("get local 13", offset),
-        .get_local_14 => simpleInstruction("get local 14", offset),
-        .get_local_15 => simpleInstruction("get local 15", offset),
         .get_local => byteInstruction("get local", chunk, offset),
 
         .set_local_0 => simpleInstruction("set local 0", offset),

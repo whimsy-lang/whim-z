@@ -1,8 +1,33 @@
 // simple test file
 
-c :: class /class
-i :: c()
-c.first := 1
-i.yay := 42
+// zig build -Drelease-fast run -- test/test.whim
 
-std.print(i.first, i.yay)
+overall_start :: std.time()
+
+do
+    f :: fn(a, b, c, d)
+        a + b + c + d
+        a + b + c + d
+        a + b + c + d
+        a + b + c + d
+        a + b + c + d
+        a + b + c + d
+        a + b + c + d
+        a + b + c + d
+        a + b + c + d
+        a + b + c + d
+    /fn
+    o := 0
+    loop break o > 10
+        start :: std.time()
+        o += 1
+        i := 0
+        loop break i > 10000000
+            i += 1
+            f(1, 2, 3, 4)
+        /loop
+        std.print(std.time() - start)
+    /loop
+/do
+
+std.print('overall: ', std.time() - overall_start)

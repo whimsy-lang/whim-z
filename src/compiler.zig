@@ -193,13 +193,7 @@ pub const Compiler = struct {
     }
 
     fn emitGet(vm: *Vm, op: OpCode, index: u8) void {
-        if (op == .get_local) {
-            const max = @enumToInt(OpCode.get_local_15) - @enumToInt(OpCode.get_local_0);
-            if (index <= max) {
-                vm.emitByte(@enumToInt(OpCode.get_local_0) + index);
-                return;
-            }
-        } else if (op == .get_upvalue) {
+        if (op == .get_upvalue) {
             const max = @enumToInt(OpCode.get_upvalue_3) - @enumToInt(OpCode.get_upvalue_0);
             if (index <= max) {
                 vm.emitByte(@enumToInt(OpCode.get_upvalue_0) + index);
