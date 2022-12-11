@@ -204,13 +204,7 @@ pub const Compiler = struct {
     }
 
     fn emitSet(vm: *Vm, op: OpCode, index: u8) void {
-        if (op == .set_local) {
-            const max = @enumToInt(OpCode.set_local_15) - @enumToInt(OpCode.set_local_0);
-            if (index <= max) {
-                vm.emitByte(@enumToInt(OpCode.set_local_0) + index);
-                return;
-            }
-        } else if (op == .set_upvalue) {
+        if (op == .set_upvalue) {
             const max = @enumToInt(OpCode.set_upvalue_3) - @enumToInt(OpCode.set_upvalue_0);
             if (index <= max) {
                 vm.emitByte(@enumToInt(OpCode.set_upvalue_0) + index);

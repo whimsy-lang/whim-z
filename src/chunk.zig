@@ -31,23 +31,6 @@ pub const OpCode = enum(u8) {
     set_global,
 
     get_local,
-
-    set_local_0,
-    set_local_1,
-    set_local_2,
-    set_local_3,
-    set_local_4,
-    set_local_5,
-    set_local_6,
-    set_local_7,
-    set_local_8,
-    set_local_9,
-    set_local_10,
-    set_local_11,
-    set_local_12,
-    set_local_13,
-    set_local_14,
-    set_local_15,
     set_local,
 
     get_upvalue_0,
