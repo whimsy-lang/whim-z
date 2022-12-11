@@ -192,17 +192,6 @@ pub const Compiler = struct {
         vm.currentChunk().code.items[offset + 1] = @intCast(u8, jump & 0xff);
     }
 
-    fn emitGet(vm: *Vm, op: OpCode, index: u8) void {
-        if (op == .get_upvalue) {
-            const max = @enumToInt(OpCode.get_upvalue_3) - @enumToInt(OpCode.get_upvalue_0);
-            if (index <= max) {
-                vm.emitByte(@enumToInt(OpCode.get_upvalue_0) + index);
-                return;
-            }
-        }
-        vm.emitOpByte(op, index);
-    }
-
     fn emitSet(vm: *Vm, op: OpCode, index: u8) void {
         if (op == .set_upvalue) {
             const max = @enumToInt(OpCode.set_upvalue_3) - @enumToInt(OpCode.set_upvalue_0);
@@ -226,7 +215,7 @@ pub const Compiler = struct {
 
     fn emitReturn(vm: *Vm) void {
         if (vm.compiler.?.fn_type == .initializer) {
-            emitGet(vm, .get_local, 0);
+            vm.emitOpByte(.get_local, 0);
         } else {
             vm.emitOp(.nil);
         }
@@ -1092,7 +1081,7 @@ pub const Compiler = struct {
                 }
 
                 if (op_type != .equal) {
-                    emitGet(vm, get_op, @intCast(u8, arg));
+                    vm.emitOpByte(get_op, @intCast(u8, arg));
                 }
 
                 advance(vm); // accept = += -= *= /= %=
@@ -1131,7 +1120,7 @@ pub const Compiler = struct {
                 op = .get_global;
             }
         }
-        emitGet(vm, op, @intCast(u8, arg));
+        vm.emitOpByte(op, @intCast(u8, arg));
     }
 
     fn parseInfixPrecedence(vm: *Vm, precedence: Precedence) void {

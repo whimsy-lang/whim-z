@@ -906,10 +906,6 @@ pub const Vm = struct {
                     frame.slots[index] = self.pop();
                 },
 
-                .get_upvalue_0, .get_upvalue_1, .get_upvalue_2, .get_upvalue_3 => {
-                    const index = @enumToInt(op) - @enumToInt(OpCode.get_upvalue_0);
-                    self.push(frame.closure.upvalues[index].?.location.*);
-                },
                 .get_upvalue => {
                     const index = frame.readByte();
                     self.push(frame.closure.upvalues[index].?.location.*);

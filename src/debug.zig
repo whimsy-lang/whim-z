@@ -56,10 +56,6 @@ pub fn disassembleInstruction(chunk: *Chunk, offset: usize) usize {
         .get_local => byteInstruction("get local", chunk, offset),
         .set_local => byteInstruction("set local", chunk, offset),
 
-        .get_upvalue_0 => simpleInstruction("get upvalue 0", offset),
-        .get_upvalue_1 => simpleInstruction("get upvalue 1", offset),
-        .get_upvalue_2 => simpleInstruction("get upvalue 2", offset),
-        .get_upvalue_3 => simpleInstruction("get upvalue 3", offset),
         .get_upvalue => byteInstruction("get upvalue", chunk, offset),
 
         .set_upvalue_0 => simpleInstruction("set upvalue 0", offset),
