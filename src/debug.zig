@@ -20,10 +20,10 @@ pub fn disassembleChunk(chunk: *Chunk, name: []const u8) void {
 
 pub fn disassembleInstruction(chunk: *Chunk, offset: usize) usize {
     std.debug.print("{d:0>4} ", .{offset});
-    if (offset > 0 and chunk.lines.items[offset] == chunk.lines.items[offset - 1]) {
+    if (offset > 0 and chunk.getLine(offset) == chunk.getLine(offset - 1)) {
         std.debug.print("   | ", .{});
     } else {
-        std.debug.print("{d:4} ", .{chunk.lines.items[offset]});
+        std.debug.print("{d:4} ", .{chunk.getLine(offset)});
     }
 
     const instruction = chunk.code.items[offset];

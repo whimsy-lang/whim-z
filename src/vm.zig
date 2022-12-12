@@ -184,7 +184,7 @@ pub const Vm = struct {
             const frame = &self.frames[@intCast(usize, i)];
             const function = frame.closure.function;
             const instruction = @ptrToInt(frame.ip) - @ptrToInt(function.chunk.code.items.ptr) - 1;
-            std.debug.print("[line {d}] in ", .{function.chunk.lines.items[instruction]});
+            std.debug.print("[line {d}] in ", .{function.chunk.getLine(instruction)});
             if (function.name == null) {
                 std.debug.print("{s}\n", .{if (i == 0) "script" else "fn()"});
             } else {

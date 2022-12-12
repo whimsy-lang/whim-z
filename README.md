@@ -192,7 +192,6 @@ compiled: *.whir
 
 ## TODO
 
-* better line number encoding
 * \> 256 constants
 * error handling
 * compiler arrays should not be a fixed size

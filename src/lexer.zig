@@ -71,14 +71,14 @@ pub const TokenType = enum {
 pub const Token = struct {
     type: TokenType,
     value: []const u8,
-    line: usize,
+    line: u29,
 };
 
 pub const Lexer = struct {
     source: [:0]const u8,
     start: usize,
     current: usize,
-    line: usize,
+    line: u29,
 
     pub fn init(source: [:0]const u8) Lexer {
         return .{

@@ -2,6 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 const Value = @import("value.zig").Value;
+const vle = @import("vle.zig");
 const Vm = @import("vm.zig").Vm;
 
 pub const OpCode = enum(u8) {
@@ -80,14 +81,16 @@ pub const OpCode = enum(u8) {
 
 pub const Chunk = struct {
     code: std.ArrayList(u8),
-    lines: std.ArrayList(usize),
+    lines: std.ArrayList(u8),
     constants: std.ArrayList(Value),
+    current_line: u29,
 
     pub fn init(allocator: Allocator) Chunk {
         return .{
             .code = std.ArrayList(u8).init(allocator),
-            .lines = std.ArrayList(usize).init(allocator),
+            .lines = std.ArrayList(u8).init(allocator),
             .constants = std.ArrayList(Value).init(allocator),
+            .current_line = 0,
         };
     }
 
@@ -97,15 +100,20 @@ pub const Chunk = struct {
         self.constants.deinit();
     }
 
-    pub fn write(self: *Chunk, byte: u8, line: usize) void {
+    pub fn write(self: *Chunk, byte: u8, line: u29) void {
         self.code.append(byte) catch {
             std.debug.print("Could not add byte to chunk.", .{});
             std.process.exit(1);
         };
-        self.lines.append(line) catch {
+        vle.add(&self.lines, line - self.current_line) catch {
             std.debug.print("Could not add line to chunk.", .{});
             std.process.exit(1);
         };
+        self.current_line = line;
+    }
+
+    pub fn getLine(self: *Chunk, index: usize) u29 {
+        return vle.sumTo(self.lines.items, index);
     }
 
     pub fn getAddConstant(self: *Chunk, vm: *Vm, value: Value) usize {
