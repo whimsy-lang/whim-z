@@ -171,27 +171,6 @@ pub const Lexer = struct {
         };
     }
 
-    fn skipBlockComment(self: *Lexer) void {
-        var depth: i32 = 1;
-
-        while (depth > 0 and !self.isAtEnd()) {
-            switch (self.advance()) {
-                '\n' => self.line += 1,
-                '/' => if (self.peek() == '*') {
-                    _ = self.advance();
-                    depth += 1;
-                },
-                '*' => if (self.peek() == '/') {
-                    _ = self.advance();
-                    depth -= 1;
-                },
-                else => {},
-            }
-        }
-
-        self.resetLength();
-    }
-
     fn identifierType(self: *Lexer) TokenType {
         const cur = self.source[self.start..self.current];
         switch (cur[0]) {
@@ -372,10 +351,6 @@ pub const Lexer = struct {
                         _ = self.advance();
                         while (self.peek() != '\n' and !self.isAtEnd()) _ = self.advance();
                         self.resetLength();
-                    },
-                    '*' => {
-                        _ = self.advance();
-                        self.skipBlockComment();
                     },
                     'c' => {
                         if (self.peekAt(1) == 'l' and

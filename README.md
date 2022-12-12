@@ -11,12 +11,6 @@ Whimsy is based on [Crafting Interpreters](http://craftinginterpreters.com/) by 
 ```
 // Whimsy, a simple embeddable language.
 
-/* multiline
-   comments
-
-   /* nesting */ is also allowed
-*/
-
 // constant and variable declarations
 myConstant :: "hello"
 myVariable := "initialized"
