@@ -81,6 +81,7 @@ pub const OpCode = enum(u8) {
 
 pub const Chunk = struct {
     code: std.ArrayList(u8),
+    // variable-length encoding of the difference from the previous line number
     lines: std.ArrayList(u8),
     constants: std.ArrayList(Value),
     current_line: u29,
