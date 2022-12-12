@@ -43,7 +43,6 @@ pub const Vm = struct {
         slots: [*]Value,
         pop_one: bool,
 
-        // todo - compare performance to increment and then returning self.ip[-1]
         fn readByte(self: *CallFrame) u8 {
             const value = self.ip[0];
             self.ip += 1;
