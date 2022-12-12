@@ -24,6 +24,7 @@ const whimsy_std = @import("std.zig");
 const StringMap = @import("string_map.zig").StringMap;
 const Value = @import("value.zig").Value;
 const ValueContainer = @import("value.zig").ValueContainer;
+const vle = @import("vle.zig");
 
 pub const InterpretResult = enum {
     ok,
@@ -56,7 +57,7 @@ pub const Vm = struct {
         }
 
         fn readConstant(self: *CallFrame) Value {
-            return self.closure.function.chunk.constants.items[self.readByte()];
+            return self.closure.function.chunk.constants.items[vle.getIncrement(&self.ip)];
         }
 
         fn readString(self: *CallFrame) *ObjString {
