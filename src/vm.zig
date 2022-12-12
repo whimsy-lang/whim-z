@@ -421,8 +421,7 @@ pub const Vm = struct {
     const NumBinaryOp = struct {
         const NumBinaryOpFn = *const fn (f64, f64) Value;
 
-        // todo - test if inlining or comptime for op_fn makes a difference
-        fn run(vm: *Vm, op_fn: NumBinaryOpFn) bool {
+        fn run(vm: *Vm, comptime op_fn: NumBinaryOpFn) bool {
             if (!vm.peek(0).is(.number) or !vm.peek(1).is(.number)) {
                 vm.runtimeError("Operands must be numbers.", .{});
                 return false;
