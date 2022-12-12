@@ -148,7 +148,7 @@ pub const Compiler = struct {
     fn isDottedIdentifier(tok_type: TokenType) bool {
         return switch (tok_type) {
             .identifier, .string => true,
-            .and_, .break_, .by, .class, .continue_, .do, .elif, .else_, .false, .fn_, .for_, .if_, .in, .is, .loop, .nil, .or_, .return_, .then, .true => true,
+            .and_, .break_, .by, .class, .continue_, .do, .elif, .else_, .false, .fn_, .for_, .if_, .in, .is, .loop, .nil, .or_, .return_, .true => true,
 
             else => false,
         };
@@ -788,8 +788,8 @@ pub const Compiler = struct {
     fn ifExpression(vm: *Vm) void {
         expression(vm);
 
-        // optional then
-        _ = match(vm, .then);
+        // optional ;
+        _ = match(vm, .semicolon);
 
         var then_jump = emitJump(vm, .jump_if_false_pop);
 
@@ -801,8 +801,8 @@ pub const Compiler = struct {
         while (match(vm, .elif)) {
             expression(vm);
 
-            // optional then
-            _ = match(vm, .then);
+            // optional ;
+            _ = match(vm, .semicolon);
 
             then_jump = emitJump(vm, .jump_if_false_pop);
 
@@ -1215,9 +1215,6 @@ pub const Compiler = struct {
     fn ifStatement(vm: *Vm) void {
         expression(vm);
 
-        // optional then
-        _ = match(vm, .then);
-
         var then_jump = emitJump(vm, .jump_if_false_pop);
 
         beginScope(vm);
@@ -1236,9 +1233,6 @@ pub const Compiler = struct {
 
         while (match(vm, .elif)) {
             expression(vm);
-
-            // optional then
-            _ = match(vm, .then);
 
             then_jump = emitJump(vm, .jump_if_false_pop);
 

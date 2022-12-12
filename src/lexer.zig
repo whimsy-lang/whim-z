@@ -55,7 +55,6 @@ pub const TokenType = enum {
     nil,
     or_,
     return_,
-    then,
     true,
     // ends
     class_end,
@@ -239,13 +238,7 @@ pub const Lexer = struct {
             'n' => return checkKeyword(cur[1..], "il", .nil),
             'o' => return checkKeyword(cur[1..], "r", .or_),
             'r' => return checkKeyword(cur[1..], "eturn", .return_),
-            't' => if (cur.len == 4) {
-                switch (cur[1]) {
-                    'h' => return checkKeyword(cur[2..], "en", .then),
-                    'r' => return checkKeyword(cur[2..], "ue", .true),
-                    else => {},
-                }
-            },
+            't' => return checkKeyword(cur[1..], "rue", .true),
             else => {},
         }
         return .identifier;
