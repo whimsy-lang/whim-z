@@ -40,7 +40,7 @@ pub fn sumTo(arr: []const u8, index: usize) u29 {
     return 0;
 }
 
-fn valueLength(arr: [*]const u8) usize {
+pub fn valueLength(arr: [*]const u8) usize {
     if (arr[0] < 0x80) return 1;
     if (arr[1] < 0x80) return 2;
     if (arr[2] < 0x80) return 3;

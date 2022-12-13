@@ -113,6 +113,21 @@ pub const Chunk = struct {
         self.current_line = line;
     }
 
+    pub fn writeVle(self: *Chunk, val: u29, line: u29) void {
+        var i = self.code.items.len;
+        vle.add(&self.code, val) catch {
+            std.debug.print("Could not add value to chunk.", .{});
+            std.process.exit(1);
+        };
+        while (i < self.code.items.len) : (i += 1) {
+            vle.add(&self.lines, line - self.current_line) catch {
+                std.debug.print("Could not add line to chunk.", .{});
+                std.process.exit(1);
+            };
+            self.current_line = line;
+        }
+    }
+
     pub fn getLine(self: *Chunk, index: usize) u29 {
         return vle.sumTo(self.lines.items, index);
     }

@@ -55,8 +55,12 @@ pub const Vm = struct {
             return value;
         }
 
+        fn readNum(self: *CallFrame) u29 {
+            return vle.getIncrement(&self.ip);
+        }
+
         fn readConstant(self: *CallFrame) Value {
-            return self.closure.function.chunk.constants.items[vle.getIncrement(&self.ip)];
+            return self.closure.function.chunk.constants.items[self.readNum()];
         }
 
         fn readString(self: *CallFrame) *ObjString {
@@ -221,9 +225,13 @@ pub const Vm = struct {
         self.currentChunk().write(@enumToInt(op), self.parser.previous.line);
     }
 
-    pub fn emitOpByte(self: *Vm, op: OpCode, byte: u8) void {
+    pub fn emitNum(self: *Vm, num: u29) void {
+        self.currentChunk().writeVle(num, self.parser.previous.line);
+    }
+
+    pub fn emitOpNum(self: *Vm, op: OpCode, num: u29) void {
         self.emitOp(op);
-        self.emitByte(byte);
+        self.emitNum(num);
     }
 
     pub fn nativeError(self: *Vm, comptime fmt: []const u8, args: anytype) Value {
@@ -235,7 +243,7 @@ pub const Vm = struct {
         return Value.string(ObjString.take(self, chars));
     }
 
-    fn call(self: *Vm, closure: *ObjClosure, arg_count: u8, pop_one: bool) bool {
+    fn call(self: *Vm, closure: *ObjClosure, arg_count: u29, pop_one: bool) bool {
         if (arg_count != closure.function.arity) {
             self.runtimeError("Expected {d} arguments but got {d}.", .{ closure.function.arity, arg_count });
             return false;
@@ -255,7 +263,7 @@ pub const Vm = struct {
         return true;
     }
 
-    fn callValue(self: *Vm, callee: Value, arg_count: u8) bool {
+    fn callValue(self: *Vm, callee: Value, arg_count: u29) bool {
         switch (callee.getType()) {
             .class => {
                 var class: ?*ObjClass = callee.asClass();
@@ -335,7 +343,7 @@ pub const Vm = struct {
         return false;
     }
 
-    fn invoke(self: *Vm, name: *ObjString, arg_count: u8) bool {
+    fn invoke(self: *Vm, name: *ObjString, arg_count: u29) bool {
         const receiver = self.peek(arg_count);
 
         if (receiver.is(.instance)) {
@@ -885,20 +893,20 @@ pub const Vm = struct {
                 },
 
                 .get_local => {
-                    const index = frame.readByte();
+                    const index = frame.readNum();
                     self.push(frame.slots[index]);
                 },
                 .set_local => {
-                    const index = frame.readByte();
+                    const index = frame.readNum();
                     frame.slots[index] = self.pop();
                 },
 
                 .get_upvalue => {
-                    const index = frame.readByte();
+                    const index = frame.readNum();
                     self.push(frame.closure.upvalues[index].?.location.*);
                 },
                 .set_upvalue => {
-                    const index = frame.readByte();
+                    const index = frame.readNum();
                     frame.closure.upvalues[index].?.location.* = self.pop();
                 },
 
@@ -1001,7 +1009,7 @@ pub const Vm = struct {
                 },
 
                 .call => {
-                    const arg_count = frame.readByte();
+                    const arg_count = frame.readNum();
                     if (!self.callValue(self.peek(arg_count), arg_count)) {
                         return .runtime_error;
                     }
@@ -1009,7 +1017,7 @@ pub const Vm = struct {
                 },
                 .invoke => {
                     const name = frame.readString();
-                    const arg_count = frame.readByte();
+                    const arg_count = frame.readNum();
                     if (!self.invoke(name, arg_count)) {
                         return .runtime_error;
                     }
@@ -1024,7 +1032,7 @@ pub const Vm = struct {
                     var i: usize = 0;
                     while (i < closure.upvalues.len) : (i += 1) {
                         const is_local = frame.readByte();
-                        const index = frame.readByte();
+                        const index = frame.readNum();
                         if (is_local == 1) {
                             closure.upvalues[i] = self.captureUpvalue(&frame.slots[index]);
                         } else {
@@ -1148,7 +1156,7 @@ pub const Vm = struct {
                     frame.ip -= offset;
                 },
                 .list => {
-                    const count = frame.readByte();
+                    const count = frame.readNum();
                     const list = ObjList.init(self);
                     self.push(Value.list(list));
                     list.items.appendSlice((self.stack_top - (count + 1))[0..count]) catch {
@@ -1202,7 +1210,7 @@ pub const Vm = struct {
                     }
                 },
                 .new_set => {
-                    const count = frame.readByte();
+                    const count = frame.readNum();
                     const set = ObjSet.init(self);
                     self.push(Value.set(set));
                     for ((self.stack_top - (count + 1))[0..count]) |val| {

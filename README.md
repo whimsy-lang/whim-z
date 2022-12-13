@@ -192,9 +192,7 @@ compiled: *.whir
 
 ## TODO
 
-* \> 256 constants
 * error handling
-* compiler arrays should not be a fixed size
 * strings - flexible array members
 * string hash set (instead of table with nil values) for interning
 * utf8

@@ -36,8 +36,7 @@ const PrimaryParseFn = *const fn (*Vm) bool;
 const ParseFn = *const fn (*Vm) void;
 
 pub const Compiler = struct {
-    const u8_count = std.math.maxInt(u8) + 1;
-    const max_loop = 32;
+    const u29_count = std.math.maxInt(u29) + 1;
 
     const Local = struct {
         name: Token,
@@ -47,7 +46,7 @@ pub const Compiler = struct {
     };
 
     const Upvalue = struct {
-        index: u8,
+        index: u29,
         is_local: bool,
     };
 
@@ -68,11 +67,9 @@ pub const Compiler = struct {
     function: ?*ObjFunction,
     fn_type: FunctionType,
 
-    locals: [u8_count]Local,
-    local_count: usize,
-    upvalues: [u8_count]Upvalue,
-    loops: [max_loop]Loop,
-    loop_count: usize,
+    locals: std.ArrayList(Local),
+    upvalues: std.ArrayList(Upvalue),
+    loops: std.ArrayList(Loop),
     scope_depth: isize,
 
     encountered_identifier: ?[]const u8,
@@ -83,12 +80,19 @@ pub const Compiler = struct {
         self.function = null;
         self.fn_type = fn_type;
 
-        self.local_count = 0;
-        self.loop_count = 0;
+        self.locals = std.ArrayList(Local).init(vm.allocator);
+        self.upvalues = std.ArrayList(Upvalue).init(vm.allocator);
+        self.loops = std.ArrayList(Loop).init(vm.allocator);
         self.scope_depth = 0;
         self.function = ObjFunction.init(vm);
 
         vm.compiler = self;
+    }
+
+    pub fn deinit(self: *Compiler) void {
+        self.locals.deinit();
+        self.upvalues.deinit();
+        self.loops.deinit();
     }
 
     pub fn markRoots(vm: *Vm) void {
@@ -204,24 +208,24 @@ pub const Compiler = struct {
 
     fn emitReturn(vm: *Vm) void {
         if (vm.compiler.?.fn_type == .initializer) {
-            vm.emitOpByte(.get_local, 0);
+            vm.emitOpNum(.get_local, 0);
         } else {
             vm.emitOp(.nil);
         }
         vm.emitOp(.return_);
     }
 
-    fn makeConstant(vm: *Vm, value: Value) u8 {
+    fn makeConstant(vm: *Vm, value: Value) u29 {
         const constant = vm.currentChunk().getAddConstant(vm, value);
-        if (constant > std.math.maxInt(u8)) {
+        if (constant > std.math.maxInt(u29)) {
             error_(vm, "Too many constants in one chunk.");
             return 0;
         }
-        return @intCast(u8, constant);
+        return @intCast(u29, constant);
     }
 
     fn emitConstant(vm: *Vm, value: Value) void {
-        vm.emitOpByte(.constant, makeConstant(vm, value));
+        vm.emitOpNum(.constant, makeConstant(vm, value));
     }
 
     fn emitNumber(vm: *Vm, value: f64) void {
@@ -298,22 +302,22 @@ pub const Compiler = struct {
         var comp = vm.compiler.?;
         comp.scope_depth -= 1;
 
-        while (comp.local_count > 0 and comp.locals[comp.local_count - 1].depth > comp.scope_depth) {
-            if (comp.locals[comp.local_count - 1].is_captured) {
+        while (comp.locals.items.len > 0 and comp.locals.items[comp.locals.items.len - 1].depth > comp.scope_depth) {
+            if (comp.locals.items[comp.locals.items.len - 1].is_captured) {
                 vm.emitOp(.close_upvalue);
             } else {
                 vm.emitOp(.pop);
             }
-            comp.local_count -= 1;
+            _ = comp.locals.pop();
         }
     }
 
     fn scopePop(vm: *Vm, depth: isize) void {
         const comp = vm.compiler.?;
-        var i = @intCast(isize, comp.local_count) - 1;
+        var i = @intCast(isize, comp.locals.items.len) - 1;
         while (i >= 0) : (i -= 1) {
-            if (comp.locals[@intCast(usize, i)].depth < depth) return;
-            if (comp.locals[@intCast(usize, i)].is_captured) {
+            if (comp.locals.items[@intCast(usize, i)].depth < depth) return;
+            if (comp.locals.items[@intCast(usize, i)].is_captured) {
                 vm.emitOp(.close_upvalue);
             } else {
                 vm.emitOp(.pop);
@@ -321,28 +325,31 @@ pub const Compiler = struct {
         }
     }
 
-    fn identifierConstant(vm: *Vm, name: *Token) u8 {
+    fn identifierConstant(vm: *Vm, name: *Token) u29 {
         return makeConstant(vm, Value.string(ObjString.copy(vm, name.value)));
     }
 
     fn addLocal(vm: *Vm, identifier: Token, constant: bool) void {
         var comp = vm.compiler.?;
-        if (comp.local_count == u8_count) {
+        if (comp.locals.items.len == u29_count) {
             error_(vm, "Too many local variables in block.");
             return;
         }
 
-        var local = &comp.locals[comp.local_count];
-        comp.local_count += 1;
-        local.name = identifier;
-        local.constant = constant;
-        local.depth = -1;
-        local.is_captured = false;
+        comp.locals.append(.{
+            .name = identifier,
+            .constant = constant,
+            .depth = -1,
+            .is_captured = false,
+        }) catch {
+            std.debug.print("Could not add local.", .{});
+            std.process.exit(1);
+        };
     }
 
     fn markInitialized(vm: *Vm) void {
         var comp = vm.compiler.?;
-        comp.locals[comp.local_count - 1].depth = comp.scope_depth;
+        comp.locals.items[comp.locals.items.len - 1].depth = comp.scope_depth;
     }
 
     fn declareLocal(vm: *Vm, identifier: *Token, constant: bool) void {
@@ -358,23 +365,26 @@ pub const Compiler = struct {
 
     fn placeholderLocal(vm: *Vm) void {
         var comp = vm.compiler.?;
-        if (comp.local_count == u8_count) {
+        if (comp.locals.items.len == u29_count) {
             error_(vm, "Too many local variables in block.");
             return;
         }
 
-        var local = &comp.locals[comp.local_count];
-        comp.local_count += 1;
-        local.name = Token{ .type = .identifier, .value = "", .line = 0 };
-        local.constant = false;
-        local.depth = comp.scope_depth;
-        local.is_captured = false;
+        comp.locals.append(.{
+            .name = Token{ .type = .identifier, .value = "", .line = 0 },
+            .constant = false,
+            .depth = comp.scope_depth,
+            .is_captured = false,
+        }) catch {
+            std.debug.print("Could not add local.", .{});
+            std.process.exit(1);
+        };
     }
 
     fn resolveLocal(self: *Compiler, identifier: *Token) isize {
-        var i = @intCast(isize, self.local_count) - 1;
+        var i = @intCast(isize, self.locals.items.len) - 1;
         while (i >= 0) : (i -= 1) {
-            const local = &self.locals[@intCast(usize, i)];
+            const local = &self.locals.items[@intCast(usize, i)];
             if (std.mem.eql(u8, identifier.value, local.name.value)) {
                 return if (local.depth == -1) -1 else i;
             }
@@ -382,24 +392,29 @@ pub const Compiler = struct {
         return -1;
     }
 
-    fn addUpvalue(self: *Compiler, vm: *Vm, index: u8, is_local: bool) usize {
+    fn addUpvalue(self: *Compiler, vm: *Vm, index: u29, is_local: bool) usize {
         const upvalue_count = self.function.?.upvalue_count;
 
         var i: usize = 0;
         while (i < upvalue_count) : (i += 1) {
-            const upvalue = &self.upvalues[i];
+            const upvalue = &self.upvalues.items[i];
             if (upvalue.index == index and upvalue.is_local == is_local) {
                 return i;
             }
         }
 
-        if (upvalue_count == u8_count) {
+        if (upvalue_count == u29_count) {
             error_(vm, "Too many closure variables in function.");
             return 0;
         }
 
-        self.upvalues[upvalue_count].is_local = is_local;
-        self.upvalues[upvalue_count].index = index;
+        self.upvalues.append(.{
+            .is_local = is_local,
+            .index = index,
+        }) catch {
+            std.debug.print("Could not add upvalue.", .{});
+            std.process.exit(1);
+        };
         self.function.?.upvalue_count += 1;
         return upvalue_count;
     }
@@ -409,13 +424,13 @@ pub const Compiler = struct {
 
         const local = self.enclosing.?.resolveLocal(identifier);
         if (local != -1) {
-            self.enclosing.?.locals[@intCast(usize, local)].is_captured = true;
-            return @intCast(isize, self.addUpvalue(vm, @intCast(u8, local), true));
+            self.enclosing.?.locals.items[@intCast(usize, local)].is_captured = true;
+            return @intCast(isize, self.addUpvalue(vm, @intCast(u29, local), true));
         }
 
         const upvalue = self.enclosing.?.resolveUpvalue(vm, identifier);
         if (upvalue != -1) {
-            return @intCast(isize, self.addUpvalue(vm, @intCast(u8, upvalue), false));
+            return @intCast(isize, self.addUpvalue(vm, @intCast(u29, upvalue), false));
         }
 
         return -1;
@@ -424,15 +439,15 @@ pub const Compiler = struct {
     fn getUpvalueLocal(vm: *Vm, upvalue_index: usize) *Local {
         var comp = vm.compiler.?;
         var index = upvalue_index;
-        while (!comp.upvalues[index].is_local) {
-            index = comp.upvalues[index].index;
+        while (!comp.upvalues.items[index].is_local) {
+            index = comp.upvalues.items[index].index;
             comp = comp.enclosing.?;
         }
-        return &comp.enclosing.?.locals[comp.upvalues[index].index];
+        return &comp.enclosing.?.locals.items[comp.upvalues.items[index].index];
     }
 
-    fn defineGlobal(vm: *Vm, global: u8, constant: bool) void {
-        vm.emitOpByte(if (constant) .define_global_const else .define_global_var, global);
+    fn defineGlobal(vm: *Vm, global: u29, constant: bool) void {
+        vm.emitOpNum(if (constant) .define_global_const else .define_global_var, global);
     }
 
     fn define(vm: *Vm, constant: bool, pop: bool) void {
@@ -508,13 +523,13 @@ pub const Compiler = struct {
         };
     }
 
-    fn argumentList(vm: *Vm) u8 {
-        var arg_count: u8 = 0;
+    fn argumentList(vm: *Vm) u29 {
+        var arg_count: u29 = 0;
         if (!check(vm, .right_paren)) {
             while (true) {
                 expression(vm);
-                if (arg_count == std.math.maxInt(u8)) {
-                    error_(vm, "Can't have more than 255 arguments.");
+                if (arg_count == std.math.maxInt(u29)) {
+                    error_(vm, "Too many arguments.");
                 }
                 arg_count += 1;
                 if (!(match(vm, .comma) and !check(vm, .right_paren))) break;
@@ -578,9 +593,9 @@ pub const Compiler = struct {
                     }
                 } else if (map) {
                     error_(vm, "All map entries must be a key/value pair.");
-                } else if (count == std.math.maxInt(u8)) {
+                } else if (count == std.math.maxInt(u29)) {
                     // set item, check count
-                    error_(vm, "Can't have more than 255 starting set items.");
+                    error_(vm, "Too many starting set items.");
                 }
 
                 count += 1;
@@ -592,7 +607,7 @@ pub const Compiler = struct {
         if (count == 0) {
             vm.emitOp(.map);
         } else if (!map) {
-            vm.emitOpByte(.new_set, @intCast(u8, count));
+            vm.emitOpNum(.new_set, @intCast(u29, count));
         }
     }
 
@@ -603,13 +618,13 @@ pub const Compiler = struct {
 
     fn call(vm: *Vm) void {
         const arg_count = argumentList(vm);
-        vm.emitOpByte(.call, arg_count);
+        vm.emitOpNum(.call, arg_count);
     }
 
     fn classField(vm: *Vm) void {
         consumeDottedIdentifier(vm, "Expect field name.");
         const name = identifierConstant(vm, &vm.parser.previous);
-        vm.emitOpByte(.constant, name);
+        vm.emitOpNum(.constant, name);
 
         switch (vm.parser.current.type) {
             .colon_colon, .colon_equal => {
@@ -636,10 +651,10 @@ pub const Compiler = struct {
         vm.emitOp(.class);
         if (vm.compiler.?.encountered_identifier) |name| {
             const name_const = makeConstant(vm, Value.string(ObjString.copy(vm, name)));
-            vm.emitByte(name_const);
+            vm.emitNum(name_const);
         } else {
             const name_const = makeConstant(vm, Value.string(vm.empty_string.?));
-            vm.emitByte(name_const);
+            vm.emitNum(name_const);
         }
 
         while (!check(vm, .class_end) and !check(vm, .eof)) {
@@ -649,13 +664,13 @@ pub const Compiler = struct {
         consume(vm, .class_end, "Expect '/class' after block.");
     }
 
-    fn dotHelper(vm: *Vm, name: u8) void {
+    fn dotHelper(vm: *Vm, name: u29) void {
         if (match(vm, .left_paren)) {
             const arg_count = argumentList(vm);
-            vm.emitOpByte(.invoke, name);
-            vm.emitByte(arg_count);
+            vm.emitOpNum(.invoke, name);
+            vm.emitNum(arg_count);
         } else {
-            vm.emitOpByte(.get_by_const_pop, name);
+            vm.emitOpNum(.get_by_const_pop, name);
         }
     }
 
@@ -672,7 +687,7 @@ pub const Compiler = struct {
                 vm.compiler.?.encountered_identifier = vm.parser.previous.value;
                 vm.compiler.?.is_method = false;
 
-                vm.emitOpByte(.constant, name);
+                vm.emitOpNum(.constant, name);
                 advance(vm); // accept :: :=
                 expression(vm);
                 define(vm, constant, true);
@@ -686,7 +701,7 @@ pub const Compiler = struct {
 
                 if (op_type != .equal) {
                     // emit get
-                    vm.emitOpByte(.get_by_const, name);
+                    vm.emitOpNum(.get_by_const, name);
                 }
 
                 advance(vm); // accept = += -= *= /= %=
@@ -703,7 +718,7 @@ pub const Compiler = struct {
                 }
 
                 // emit set
-                vm.emitOpByte(.set_by_const, name);
+                vm.emitOpNum(.set_by_const, name);
 
                 return true;
             },
@@ -724,6 +739,7 @@ pub const Compiler = struct {
         const is_method = vm.compiler.?.is_method;
         var compiler: Compiler = undefined;
         compiler.init(vm, .function);
+        defer compiler.deinit();
         if (vm.compiler.?.enclosing.?.encountered_identifier) |name| {
             compiler.function.?.name = ObjString.copy(vm, name);
 
@@ -737,8 +753,8 @@ pub const Compiler = struct {
         if (!check(vm, .right_paren)) {
             while (true) {
                 vm.compiler.?.function.?.arity += 1;
-                if (vm.compiler.?.function.?.arity > std.math.maxInt(u8)) {
-                    errorAtCurrent(vm, "Can't have more than 255 parameters.");
+                if (vm.compiler.?.function.?.arity > std.math.maxInt(u29)) {
+                    errorAtCurrent(vm, "Too many parameters.");
                 }
                 consume(vm, .identifier, "Expect parameter name.");
                 declareLocal(vm, &vm.parser.previous, true);
@@ -750,12 +766,12 @@ pub const Compiler = struct {
         block(vm, .fn_end, "Expect '/fn' after block.");
 
         const new_func = endCompiler(vm);
-        vm.emitOpByte(.closure, makeConstant(vm, Value.function(new_func)));
+        vm.emitOpNum(.closure, makeConstant(vm, Value.function(new_func)));
 
         var i: usize = 0;
         while (i < new_func.upvalue_count) : (i += 1) {
-            vm.emitByte(if (compiler.upvalues[i].is_local) 1 else 0);
-            vm.emitByte(compiler.upvalues[i].index);
+            vm.emitByte(if (compiler.upvalues.items[i].is_local) 1 else 0);
+            vm.emitNum(compiler.upvalues.items[i].index);
         }
     }
 
@@ -765,13 +781,13 @@ pub const Compiler = struct {
     }
 
     fn grouping(vm: *Vm) void {
-        var count: u8 = 0;
+        var count: u29 = 0;
         var list = false;
         if (!check(vm, .right_paren)) {
             while (true) {
                 expression(vm);
-                if (count == std.math.maxInt(u8)) {
-                    error_(vm, "Can't have more than 255 starting list items.");
+                if (count == std.math.maxInt(u29)) {
+                    error_(vm, "Too many starting list items.");
                 }
                 count += 1;
                 if (check(vm, .comma)) list = true;
@@ -781,7 +797,7 @@ pub const Compiler = struct {
         consume(vm, .right_paren, "Expect ')' after expression.");
 
         if (count == 0 or list) {
-            vm.emitOpByte(.list, count);
+            vm.emitOpNum(.list, count);
         }
     }
 
@@ -894,8 +910,8 @@ pub const Compiler = struct {
         consume(vm, .left_paren, "Expect '(' after method name.");
         vm.emitOp(.dup);
         const arg_count = argumentList(vm) + 1;
-        vm.emitOpByte(.invoke, name);
-        vm.emitByte(arg_count);
+        vm.emitOpNum(.invoke, name);
+        vm.emitNum(arg_count);
     }
 
     fn negate(vm: *Vm) void {
@@ -1000,7 +1016,7 @@ pub const Compiler = struct {
 
                 if (arg != -1) {
                     // local
-                    if (vm.compiler.?.locals[@intCast(usize, arg)].constant) {
+                    if (vm.compiler.?.locals.items[@intCast(usize, arg)].constant) {
                         error_(vm, "Local is constant.");
                     }
                 } else {
@@ -1022,7 +1038,7 @@ pub const Compiler = struct {
                 }
 
                 if (op_type != .equal) {
-                    vm.emitOpByte(get_op, @intCast(u8, arg));
+                    vm.emitOpNum(get_op, @intCast(u29, arg));
                 }
 
                 advance(vm); // accept = += -= *= /= %=
@@ -1038,7 +1054,7 @@ pub const Compiler = struct {
                     else => {},
                 }
 
-                vm.emitOpByte(set_op, @intCast(u8, arg));
+                vm.emitOpNum(set_op, @intCast(u29, arg));
 
                 return true;
             },
@@ -1061,7 +1077,7 @@ pub const Compiler = struct {
                 op = .get_global;
             }
         }
-        vm.emitOpByte(op, @intCast(u8, arg));
+        vm.emitOpNum(op, @intCast(u29, arg));
     }
 
     fn parseInfixPrecedence(vm: *Vm, precedence: Precedence) void {
@@ -1105,7 +1121,7 @@ pub const Compiler = struct {
     }
 
     fn breakStatement(vm: *Vm) void {
-        if (vm.compiler.?.loop_count == 0) {
+        if (vm.compiler.?.loops.items.len == 0) {
             error_(vm, "Cannot break, not in a loop.");
             return;
         }
@@ -1114,7 +1130,7 @@ pub const Compiler = struct {
 
         const skip_jump = emitJump(vm, .jump_if_false_pop);
 
-        const loop = &vm.compiler.?.loops[vm.compiler.?.loop_count - 1];
+        const loop = &vm.compiler.?.loops.items[vm.compiler.?.loops.items.len - 1];
         scopePop(vm, loop.depth);
         if (loop.exit != -1) patchJump(vm, @intCast(usize, loop.exit));
         loop.exit = @intCast(isize, emitJump(vm, .jump));
@@ -1123,7 +1139,7 @@ pub const Compiler = struct {
     }
 
     fn continueStatement(vm: *Vm) void {
-        if (vm.compiler.?.loop_count == 0) {
+        if (vm.compiler.?.loops.items.len == 0) {
             error_(vm, "Cannot continue, not in a loop.");
             return;
         }
@@ -1132,7 +1148,7 @@ pub const Compiler = struct {
 
         const skip_jump = emitJump(vm, .jump_if_false_pop);
 
-        const loop = &vm.compiler.?.loops[vm.compiler.?.loop_count - 1];
+        const loop = &vm.compiler.?.loops.items[vm.compiler.?.loops.items.len - 1];
         scopePop(vm, loop.depth);
         emitLoop(vm, if (loop.iterator) .iterate_next else .jump_back, loop.start);
 
@@ -1165,11 +1181,6 @@ pub const Compiler = struct {
     }
 
     fn forStatement(vm: *Vm) void {
-        if (vm.compiler.?.loop_count == max_loop) {
-            error_(vm, "Too many nested loops.");
-            return;
-        }
-
         beginScope(vm);
 
         // stack: [object being iterated over] [index] [current value]
@@ -1189,12 +1200,16 @@ pub const Compiler = struct {
         // push starting index 0 on the stack
         emitNumber(vm, 0);
 
-        var loop = &vm.compiler.?.loops[vm.compiler.?.loop_count];
-        vm.compiler.?.loop_count += 1;
-        loop.start = vm.currentChunk().code.items.len;
-        loop.exit = @intCast(isize, emitJump(vm, .iterate_check));
-        loop.depth = vm.compiler.?.scope_depth;
-        loop.iterator = true;
+        vm.compiler.?.loops.append(.{
+            .start = vm.currentChunk().code.items.len,
+            .exit = @intCast(isize, emitJump(vm, .iterate_check)),
+            .depth = vm.compiler.?.scope_depth,
+            .iterator = true,
+        }) catch {
+            std.debug.print("Could not add loop.", .{});
+            std.process.exit(1);
+        };
+        const loop = &vm.compiler.?.loops.items[vm.compiler.?.loops.items.len - 1];
 
         while (vm.parser.current.type != .for_end and vm.parser.current.type != .eof) {
             statement(vm);
@@ -1209,7 +1224,7 @@ pub const Compiler = struct {
 
         consume(vm, .for_end, "Expect '/for' after block.");
 
-        vm.compiler.?.loop_count -= 1;
+        _ = vm.compiler.?.loops.pop();
     }
 
     fn ifStatement(vm: *Vm) void {
@@ -1267,19 +1282,18 @@ pub const Compiler = struct {
     }
 
     fn loopStatement(vm: *Vm) void {
-        if (vm.compiler.?.loop_count == max_loop) {
-            error_(vm, "Too many nested loops.");
-            return;
-        }
-
         beginScope(vm);
 
-        var loop = &vm.compiler.?.loops[vm.compiler.?.loop_count];
-        vm.compiler.?.loop_count += 1;
-        loop.start = vm.currentChunk().code.items.len;
-        loop.exit = -1;
-        loop.depth = vm.compiler.?.scope_depth;
-        loop.iterator = false;
+        vm.compiler.?.loops.append(.{
+            .start = vm.currentChunk().code.items.len,
+            .exit = -1,
+            .depth = vm.compiler.?.scope_depth,
+            .iterator = false,
+        }) catch {
+            std.debug.print("Could not add loop.", .{});
+            std.process.exit(1);
+        };
+        const loop = &vm.compiler.?.loops.items[vm.compiler.?.loops.items.len - 1];
 
         while (vm.parser.current.type != .loop_end and vm.parser.current.type != .eof) {
             statement(vm);
@@ -1293,7 +1307,7 @@ pub const Compiler = struct {
 
         consume(vm, .loop_end, "Expect '/loop' after block.");
 
-        vm.compiler.?.loop_count -= 1;
+        _ = vm.compiler.?.loops.pop();
     }
 
     fn returnStatement(vm: *Vm) void {
@@ -1358,6 +1372,7 @@ pub const Compiler = struct {
 
         var compiler: Compiler = undefined;
         compiler.init(vm, .script);
+        defer compiler.deinit();
 
         advance(vm);
 
