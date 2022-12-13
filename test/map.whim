@@ -12,26 +12,31 @@ c :: class
     fifth :: 5
 /class
 
+overall_start :: std.time()
+
 do
-    i := 0
-    count := 0
-    loop break i > 10000000
-        i += 1
-        count += c.first
-        count += c.second
-        count += c.third
-        count += c.fourth
-        count += c.fifth
+    o := 0
+    loop break o > 9
+        start :: std.time()
+        o += 1
+        i := 0
+        count := 0
+        loop break i > 10000000
+            i += 1
+            count += c.first
+            count += c.second
+            count += c.third
+            count += c.fourth
+            count += c.fifth
 
-        count -= c.first
-        count -= c.second
-        count -= c.third
-        count -= c.fourth
-        count -= c.fifth
+            count -= c.first
+            count -= c.second
+            count -= c.third
+            count -= c.fourth
+            count -= c.fifth
+        /loop
+        std.print(std.time() - start)
     /loop
-
-    std.print('i: ', i)
-    std.print('count: ', count)
 /do
 
-std.print('elapsed: ', std.time() - start)
+std.print('overall: ', std.time() - overall_start)
