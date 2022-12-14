@@ -175,16 +175,14 @@ pub const StringMap = struct {
 
     pub fn mark(self: *StringMap, vm: *Vm) void {
         for (self.entries) |entry| {
-            if (entry.key) |key| {
-                Value.string(key).mark(vm);
-            }
+            if (entry.key) |key| key.obj.mark(vm);
             entry.value.value.mark(vm);
         }
     }
 
     pub fn removeWhite(self: *StringMap) void {
         for (self.entries) |entry| {
-            if (entry.key != null and !entry.key.?.is_marked) {
+            if (entry.key != null and !entry.key.?.obj.is_marked) {
                 _ = self.delete(entry.key.?);
             }
         }

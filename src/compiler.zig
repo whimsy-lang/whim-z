@@ -99,7 +99,7 @@ pub const Compiler = struct {
         var compiler = vm.compiler;
         while (compiler) |comp| {
             if (comp.function) |func| {
-                Value.function(func).mark(vm);
+                func.obj.mark(vm);
             }
             compiler = comp.enclosing;
         }

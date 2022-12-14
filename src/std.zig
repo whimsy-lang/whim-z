@@ -102,7 +102,7 @@ fn n_std_list_add(vm: *Vm, values: []Value) Value {
     if (values.len < 2) {
         return vm.nativeError("std.list.add takes a list and at least one item to add", .{});
     }
-    if (!values[0].is(.list)) {
+    if (!values[0].isObj(.list)) {
         return vm.nativeError("std.list.add's first argument must be a list", .{});
     }
     values[0].asList().items.appendSlice(values[1..]) catch {
@@ -113,7 +113,7 @@ fn n_std_list_add(vm: *Vm, values: []Value) Value {
 }
 
 fn n_std_list_length(vm: *Vm, values: []Value) Value {
-    if (values.len != 1 or !values[0].is(.list)) {
+    if (values.len != 1 or !values[0].isObj(.list)) {
         return vm.nativeError("std.list.length takes a list", .{});
     }
     return Value.number(@intToFloat(f64, values[0].asList().items.items.len));
@@ -123,7 +123,7 @@ fn n_std_list_remove(vm: *Vm, values: []Value) Value {
     if (values.len != 2) {
         return vm.nativeError("std.list.remove takes a list and the index to remove", .{});
     }
-    if (!values[0].is(.list) or !values[1].is(.number)) {
+    if (!values[0].isObj(.list) or !values[1].is(.number)) {
         return vm.nativeError("std.list.remove arguments must be a list and number", .{});
     }
     return values[0].asList().items.orderedRemove(@floatToInt(usize, values[1].asNumber()));
@@ -131,7 +131,7 @@ fn n_std_list_remove(vm: *Vm, values: []Value) Value {
 
 fn n_std_map_length(vm: *Vm, values: []Value) Value {
     var length: usize = 0;
-    if (values.len != 1 or !values[0].is(.map)) {
+    if (values.len != 1 or !values[0].isObj(.map)) {
         return vm.nativeError("std.map.length takes a map", .{});
     }
     for (values[0].asMap().items.entries) |entry| {
@@ -146,7 +146,7 @@ fn n_std_map_remove(vm: *Vm, values: []Value) Value {
     if (values.len < 2) {
         return vm.nativeError("std.map.remove takes a map and at least one key to remove", .{});
     }
-    if (!values[0].is(.map)) {
+    if (!values[0].isObj(.map)) {
         return vm.nativeError("std.map.remove's first argument must be a map", .{});
     }
     const map = values[0].asMap();
@@ -160,7 +160,7 @@ fn n_std_set_add(vm: *Vm, values: []Value) Value {
     if (values.len < 2) {
         return vm.nativeError("std.set.add takes a set and at least one item to add", .{});
     }
-    if (!values[0].is(.set)) {
+    if (!values[0].isObj(.set)) {
         return vm.nativeError("std.set.add's first argument must be a set", .{});
     }
     const set = values[0].asSet();
@@ -172,7 +172,7 @@ fn n_std_set_add(vm: *Vm, values: []Value) Value {
 
 fn n_std_set_length(vm: *Vm, values: []Value) Value {
     var length: usize = 0;
-    if (values.len != 1 or !values[0].is(.set)) {
+    if (values.len != 1 or !values[0].isObj(.set)) {
         return vm.nativeError("std.set.length takes a set", .{});
     }
     for (values[0].asSet().items.entries) |entry| {
@@ -187,7 +187,7 @@ fn n_std_set_remove(vm: *Vm, values: []Value) Value {
     if (values.len < 2) {
         return vm.nativeError("std.set.remove takes a set and at least one item to remove", .{});
     }
-    if (!values[0].is(.set)) {
+    if (!values[0].isObj(.set)) {
         return vm.nativeError("std.set.remove's first argument must be a set", .{});
     }
     const set = values[0].asSet();
@@ -198,7 +198,7 @@ fn n_std_set_remove(vm: *Vm, values: []Value) Value {
 }
 
 fn n_std_string_length(vm: *Vm, values: []Value) Value {
-    if (values.len != 1 or !values[0].is(.string)) {
+    if (values.len != 1 or !values[0].isObj(.string)) {
         return vm.nativeError("std.string.length takes a string", .{});
     }
     return Value.number(@intToFloat(f64, values[0].asString().chars.len));

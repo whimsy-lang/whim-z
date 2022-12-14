@@ -9,6 +9,7 @@ const debug = @import("debug.zig");
 const Lexer = @import("lexer.zig").Lexer;
 const GcAllocator = @import("memory.zig").GcAllocater;
 const NativeFn = @import("object.zig").NativeFn;
+const Object = @import("object.zig").Object;
 const ObjClass = @import("object.zig").ObjClass;
 const ObjClosure = @import("object.zig").ObjClosure;
 const ObjFunction = @import("object.zig").ObjFunction;
@@ -71,7 +72,7 @@ pub const Vm = struct {
     parent_allocator: Allocator,
     gc: GcAllocator,
     allocator: Allocator,
-    objects: std.ArrayList(Value),
+    objects: std.ArrayList(*Object),
     globals: StringMap,
     strings: StringMap,
     open_upvalues: ?*ObjUpvalue,
@@ -106,7 +107,7 @@ pub const Vm = struct {
         self.parent_allocator = allocator;
         self.gc = GcAllocator.init(self);
         self.allocator = self.gc.allocator();
-        self.objects = std.ArrayList(Value).init(self.parent_allocator);
+        self.objects = std.ArrayList(*Object).init(self.parent_allocator);
 
         self.compiler = null;
 
@@ -166,7 +167,7 @@ pub const Vm = struct {
         self.gc.deinit();
     }
 
-    pub fn registerObject(self: *Vm, object: Value) void {
+    pub fn registerObject(self: *Vm, object: *Object) void {
         self.objects.append(object) catch {
             std.debug.print("Could not allocate memory to track object.", .{});
             std.process.exit(1);
@@ -264,80 +265,83 @@ pub const Vm = struct {
     }
 
     fn callValue(self: *Vm, callee: Value, arg_count: u29) bool {
-        switch (callee.getType()) {
-            .class => {
-                var class: ?*ObjClass = callee.asClass();
-                if (class == self.list_class) {
-                    const list = ObjList.init(self);
-                    (self.stack_top - (arg_count + 1))[0] = Value.list(list);
-                    list.items.appendSlice((self.stack_top - arg_count)[0..arg_count]) catch {
-                        std.debug.print("Could not allocate memory for list.", .{});
-                        std.process.exit(1);
-                    };
-                    self.stack_top -= arg_count;
-                    return true;
-                }
-                if (class == self.map_class) {
+        if (callee.is(.object)) {
+            const obj = callee.asObject();
+            switch (obj.type) {
+                .class => {
+                    var class: ?*ObjClass = obj.asClass();
+                    if (class == self.list_class) {
+                        const list = ObjList.init(self);
+                        (self.stack_top - (arg_count + 1))[0] = Value.list(list);
+                        list.items.appendSlice((self.stack_top - arg_count)[0..arg_count]) catch {
+                            std.debug.print("Could not allocate memory for list.", .{});
+                            std.process.exit(1);
+                        };
+                        self.stack_top -= arg_count;
+                        return true;
+                    }
+                    if (class == self.map_class) {
+                        if (arg_count != 0) {
+                            self.runtimeError("Expected 0 arguments but got {d}.", .{arg_count});
+                            return false;
+                        }
+                        const map = ObjMap.init(self);
+                        (self.stack_top - 1)[0] = Value.map(map);
+                        return true;
+                    }
+                    if (class == self.set_class) {
+                        const set = ObjSet.init(self);
+                        (self.stack_top - (arg_count + 1))[0] = Value.set(set);
+                        for ((self.stack_top - arg_count)[0..arg_count]) |val| {
+                            _ = set.items.add(val, Value.nil(), true);
+                        }
+                        self.stack_top -= arg_count;
+                        return true;
+                    }
+                    if (class == self.bool_class or
+                        class == self.class_class or
+                        class == self.function_class or
+                        class == self.nil_class or
+                        class == self.number_class or
+                        class == self.range_class or
+                        class == self.string_class)
+                    {
+                        self.runtimeError("Cannot use an initializer on a primitive type.", .{});
+                        return false;
+                    }
+
+                    (self.stack_top - (arg_count + 1))[0] = Value.instance(ObjInstance.init(self, class.?));
+
+                    var initializer: Value = undefined;
+                    while (class) |cl| {
+                        if (cl.fields.get(self.init_string.?, &initializer)) {
+                            return self.call(initializer.asClosure(), arg_count + 1, false);
+                        }
+                        class = cl.super;
+                    }
+
                     if (arg_count != 0) {
                         self.runtimeError("Expected 0 arguments but got {d}.", .{arg_count});
                         return false;
                     }
-                    const map = ObjMap.init(self);
-                    (self.stack_top - 1)[0] = Value.map(map);
+
                     return true;
-                }
-                if (class == self.set_class) {
-                    const set = ObjSet.init(self);
-                    (self.stack_top - (arg_count + 1))[0] = Value.set(set);
-                    for ((self.stack_top - arg_count)[0..arg_count]) |val| {
-                        _ = set.items.add(val, Value.nil(), true);
+                },
+                .closure => return self.call(obj.asClosure(), arg_count, true),
+                .native => {
+                    self.has_native_error = false;
+                    const native = obj.asNative().function;
+                    const result = native(self, (self.stack_top - arg_count)[0..arg_count]);
+                    self.stack_top -= arg_count + 1;
+                    self.push(result);
+                    if (self.has_native_error) {
+                        self.runtimeError("{s}", .{result.asString().chars});
+                        return false;
                     }
-                    self.stack_top -= arg_count;
                     return true;
-                }
-                if (class == self.bool_class or
-                    class == self.class_class or
-                    class == self.function_class or
-                    class == self.nil_class or
-                    class == self.number_class or
-                    class == self.range_class or
-                    class == self.string_class)
-                {
-                    self.runtimeError("Cannot use an initializer on a primitive type.", .{});
-                    return false;
-                }
-
-                (self.stack_top - (arg_count + 1))[0] = Value.instance(ObjInstance.init(self, class.?));
-
-                var initializer: Value = undefined;
-                while (class) |cl| {
-                    if (cl.fields.get(self.init_string.?, &initializer)) {
-                        return self.call(initializer.asClosure(), arg_count + 1, false);
-                    }
-                    class = cl.super;
-                }
-
-                if (arg_count != 0) {
-                    self.runtimeError("Expected 0 arguments but got {d}.", .{arg_count});
-                    return false;
-                }
-
-                return true;
-            },
-            .closure => return self.call(callee.asClosure(), arg_count, true),
-            .native => {
-                self.has_native_error = false;
-                const native = callee.asNative().function;
-                const result = native(self, (self.stack_top - arg_count)[0..arg_count]);
-                self.stack_top -= arg_count + 1;
-                self.push(result);
-                if (self.has_native_error) {
-                    self.runtimeError("{s}", .{result.asString().chars});
-                    return false;
-                }
-                return true;
-            },
-            else => {},
+                },
+                else => {},
+            }
         }
         self.runtimeError("Can only call functions and classes.", .{});
         return false;
@@ -346,7 +350,7 @@ pub const Vm = struct {
     fn invoke(self: *Vm, name: *ObjString, arg_count: u29) bool {
         const receiver = self.peek(arg_count);
 
-        if (receiver.is(.instance)) {
+        if (receiver.isObj(.instance)) {
             const instance = receiver.asInstance();
 
             var value: Value = undefined;
@@ -368,7 +372,7 @@ pub const Vm = struct {
             return false;
         } else if (receiver.hasStdClass()) {
             const std_class = receiver.stdClass(self);
-            var class: ?*ObjClass = if (receiver.is(.class)) receiver.asClass() else std_class;
+            var class: ?*ObjClass = if (receiver.isObj(.class)) receiver.asClass() else std_class;
 
             // type
             if (name == self.type_string) {
@@ -477,16 +481,16 @@ pub const Vm = struct {
         const b = self.pop();
         const a = self.pop();
 
-        if (!b.is(.class)) {
+        if (!b.isObj(.class)) {
             self.runtimeError("Right operand of 'is' must be a class.", .{});
             return false;
         }
 
         const target = b.asClass();
         var class: ?*ObjClass = null;
-        if (a.is(.instance)) {
+        if (a.isObj(.instance)) {
             class = a.asInstance().type;
-        } else if (a.is(.class)) {
+        } else if (a.isObj(.class)) {
             class = a.asClass();
             // myClass is std.class
             if (target == self.class_class) {
@@ -531,15 +535,16 @@ pub const Vm = struct {
     }
 
     fn defineOnValue(self: *Vm, object: Value, key: Value, value: Value, constant: bool) bool {
-        return switch (object.getType()) {
-            .class => defineOnStringMap(self, &object.asClass().fields, key, value, constant),
-            .instance => defineOnStringMap(self, &object.asInstance().fields, key, value, constant),
-            .map => defineOnMap(self, object.asMap(), key, value, constant),
-            else => {
-                self.runtimeError("Only classes, instances, and maps have properties.", .{});
-                return false;
-            },
-        };
+        if (object.is(.object)) {
+            switch (object.asObject().type) {
+                .class => return defineOnStringMap(self, &object.asClass().fields, key, value, constant),
+                .instance => return defineOnStringMap(self, &object.asInstance().fields, key, value, constant),
+                .map => return defineOnMap(self, object.asMap(), key, value, constant),
+                else => {},
+            }
+        }
+        self.runtimeError("Only classes, instances, and maps have properties.", .{});
+        return false;
     }
 
     fn defineOnMap(self: *Vm, map: *ObjMap, key: Value, value: Value, constant: bool) bool {
@@ -551,7 +556,7 @@ pub const Vm = struct {
     }
 
     fn defineOnStringMap(self: *Vm, str_map: *StringMap, key: Value, value: Value, constant: bool) bool {
-        if (!key.is(.string)) {
+        if (!key.isObj(.string)) {
             self.runtimeError("Key must be a string.", .{});
             return false;
         }
@@ -566,116 +571,113 @@ pub const Vm = struct {
     }
 
     fn getOnValue(self: *Vm, object: Value, key: Value, pop_count: usize) bool {
-        return switch (object.getType()) {
-            .list => getOnList(self, object.asList(), key, pop_count),
-            .map => getOnMap(self, object.asMap(), key, pop_count),
-            .set => getOnSet(self, object.asSet(), key, pop_count),
-            .string => getOnString(self, object.asString(), key, pop_count),
-            else => {
-                // class/instance
-                if (!key.is(.string)) {
-                    self.runtimeError("Class and instance keys must be a string.", .{});
-                    return false;
-                }
+        if (object.is(.object)) {
+            switch (object.asObject().type) {
+                .list => return getOnList(self, object.asList(), key, pop_count),
+                .map => return getOnMap(self, object.asMap(), key, pop_count),
+                .set => return getOnSet(self, object.asSet(), key, pop_count),
+                .string => return getOnString(self, object.asString(), key, pop_count),
+                else => {},
+            }
+        }
 
-                const key_str = key.asString();
+        // class/instance
+        if (!key.isObj(.string)) {
+            self.runtimeError("Class and instance keys must be a string.", .{});
+            return false;
+        }
 
-                var class: ?*ObjClass = null;
-                if (object.is(.instance)) {
-                    const instance = object.asInstance();
-                    var value: Value = undefined;
-                    if (instance.fields.get(key_str, &value)) {
-                        self.stack_top -= pop_count;
-                        self.push(value);
-                        return true;
-                    }
-                    class = instance.type;
-                } else if (object.hasStdClass()) {
-                    const std_class = object.stdClass(self);
-                    class = if (object.is(.class)) object.asClass() else std_class;
+        const key_str = key.asString();
 
-                    // type
-                    if (key_str == self.type_string) {
-                        self.stack_top -= pop_count;
-                        self.push(Value.class(std_class));
-                        return true;
-                    }
-                } else {
-                    self.runtimeError("Only classes and instances have properties.", .{});
-                    return false;
-                }
+        var class: ?*ObjClass = null;
+        if (object.isObj(.instance)) {
+            const instance = object.asInstance();
+            var value: Value = undefined;
+            if (instance.fields.get(key_str, &value)) {
+                self.stack_top -= pop_count;
+                self.push(value);
+                return true;
+            }
+            class = instance.type;
+        } else if (object.hasStdClass()) {
+            const std_class = object.stdClass(self);
+            class = if (object.isObj(.class)) object.asClass() else std_class;
 
-                while (class) |cl| {
-                    var value: Value = undefined;
-                    if (cl.fields.get(key_str, &value)) {
-                        self.stack_top -= pop_count;
-                        self.push(value);
-                        return true;
-                    }
-                    class = cl.super;
-                }
+            // type
+            if (key_str == self.type_string) {
+                self.stack_top -= pop_count;
+                self.push(Value.class(std_class));
+                return true;
+            }
+        } else {
+            self.runtimeError("Only classes and instances have properties.", .{});
+            return false;
+        }
 
-                self.runtimeError("Undefined property '{s}'.", .{key_str.chars});
-                return false;
-            },
-        };
+        while (class) |cl| {
+            var value: Value = undefined;
+            if (cl.fields.get(key_str, &value)) {
+                self.stack_top -= pop_count;
+                self.push(value);
+                return true;
+            }
+            class = cl.super;
+        }
+
+        self.runtimeError("Undefined property '{s}'.", .{key_str.chars});
+        return false;
     }
 
     fn getOnList(self: *Vm, list: *ObjList, key: Value, pop_count: usize) bool {
-        return switch (key.getType()) {
-            .number => {
-                const index = @floatToInt(isize, key.asNumber());
-                if (index < 0 or index >= list.items.items.len) {
-                    self.runtimeError("Index {d} is out of bounds (0-{d}).", .{ index, list.items.items.len - 1 });
-                    return false;
-                }
-                self.stack_top -= pop_count;
-                self.push(list.items.items[@intCast(usize, index)]);
-                return true;
-            },
-            .range => {
-                const range = key.asRange();
-                if (range.start.is(.number) and range.step == 1) {
-                    const start = @floatToInt(isize, range.start.asNumber());
-                    var end = @floatToInt(isize, range.end.asNumber());
-                    if (range.inclusive) end += 1;
-
-                    if (start < 0 or start > list.items.items.len) {
-                        self.runtimeError("Start {d} is out of bounds (0-{d}).", .{ start, list.items.items.len });
-                        return false;
-                    }
-                    if (end < 0 or end > list.items.items.len) {
-                        self.runtimeError("End {d} is out of bounds (0-{d}).", .{ end, list.items.items.len });
-                        return false;
-                    }
-                    if (end < start) {
-                        self.runtimeError("End {d} is before start {d}.", .{ end, start });
-                        return false;
-                    }
-
-                    const ustart = @intCast(usize, start);
-                    const uend = @intCast(usize, end);
-
-                    const new_list = ObjList.init(self);
-                    self.push(Value.list(new_list));
-                    new_list.items.appendSlice(list.items.items[ustart..uend]) catch {
-                        std.debug.print("Could not allocate memory for list.", .{});
-                        std.process.exit(1);
-                    };
-
-                    self.stack_top -= (pop_count + 1);
-                    self.push(Value.list(new_list));
-                    return true;
-                } else {
-                    self.runtimeError("Only numeric ranges with a step of 1 can be used to index a list.", .{});
-                    return false;
-                }
-            },
-            else => {
-                self.runtimeError("Only numbers and ranges can be used to index a list.", .{});
+        if (key.is(.number)) {
+            const index = @floatToInt(isize, key.asNumber());
+            if (index < 0 or index >= list.items.items.len) {
+                self.runtimeError("Index {d} is out of bounds (0-{d}).", .{ index, list.items.items.len - 1 });
                 return false;
-            },
-        };
+            }
+            self.stack_top -= pop_count;
+            self.push(list.items.items[@intCast(usize, index)]);
+            return true;
+        }
+        if (key.isObj(.range)) {
+            const range = key.asRange();
+            if (range.start.is(.number) and range.step == 1) {
+                const start = @floatToInt(isize, range.start.asNumber());
+                var end = @floatToInt(isize, range.end.asNumber());
+                if (range.inclusive) end += 1;
+
+                if (start < 0 or start > list.items.items.len) {
+                    self.runtimeError("Start {d} is out of bounds (0-{d}).", .{ start, list.items.items.len });
+                    return false;
+                }
+                if (end < 0 or end > list.items.items.len) {
+                    self.runtimeError("End {d} is out of bounds (0-{d}).", .{ end, list.items.items.len });
+                    return false;
+                }
+                if (end < start) {
+                    self.runtimeError("End {d} is before start {d}.", .{ end, start });
+                    return false;
+                }
+
+                const ustart = @intCast(usize, start);
+                const uend = @intCast(usize, end);
+
+                const new_list = ObjList.init(self);
+                self.push(Value.list(new_list));
+                new_list.items.appendSlice(list.items.items[ustart..uend]) catch {
+                    std.debug.print("Could not allocate memory for list.", .{});
+                    std.process.exit(1);
+                };
+
+                self.stack_top -= (pop_count + 1);
+                self.push(Value.list(new_list));
+                return true;
+            }
+            self.runtimeError("Only numeric ranges with a step of 1 can be used to index a list.", .{});
+            return false;
+        }
+        self.runtimeError("Only numbers and ranges can be used to index a list.", .{});
+        return false;
     }
 
     fn getOnMap(self: *Vm, map: *ObjMap, key: Value, pop_count: usize) bool {
@@ -698,107 +700,104 @@ pub const Vm = struct {
     }
 
     fn getOnString(self: *Vm, string: *ObjString, key: Value, pop_count: usize) bool {
-        return switch (key.getType()) {
-            .number => {
-                const index = @floatToInt(isize, key.asNumber());
+        if (key.is(.number)) {
+            const index = @floatToInt(isize, key.asNumber());
 
-                if (index < 0 or index >= string.chars.len) {
-                    self.runtimeError("Index {d} is out of bounds (0-{d}).", .{ index, string.chars.len - 1 });
+            if (index < 0 or index >= string.chars.len) {
+                self.runtimeError("Index {d} is out of bounds (0-{d}).", .{ index, string.chars.len - 1 });
+                return false;
+            }
+
+            self.stack_top -= pop_count;
+            const uindex = @intCast(usize, index);
+            self.push(Value.string(ObjString.copy(self, string.chars[uindex .. uindex + 1])));
+            return true;
+        }
+        if (key.isObj(.range)) {
+            const range = key.asRange();
+            if (range.start.is(.number) and range.step == 1) {
+                const start = @floatToInt(isize, range.start.asNumber());
+                var end = @floatToInt(isize, range.end.asNumber());
+                if (range.inclusive) end += 1;
+
+                if (start < 0 or start > string.chars.len) {
+                    self.runtimeError("Start {d} is out of bounds (0-{d}).", .{ start, string.chars.len });
                     return false;
                 }
+                if (end < 0 or end > string.chars.len) {
+                    self.runtimeError("End {d} is out of bounds (0-{d}).", .{ end, string.chars.len });
+                    return false;
+                }
+                if (end < start) {
+                    self.runtimeError("End {d} is before start {d}.", .{ end, start });
+                    return false;
+                }
+
+                const ustart = @intCast(usize, start);
+                const uend = @intCast(usize, end);
 
                 self.stack_top -= pop_count;
-                const uindex = @intCast(usize, index);
-                self.push(Value.string(ObjString.copy(self, string.chars[uindex .. uindex + 1])));
+                self.push(Value.string(ObjString.copy(self, string.chars[ustart..uend])));
                 return true;
-            },
-            .range => {
-                const range = key.asRange();
-                if (range.start.is(.number) and range.step == 1) {
-                    const start = @floatToInt(isize, range.start.asNumber());
-                    var end = @floatToInt(isize, range.end.asNumber());
-                    if (range.inclusive) end += 1;
-
-                    if (start < 0 or start > string.chars.len) {
-                        self.runtimeError("Start {d} is out of bounds (0-{d}).", .{ start, string.chars.len });
-                        return false;
-                    }
-                    if (end < 0 or end > string.chars.len) {
-                        self.runtimeError("End {d} is out of bounds (0-{d}).", .{ end, string.chars.len });
-                        return false;
-                    }
-                    if (end < start) {
-                        self.runtimeError("End {d} is before start {d}.", .{ end, start });
-                        return false;
-                    }
-
-                    const ustart = @intCast(usize, start);
-                    const uend = @intCast(usize, end);
-
-                    self.stack_top -= pop_count;
-                    self.push(Value.string(ObjString.copy(self, string.chars[ustart..uend])));
-                    return true;
-                } else {
-                    self.runtimeError("Only numeric ranges with a step of 1 can be used to index a string.", .{});
-                    return false;
-                }
-            },
-            else => {
-                self.runtimeError("Only numbers and ranges can be used to index a string.", .{});
-                return false;
-            },
-        };
+            }
+            self.runtimeError("Only numeric ranges with a step of 1 can be used to index a string.", .{});
+            return false;
+        }
+        self.runtimeError("Only numbers and ranges can be used to index a string.", .{});
+        return false;
     }
 
     fn setOnValue(self: *Vm, object: Value, key: Value, value: Value) bool {
-        return switch (object.getType()) {
-            .list => setOnList(self, object.asList(), key, value),
-            .map => setOnMap(self, object.asMap(), key, value),
-            else => {
-                // class/instance
-                if (!key.is(.string)) {
-                    self.runtimeError("Class and instance keys must be a string.", .{});
-                    return false;
-                }
+        if (object.is(.object)) {
+            switch (object.asObject().type) {
+                .list => return setOnList(self, object.asList(), key, value),
+                .map => return setOnMap(self, object.asMap(), key, value),
+                else => {},
+            }
+        }
 
-                const key_str = key.asString();
+        // class/instance
+        if (!key.isObj(.string)) {
+            self.runtimeError("Class and instance keys must be a string.", .{});
+            return false;
+        }
 
-                var vc: *ValueContainer = undefined;
-                var found = false;
-                var class: ?*ObjClass = null;
-                if (object.is(.instance)) {
-                    const instance = object.asInstance();
-                    if (instance.fields.getPtr(key_str, &vc)) {
-                        found = true;
-                    }
-                    class = instance.type;
-                } else if (object.is(.class)) {
-                    class = object.asClass();
-                } else {
-                    self.runtimeError("Only classes and instances have properties.", .{});
-                    return false;
-                }
+        const key_str = key.asString();
 
-                while (!found and class != null) {
-                    if (class.?.fields.getPtr(key_str, &vc)) {
-                        found = true;
-                    }
-                    class = class.?.super;
-                }
+        var vc: *ValueContainer = undefined;
+        var found = false;
+        var class: ?*ObjClass = null;
+        if (object.isObj(.instance)) {
+            const instance = object.asInstance();
+            if (instance.fields.getPtr(key_str, &vc)) {
+                found = true;
+            }
+            class = instance.type;
+        } else if (object.isObj(.class)) {
+            class = object.asClass();
+        } else {
+            self.runtimeError("Only classes and instances have properties.", .{});
+            return false;
+        }
 
-                if (!found) {
-                    self.runtimeError("Undefined property '{s}'.", .{key_str.chars});
-                    return false;
-                }
-                if (vc.constant) {
-                    self.runtimeError("Property '{s}' is constant.", .{key_str.chars});
-                    return false;
-                }
+        while (!found and class != null) {
+            if (class.?.fields.getPtr(key_str, &vc)) {
+                found = true;
+            }
+            class = class.?.super;
+        }
 
-                vc.value = value;
-                return true;
-            },
-        };
+        if (!found) {
+            self.runtimeError("Undefined property '{s}'.", .{key_str.chars});
+            return false;
+        }
+        if (vc.constant) {
+            self.runtimeError("Property '{s}' is constant.", .{key_str.chars});
+            return false;
+        }
+
+        vc.value = value;
+        return true;
     }
 
     fn setOnList(self: *Vm, list: *ObjList, key: Value, value: Value) bool {
@@ -966,7 +965,7 @@ pub const Vm = struct {
                         const b = self.pop().asNumber();
                         const a = self.pop().asNumber();
                         self.push(Value.number(a + b));
-                    } else if (self.peek(0).is(.string) and self.peek(1).is(.string)) {
+                    } else if (self.peek(0).isObj(.string) and self.peek(1).isObj(.string)) {
                         self.concatenate();
                     } else {
                         self.runtimeError("Operands must both be numbers or strings.", .{});
@@ -1062,7 +1061,7 @@ pub const Vm = struct {
                 },
                 .class => {
                     var super: ?*ObjClass = null;
-                    if (self.peek(0).is(.class)) {
+                    if (self.peek(0).isObj(.class)) {
                         super = self.peek(0).asClass();
                         if (super == self.bool_class or
                             super == self.class_class or
@@ -1098,14 +1097,6 @@ pub const Vm = struct {
                     const index = self.peek(0).asNumber();
                     const uindex = @floatToInt(usize, index);
                     switch (obj.getType()) {
-                        .list => {
-                            const list = obj.asList();
-                            if (uindex < list.items.items.len) {
-                                self.push(list.items.items[uindex]);
-                            } else {
-                                frame.ip += offset;
-                            }
-                        },
                         .number => {
                             if (index < obj.asNumber()) {
                                 self.push(self.peek(0));
@@ -1113,34 +1104,48 @@ pub const Vm = struct {
                                 frame.ip += offset;
                             }
                         },
-                        .range => {
-                            const range = obj.asRange();
-                            if (range.start.is(.number)) {
-                                const val = range.start.asNumber() + index * range.step;
-                                const end = range.end.asNumber();
-                                if ((range.step > 0 and val < end) or (range.step < 0 and val > end) or (range.inclusive and val == end)) {
-                                    self.push(Value.number(val));
+                        .object => switch (obj.asObject().type) {
+                            .list => {
+                                const list = obj.asList();
+                                if (uindex < list.items.items.len) {
+                                    self.push(list.items.items[uindex]);
                                 } else {
                                     frame.ip += offset;
                                 }
-                            } else {
-                                const val = @intCast(u8, range.start.asString().chars[0] + @floatToInt(isize, index * range.step));
-                                const end = range.end.asString().chars[0];
-                                if ((range.step > 0 and val < end) or (range.step < 0 and val > end) or (range.inclusive and val == end)) {
-                                    const next_char = [_]u8{val};
-                                    self.push(Value.string(ObjString.copy(self, &next_char)));
+                            },
+                            .range => {
+                                const range = obj.asRange();
+                                if (range.start.is(.number)) {
+                                    const val = range.start.asNumber() + index * range.step;
+                                    const end = range.end.asNumber();
+                                    if ((range.step > 0 and val < end) or (range.step < 0 and val > end) or (range.inclusive and val == end)) {
+                                        self.push(Value.number(val));
+                                    } else {
+                                        frame.ip += offset;
+                                    }
+                                } else {
+                                    const val = @intCast(u8, range.start.asString().chars[0] + @floatToInt(isize, index * range.step));
+                                    const end = range.end.asString().chars[0];
+                                    if ((range.step > 0 and val < end) or (range.step < 0 and val > end) or (range.inclusive and val == end)) {
+                                        const next_char = [_]u8{val};
+                                        self.push(Value.string(ObjString.copy(self, &next_char)));
+                                    } else {
+                                        frame.ip += offset;
+                                    }
+                                }
+                            },
+                            .string => {
+                                const str = obj.asString();
+                                if (uindex < str.chars.len) {
+                                    self.push(Value.string(ObjString.copy(self, str.chars[uindex .. uindex + 1])));
                                 } else {
                                     frame.ip += offset;
                                 }
-                            }
-                        },
-                        .string => {
-                            const str = obj.asString();
-                            if (uindex < str.chars.len) {
-                                self.push(Value.string(ObjString.copy(self, str.chars[uindex .. uindex + 1])));
-                            } else {
-                                frame.ip += offset;
-                            }
+                            },
+                            else => {
+                                self.runtimeError("Only lists, numbers, ranges, and strings can be iterated on.", .{});
+                                return .runtime_error;
+                            },
                         },
                         else => {
                             self.runtimeError("Only lists, numbers, ranges, and strings can be iterated on.", .{});
@@ -1180,7 +1185,7 @@ pub const Vm = struct {
                     const end = self.peek(0);
                     const start = self.peek(1);
                     if ((start.is(.number) and end.is(.number)) or
-                        (start.is(.string) and end.is(.string) and start.asString().chars.len == 1 and end.asString().chars.len == 1))
+                        (start.isObj(.string) and end.isObj(.string) and start.asString().chars.len == 1 and end.asString().chars.len == 1))
                     {
                         const range = ObjRange.init(self, start, end, 1, op == .range_inclusive);
                         self.stack_top -= 2;
@@ -1195,7 +1200,7 @@ pub const Vm = struct {
                     const end = self.peek(1);
                     const start = self.peek(2);
                     if (((start.is(.number) and end.is(.number)) or
-                        (start.is(.string) and end.is(.string) and start.asString().chars.len == 1 and end.asString().chars.len == 1)) and step.is(.number))
+                        (start.isObj(.string) and end.isObj(.string) and start.asString().chars.len == 1 and end.asString().chars.len == 1)) and step.is(.number))
                     {
                         if (step.asNumber() == 0) {
                             self.runtimeError("Step cannot be 0.", .{});

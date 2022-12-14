@@ -203,10 +203,6 @@ compiled: *.whir
 * closures only for functions that need it?
 * generational gc
 * NaN boxing
-  * pointer as a single value type, with Obj containing type, marked, and ptr
-  * pointer as a single value type, using type punning
-    * packed structs
-    * extern structs
 
 ### Language Features
 

@@ -3,6 +3,7 @@ const Allocator = std.mem.Allocator;
 
 const Compiler = @import("compiler.zig").Compiler;
 const debug = @import("debug.zig");
+const Object = @import("object.zig").Object;
 const ObjString = @import("object.zig").ObjString;
 const Value = @import("value.zig").Value;
 const Vm = @import("vm.zig").Vm;
@@ -13,14 +14,14 @@ pub const GcAllocater = struct {
     vm: *Vm,
     bytes_allocated: usize,
     next_gc: usize,
-    gray_stack: std.ArrayList(Value),
+    gray_stack: std.ArrayList(*Object),
 
     pub fn init(vm: *Vm) GcAllocater {
         return .{
             .vm = vm,
             .bytes_allocated = 0,
             .next_gc = 1024 * 1024,
-            .gray_stack = std.ArrayList(Value).init(vm.parent_allocator),
+            .gray_stack = std.ArrayList(*Object).init(vm.parent_allocator),
         };
     }
 
@@ -103,12 +104,12 @@ pub const GcAllocater = struct {
 
         var i: usize = 0;
         while (i < vm.frame_count) : (i += 1) {
-            Value.closure(vm.frames[i].closure).mark(vm);
+            vm.frames[i].closure.obj.mark(vm);
         }
 
         var upvalue = vm.open_upvalues;
         while (upvalue) |up| {
-            Value.upvalue(up).mark(vm);
+            up.obj.mark(vm);
             upvalue = up.next;
         }
 
@@ -116,21 +117,21 @@ pub const GcAllocater = struct {
 
         Compiler.markRoots(vm);
 
-        if (vm.empty_string) |s| Value.string(s).mark(vm);
-        if (vm.init_string) |s| Value.string(s).mark(vm);
-        if (vm.type_string) |s| Value.string(s).mark(vm);
-        if (vm.super_string) |s| Value.string(s).mark(vm);
+        if (vm.empty_string) |s| s.obj.mark(vm);
+        if (vm.init_string) |s| s.obj.mark(vm);
+        if (vm.type_string) |s| s.obj.mark(vm);
+        if (vm.super_string) |s| s.obj.mark(vm);
 
-        if (vm.bool_class) |c| Value.class(c).mark(vm);
-        if (vm.class_class) |c| Value.class(c).mark(vm);
-        if (vm.function_class) |c| Value.class(c).mark(vm);
-        if (vm.list_class) |c| Value.class(c).mark(vm);
-        if (vm.map_class) |c| Value.class(c).mark(vm);
-        if (vm.nil_class) |c| Value.class(c).mark(vm);
-        if (vm.number_class) |c| Value.class(c).mark(vm);
-        if (vm.range_class) |c| Value.class(c).mark(vm);
-        if (vm.set_class) |c| Value.class(c).mark(vm);
-        if (vm.string_class) |c| Value.class(c).mark(vm);
+        if (vm.bool_class) |c| c.obj.mark(vm);
+        if (vm.class_class) |c| c.obj.mark(vm);
+        if (vm.function_class) |c| c.obj.mark(vm);
+        if (vm.list_class) |c| c.obj.mark(vm);
+        if (vm.map_class) |c| c.obj.mark(vm);
+        if (vm.nil_class) |c| c.obj.mark(vm);
+        if (vm.number_class) |c| c.obj.mark(vm);
+        if (vm.range_class) |c| c.obj.mark(vm);
+        if (vm.set_class) |c| c.obj.mark(vm);
+        if (vm.string_class) |c| c.obj.mark(vm);
     }
 
     fn traceReferences(vm: *Vm) void {
@@ -143,8 +144,8 @@ pub const GcAllocater = struct {
     fn sweep(vm: *Vm) void {
         var i: usize = 0;
         while (i < vm.objects.items.len) {
-            if (vm.objects.items[i].getMarked()) {
-                vm.objects.items[i].setMarked(false);
+            if (vm.objects.items[i].is_marked) {
+                vm.objects.items[i].is_marked = false;
                 i += 1;
             } else {
                 const unreached = vm.objects.swapRemove(i);
@@ -177,13 +178,13 @@ pub const GcAllocater = struct {
         }
     }
 
-    fn freeObject(vm: *Vm, object: Value) void {
+    fn freeObject(vm: *Vm, object: *Object) void {
         if (debug.log_gc) {
-            std.debug.print("free {any}: ", .{object.getType()});
+            std.debug.print("free {any}: ", .{object.type});
             object.print();
             std.debug.print("\n", .{});
         }
-        switch (object.getType()) {
+        switch (object.type) {
             .class => {
                 const class = object.asClass();
                 class.deinit();
@@ -227,7 +228,6 @@ pub const GcAllocater = struct {
                 vm.allocator.destroy(string);
             },
             .upvalue => vm.allocator.destroy(object.asUpvalue()),
-            else => unreachable,
         }
     }
 };

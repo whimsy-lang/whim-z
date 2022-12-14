@@ -1,6 +1,8 @@
 const std = @import("std");
 
 const debug = @import("debug.zig");
+const Object = @import("object.zig").Object;
+const ObjectType = @import("object.zig").ObjectType;
 const ObjClass = @import("object.zig").ObjClass;
 const ObjClosure = @import("object.zig").ObjClosure;
 const ObjFunction = @import("object.zig").ObjFunction;
@@ -21,43 +23,19 @@ pub const ValueContainer = struct {
 
 pub const ValueType = enum {
     empty,
-
     bool,
     nil,
     number,
-
-    class,
-    closure,
-    function,
-    instance,
-    list,
-    map,
-    native,
-    range,
-    set,
-    string,
-    upvalue,
+    object,
 };
 
 pub const Value = struct {
     as: union(ValueType) {
         empty: void,
-
         bool: bool,
         nil: void,
         number: f64,
-
-        class: *ObjClass,
-        closure: *ObjClosure,
-        function: *ObjFunction,
-        instance: *ObjInstance,
-        list: *ObjList,
-        map: *ObjMap,
-        native: *ObjNative,
-        range: *ObjRange,
-        set: *ObjSet,
-        string: *ObjString,
-        upvalue: *ObjUpvalue,
+        object: *Object,
     },
 
     pub fn getType(self: Value) ValueType {
@@ -69,11 +47,11 @@ pub const Value = struct {
     }
 
     pub fn class(value: *ObjClass) Value {
-        return .{ .as = .{ .class = value } };
+        return .{ .as = .{ .object = &value.obj } };
     }
 
     pub fn closure(value: *ObjClosure) Value {
-        return .{ .as = .{ .closure = value } };
+        return .{ .as = .{ .object = &value.obj } };
     }
 
     pub fn empty() Value {
@@ -81,23 +59,23 @@ pub const Value = struct {
     }
 
     pub fn function(value: *ObjFunction) Value {
-        return .{ .as = .{ .function = value } };
+        return .{ .as = .{ .object = &value.obj } };
     }
 
     pub fn instance(value: *ObjInstance) Value {
-        return .{ .as = .{ .instance = value } };
+        return .{ .as = .{ .object = &value.obj } };
     }
 
     pub fn list(value: *ObjList) Value {
-        return .{ .as = .{ .list = value } };
+        return .{ .as = .{ .object = &value.obj } };
     }
 
     pub fn map(value: *ObjMap) Value {
-        return .{ .as = .{ .map = value } };
+        return .{ .as = .{ .object = &value.obj } };
     }
 
     pub fn native(value: *ObjNative) Value {
-        return .{ .as = .{ .native = value } };
+        return .{ .as = .{ .object = &value.obj } };
     }
 
     pub fn nil() Value {
@@ -108,24 +86,32 @@ pub const Value = struct {
         return .{ .as = .{ .number = value } };
     }
 
+    pub fn object(value: *Object) Value {
+        return .{ .as = .{ .object = value } };
+    }
+
     pub fn range(value: *ObjRange) Value {
-        return .{ .as = .{ .range = value } };
+        return .{ .as = .{ .object = &value.obj } };
     }
 
     pub fn set(value: *ObjSet) Value {
-        return .{ .as = .{ .set = value } };
+        return .{ .as = .{ .object = &value.obj } };
     }
 
     pub fn string(value: *ObjString) Value {
-        return .{ .as = .{ .string = value } };
+        return .{ .as = .{ .object = &value.obj } };
     }
 
     pub fn upvalue(value: *ObjUpvalue) Value {
-        return .{ .as = .{ .upvalue = value } };
+        return .{ .as = .{ .object = &value.obj } };
     }
 
     pub fn is(self: Value, val_type: ValueType) bool {
         return self.getType() == val_type;
+    }
+
+    pub fn isObj(self: Value, obj_type: ObjectType) bool {
+        return self.is(.object) and self.asObject().is(obj_type);
     }
 
     pub fn asBool(self: Value) bool {
@@ -133,51 +119,55 @@ pub const Value = struct {
     }
 
     pub fn asClass(self: Value) *ObjClass {
-        return self.as.class;
+        return self.asObject().asClass();
     }
 
     pub fn asClosure(self: Value) *ObjClosure {
-        return self.as.closure;
+        return self.asObject().asClosure();
     }
 
     pub fn asFunction(self: Value) *ObjFunction {
-        return self.as.function;
+        return self.asObject().asFunction();
     }
 
     pub fn asInstance(self: Value) *ObjInstance {
-        return self.as.instance;
+        return self.asObject().asInstance();
     }
 
     pub fn asList(self: Value) *ObjList {
-        return self.as.list;
+        return self.asObject().asList();
     }
 
     pub fn asMap(self: Value) *ObjMap {
-        return self.as.map;
+        return self.asObject().asMap();
     }
 
     pub fn asNative(self: Value) *ObjNative {
-        return self.as.native;
+        return self.asObject().asNative();
     }
 
     pub fn asNumber(self: Value) f64 {
         return self.as.number;
     }
 
+    pub fn asObject(self: Value) *Object {
+        return self.as.object;
+    }
+
     pub fn asRange(self: Value) *ObjRange {
-        return self.as.range;
+        return self.asObject().asRange();
     }
 
     pub fn asSet(self: Value) *ObjSet {
-        return self.as.set;
+        return self.asObject().asSet();
     }
 
     pub fn asString(self: Value) *ObjString {
-        return self.as.string;
+        return self.asObject().asString();
     }
 
     pub fn asUpvalue(self: Value) *ObjUpvalue {
-        return self.as.upvalue;
+        return self.asObject().asUpvalue();
     }
 
     pub fn isFalsey(self: Value) bool {
@@ -188,28 +178,20 @@ pub const Value = struct {
         if (!self.is(other.getType())) return false;
         return switch (self.getType()) {
             .empty => true,
-
             .bool => self.asBool() == other.asBool(),
             .nil => true,
             .number => self.asNumber() == other.asNumber(),
-
-            .class => self.asClass() == other.asClass(),
-            .closure => self.asClosure() == other.asClosure(),
-            .function => self.asFunction() == other.asFunction(),
-            .instance => self.asInstance() == other.asInstance(),
-            .list => self.asList() == other.asList(),
-            .map => self.asMap() == other.asMap(),
-            .native => self.asNative() == other.asNative(),
-            .range => self.asRange() == other.asRange(),
-            .set => self.asSet() == other.asSet(),
-            .string => self.asString() == other.asString(),
-            .upvalue => self.asUpvalue() == other.asUpvalue(),
+            .object => self.asObject() == other.asObject(),
         };
     }
 
     pub fn hasStdClass(self: Value) bool {
         return switch (self.getType()) {
-            .empty, .instance, .upvalue => false,
+            .empty => false,
+            .object => switch (self.asObject().type) {
+                .instance, .upvalue => false,
+                else => true,
+            },
             else => true,
         };
     }
@@ -217,16 +199,18 @@ pub const Value = struct {
     pub fn stdClass(self: Value, vm: *Vm) *ObjClass {
         return switch (self.getType()) {
             .bool => vm.bool_class.?,
-            .class => vm.class_class.?,
-            .closure, .function, .native => vm.function_class.?,
-            .list => vm.list_class.?,
-            .map => vm.map_class.?,
             .nil => vm.nil_class.?,
             .number => vm.number_class.?,
-            .range => vm.range_class.?,
-            .set => vm.set_class.?,
-            .string => vm.string_class.?,
-
+            .object => switch (self.asObject().type) {
+                .class => vm.class_class.?,
+                .closure, .function, .native => vm.function_class.?,
+                .list => vm.list_class.?,
+                .map => vm.map_class.?,
+                .range => vm.range_class.?,
+                .set => vm.set_class.?,
+                .string => vm.string_class.?,
+                else => unreachable,
+            },
             else => unreachable,
         };
     }
@@ -234,205 +218,36 @@ pub const Value = struct {
     pub fn print(self: Value) void {
         switch (self.getType()) {
             .empty => std.debug.print("empty", .{}),
-
             .bool => std.debug.print("{s}", .{if (self.asBool()) "true" else "false"}),
             .nil => std.debug.print("nil", .{}),
             .number => std.debug.print("{d}", .{self.asNumber()}),
-
-            .class => if (self.asClass().name) |name| {
-                std.debug.print("class {s}", .{name.chars});
-            } else {
-                std.debug.print("anon class", .{});
-            },
-            .closure => self.asClosure().function.print(),
-            .function => self.asFunction().print(),
-            .instance => if (self.asInstance().type.name) |name| {
-                std.debug.print("{s} inst", .{name.chars});
-            } else {
-                std.debug.print("anon inst", .{});
-            },
-            .list => {
-                std.debug.print("(", .{});
-                var first = true;
-                for (self.asList().items.items) |item| {
-                    if (first) {
-                        first = false;
-                    } else {
-                        std.debug.print(", ", .{});
-                    }
-                    item.print();
-                }
-                std.debug.print(")", .{});
-            },
-            .map => {
-                std.debug.print("[", .{});
-                var first = true;
-                for (self.asMap().items.entries) |entry| {
-                    if (!entry.key.is(.empty)) {
-                        if (first) {
-                            first = false;
-                        } else {
-                            std.debug.print(", ", .{});
-                        }
-                        entry.key.print();
-                        std.debug.print(" {s} ", .{if (entry.value.constant) "::" else ":="});
-                        entry.value.value.print();
-                    }
-                }
-                std.debug.print("]", .{});
-            },
-            .native => std.debug.print("<native fn>", .{}),
-            .range => {
-                const r = self.asRange();
-                r.start.print();
-                std.debug.print("{s}", .{if (r.inclusive) "..=" else ".."});
-                r.end.print();
-                if (r.step != 1) std.debug.print(" by {d}", .{r.step});
-            },
-            .set => {
-                std.debug.print("[", .{});
-                var first = true;
-                for (self.asSet().items.entries) |entry| {
-                    if (!entry.key.is(.empty)) {
-                        if (first) {
-                            first = false;
-                        } else {
-                            std.debug.print(", ", .{});
-                        }
-                        entry.key.print();
-                    }
-                }
-                std.debug.print("]", .{});
-            },
-            .string => std.debug.print("{s}", .{self.asString().chars}),
-            .upvalue => std.debug.print("upvalue", .{}),
+            .object => self.asObject().print(),
         }
     }
 
     pub fn mark(self: Value, vm: *Vm) void {
-        if (self.getMarked()) return;
-
-        if (debug.log_gc) {
-            std.debug.print("mark {any}: ", .{self.getType()});
-            self.print();
-            std.debug.print("\n", .{});
-        }
-
-        self.setMarked(true);
-
-        // don't bother queueing up strings or native functions since they
-        // do not have references to check
-        if (self.is(.string) or self.is(.native)) return;
-
-        vm.gc.gray_stack.append(self) catch {
-            std.debug.print("Could not allocate memory for garbage collection.", .{});
-            std.process.exit(1);
-        };
-    }
-
-    fn markArray(arr: *std.ArrayList(Value), vm: *Vm) void {
-        for (arr.items) |val| val.mark(vm);
-    }
-
-    pub fn blacken(self: Value, vm: *Vm) void {
-        if (debug.log_gc) {
-            std.debug.print("blacken {any}: ", .{self.getType()});
-            self.print();
-            std.debug.print("\n", .{});
-        }
-
-        switch (self.getType()) {
-            .class => {
-                const cl = self.asClass();
-                if (cl.name) |name| Value.string(name).mark(vm);
-                if (cl.super) |super| Value.class(super).mark(vm);
-                cl.fields.mark(vm);
-            },
-            .closure => {
-                const clos = self.asClosure();
-                Value.function(clos.function).mark(vm);
-                for (clos.upvalues) |upval| {
-                    if (upval) |up| Value.upvalue(up).mark(vm);
-                }
-            },
-            .function => {
-                const func = self.asFunction();
-                if (func.name) |name| Value.string(name).mark(vm);
-                markArray(&func.chunk.constants, vm);
-            },
-            .instance => {
-                const inst = self.asInstance();
-                Value.class(inst.type).mark(vm);
-                inst.fields.mark(vm);
-            },
-            .list => markArray(&self.asList().items, vm),
-            .map => self.asMap().items.mark(vm),
-            .range => {
-                const r = self.asRange();
-                r.start.mark(vm);
-                r.end.mark(vm);
-            },
-            .set => self.asSet().items.mark(vm),
-            .upvalue => self.asUpvalue().closed.mark(vm),
-            else => unreachable,
-        }
-    }
-
-    pub fn getMarked(self: Value) bool {
-        return switch (self.getType()) {
-            .class => self.asClass().is_marked,
-            .closure => self.asClosure().is_marked,
-            .function => self.asFunction().is_marked,
-            .instance => self.asInstance().is_marked,
-            .list => self.asList().is_marked,
-            .map => self.asMap().is_marked,
-            .native => self.asNative().is_marked,
-            .range => self.asRange().is_marked,
-            .set => self.asSet().is_marked,
-            .string => self.asString().is_marked,
-            .upvalue => self.asUpvalue().is_marked,
-
-            else => true,
-        };
-    }
-
-    pub fn setMarked(self: Value, mark_val: bool) void {
-        switch (self.getType()) {
-            .class => self.asClass().is_marked = mark_val,
-            .closure => self.asClosure().is_marked = mark_val,
-            .function => self.asFunction().is_marked = mark_val,
-            .instance => self.asInstance().is_marked = mark_val,
-            .list => self.asList().is_marked = mark_val,
-            .map => self.asMap().is_marked = mark_val,
-            .native => self.asNative().is_marked = mark_val,
-            .range => self.asRange().is_marked = mark_val,
-            .set => self.asSet().is_marked = mark_val,
-            .string => self.asString().is_marked = mark_val,
-            .upvalue => self.asUpvalue().is_marked = mark_val,
-
-            else => unreachable,
-        }
+        if (self.is(.object)) self.asObject().mark(vm);
     }
 
     pub fn hash(self: Value) u32 {
         return switch (self.getType()) {
             .empty => unreachable,
-
             .bool => calcPtrHash(&self.asBool()),
             .nil => 0,
             .number => calcPtrHash(&self.asNumber()),
-
-            .class => calcPtrHash(&self.asClass()),
-            .closure => calcPtrHash(&self.asClosure()),
-            .function => calcPtrHash(&self.asFunction()),
-            .instance => calcPtrHash(&self.asInstance()),
-            .list => calcPtrHash(&self.asList()),
-            .map => calcPtrHash(&self.asMap()),
-            .native => calcPtrHash(&self.asNative()),
-            .range => calcPtrHash(&self.asRange()),
-            .set => calcPtrHash(&self.asSet()),
-            .string => self.asString().hash,
-            .upvalue => calcPtrHash(&self.asUpvalue()),
+            .object => switch (self.asObject().type) {
+                .class => calcPtrHash(&self.asClass()),
+                .closure => calcPtrHash(&self.asClosure()),
+                .function => calcPtrHash(&self.asFunction()),
+                .instance => calcPtrHash(&self.asInstance()),
+                .list => calcPtrHash(&self.asList()),
+                .map => calcPtrHash(&self.asMap()),
+                .native => calcPtrHash(&self.asNative()),
+                .range => calcPtrHash(&self.asRange()),
+                .set => calcPtrHash(&self.asSet()),
+                .string => self.asString().hash,
+                .upvalue => calcPtrHash(&self.asUpvalue()),
+            },
         };
     }
 
