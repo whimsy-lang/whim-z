@@ -202,7 +202,6 @@ compiled: *.whir
 * ip in a local and flag it as a register
 * closures only for functions that need it?
 * generational gc
-* NaN boxing
 
 ### Language Features
 

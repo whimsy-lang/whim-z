@@ -16,253 +16,252 @@ const ObjString = @import("object.zig").ObjString;
 const ObjUpvalue = @import("object.zig").ObjUpvalue;
 const Vm = @import("vm.zig").Vm;
 
+const quiet_nan: u64 = 0b01111111_11111100_00000000_00000000_00000000_00000000_00000000_00000000;
+const sign_bit: u64 = 0b10000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000;
+const obj_tag = sign_bit | quiet_nan;
+const empty_val = quiet_nan | 1;
+const nil_val = quiet_nan | 2;
+const true_val = quiet_nan | 3;
+const false_val = quiet_nan | 4;
+
 pub const ValueContainer = struct {
     value: Value,
     constant: bool = false,
 };
 
-pub const ValueType = enum {
-    empty,
-    bool,
-    nil,
-    number,
-    object,
-};
+pub const Value = u64;
 
-pub const Value = struct {
-    as: union(ValueType) {
-        empty: void,
-        bool: bool,
-        nil: void,
-        number: f64,
-        object: *Object,
-    },
+// initializers
 
-    pub fn getType(self: Value) ValueType {
-        return self.as;
-    }
+pub fn boolean(val: bool) Value {
+    return if (val) true_val else false_val;
+}
 
-    pub fn boolean(value: bool) Value {
-        return .{ .as = .{ .bool = value } };
-    }
+pub fn class(val: *ObjClass) Value {
+    return object(&val.obj);
+}
 
-    pub fn class(value: *ObjClass) Value {
-        return .{ .as = .{ .object = &value.obj } };
-    }
+pub fn closure(val: *ObjClosure) Value {
+    return object(&val.obj);
+}
 
-    pub fn closure(value: *ObjClosure) Value {
-        return .{ .as = .{ .object = &value.obj } };
-    }
+pub fn empty() Value {
+    return empty_val;
+}
 
-    pub fn empty() Value {
-        return .{ .as = .empty };
-    }
+pub fn function(val: *ObjFunction) Value {
+    return object(&val.obj);
+}
 
-    pub fn function(value: *ObjFunction) Value {
-        return .{ .as = .{ .object = &value.obj } };
-    }
+pub fn instance(val: *ObjInstance) Value {
+    return object(&val.obj);
+}
 
-    pub fn instance(value: *ObjInstance) Value {
-        return .{ .as = .{ .object = &value.obj } };
-    }
+pub fn list(val: *ObjList) Value {
+    return object(&val.obj);
+}
 
-    pub fn list(value: *ObjList) Value {
-        return .{ .as = .{ .object = &value.obj } };
-    }
+pub fn map(val: *ObjMap) Value {
+    return object(&val.obj);
+}
 
-    pub fn map(value: *ObjMap) Value {
-        return .{ .as = .{ .object = &value.obj } };
-    }
+pub fn native(val: *ObjNative) Value {
+    return object(&val.obj);
+}
 
-    pub fn native(value: *ObjNative) Value {
-        return .{ .as = .{ .object = &value.obj } };
-    }
+pub fn nil() Value {
+    return nil_val;
+}
 
-    pub fn nil() Value {
-        return .{ .as = .nil };
-    }
+pub fn number(val: f64) Value {
+    return @ptrCast(*const u64, &val).*;
+}
 
-    pub fn number(value: f64) Value {
-        return .{ .as = .{ .number = value } };
-    }
+pub fn object(val: *Object) Value {
+    return obj_tag | @ptrCast(*const u64, &val).*;
+}
 
-    pub fn object(value: *Object) Value {
-        return .{ .as = .{ .object = value } };
-    }
+pub fn range(val: *ObjRange) Value {
+    return object(&val.obj);
+}
 
-    pub fn range(value: *ObjRange) Value {
-        return .{ .as = .{ .object = &value.obj } };
-    }
+pub fn set(val: *ObjSet) Value {
+    return object(&val.obj);
+}
 
-    pub fn set(value: *ObjSet) Value {
-        return .{ .as = .{ .object = &value.obj } };
-    }
+pub fn string(val: *ObjString) Value {
+    return object(&val.obj);
+}
 
-    pub fn string(value: *ObjString) Value {
-        return .{ .as = .{ .object = &value.obj } };
-    }
+pub fn upvalue(val: *ObjUpvalue) Value {
+    return object(&val.obj);
+}
 
-    pub fn upvalue(value: *ObjUpvalue) Value {
-        return .{ .as = .{ .object = &value.obj } };
-    }
+// checks
 
-    pub fn is(self: Value, val_type: ValueType) bool {
-        return self.getType() == val_type;
-    }
+pub fn isBool(val: Value) bool {
+    return val == true_val or val == false_val;
+}
 
-    pub fn isObj(self: Value, obj_type: ObjectType) bool {
-        return self.is(.object) and self.asObject().is(obj_type);
-    }
+pub fn isEmpty(val: Value) bool {
+    return val == empty_val;
+}
 
-    pub fn asBool(self: Value) bool {
-        return self.as.bool;
-    }
+pub fn isNil(val: Value) bool {
+    return val == nil_val;
+}
 
-    pub fn asClass(self: Value) *ObjClass {
-        return self.asObject().asClass();
-    }
+pub fn isNumber(val: Value) bool {
+    return (val & quiet_nan) != quiet_nan;
+}
 
-    pub fn asClosure(self: Value) *ObjClosure {
-        return self.asObject().asClosure();
-    }
+pub fn isObject(val: Value) bool {
+    return (val & obj_tag) == obj_tag;
+}
 
-    pub fn asFunction(self: Value) *ObjFunction {
-        return self.asObject().asFunction();
-    }
+pub fn isObjType(val: Value, obj_type: ObjectType) bool {
+    return isObject(val) and asObject(val).type == obj_type;
+}
 
-    pub fn asInstance(self: Value) *ObjInstance {
-        return self.asObject().asInstance();
-    }
+// casts
 
-    pub fn asList(self: Value) *ObjList {
-        return self.asObject().asList();
-    }
+pub fn asBool(val: Value) bool {
+    return val == true_val;
+}
 
-    pub fn asMap(self: Value) *ObjMap {
-        return self.asObject().asMap();
-    }
+pub fn asClass(val: Value) *ObjClass {
+    return asObject(val).asClass();
+}
 
-    pub fn asNative(self: Value) *ObjNative {
-        return self.asObject().asNative();
-    }
+pub fn asClosure(val: Value) *ObjClosure {
+    return asObject(val).asClosure();
+}
 
-    pub fn asNumber(self: Value) f64 {
-        return self.as.number;
-    }
+pub fn asFunction(val: Value) *ObjFunction {
+    return asObject(val).asFunction();
+}
 
-    pub fn asObject(self: Value) *Object {
-        return self.as.object;
-    }
+pub fn asInstance(val: Value) *ObjInstance {
+    return asObject(val).asInstance();
+}
 
-    pub fn asRange(self: Value) *ObjRange {
-        return self.asObject().asRange();
-    }
+pub fn asList(val: Value) *ObjList {
+    return asObject(val).asList();
+}
 
-    pub fn asSet(self: Value) *ObjSet {
-        return self.asObject().asSet();
-    }
+pub fn asMap(val: Value) *ObjMap {
+    return asObject(val).asMap();
+}
 
-    pub fn asString(self: Value) *ObjString {
-        return self.asObject().asString();
-    }
+pub fn asNative(val: Value) *ObjNative {
+    return asObject(val).asNative();
+}
 
-    pub fn asUpvalue(self: Value) *ObjUpvalue {
-        return self.asObject().asUpvalue();
-    }
+pub fn asNumber(val: Value) f64 {
+    return @ptrCast(*const f64, &val).*;
+}
 
-    pub fn isFalsey(self: Value) bool {
-        return self.is(.nil) or (self.is(.bool) and !self.asBool());
-    }
+pub fn asObject(val: Value) *Object {
+    const addr = val & ~(obj_tag);
+    return @ptrCast(*const *Object, &addr).*;
+}
 
-    pub fn equal(self: Value, other: Value) bool {
-        if (!self.is(other.getType())) return false;
-        return switch (self.getType()) {
-            .empty => true,
-            .bool => self.asBool() == other.asBool(),
-            .nil => true,
-            .number => self.asNumber() == other.asNumber(),
-            .object => self.asObject() == other.asObject(),
-        };
-    }
+pub fn asRange(val: Value) *ObjRange {
+    return asObject(val).asRange();
+}
 
-    pub fn hasStdClass(self: Value) bool {
-        return switch (self.getType()) {
-            .empty => false,
-            .object => switch (self.asObject().type) {
-                .instance, .upvalue => false,
-                else => true,
-            },
+pub fn asSet(val: Value) *ObjSet {
+    return asObject(val).asSet();
+}
+
+pub fn asString(val: Value) *ObjString {
+    return asObject(val).asString();
+}
+
+pub fn asUpvalue(val: Value) *ObjUpvalue {
+    return asObject(val).asUpvalue();
+}
+
+pub fn isFalsey(val: Value) bool {
+    return val == nil_val or val == false_val;
+}
+
+pub fn hasStdClass(val: Value) bool {
+    if (isObject(val)) {
+        return switch (asObject(val).type) {
+            .instance, .upvalue => false,
             else => true,
         };
     }
+    return !isEmpty(val);
+}
 
-    pub fn stdClass(self: Value, vm: *Vm) *ObjClass {
-        return switch (self.getType()) {
-            .bool => vm.bool_class.?,
-            .nil => vm.nil_class.?,
-            .number => vm.number_class.?,
-            .object => switch (self.asObject().type) {
-                .class => vm.class_class.?,
-                .closure, .function, .native => vm.function_class.?,
-                .list => vm.list_class.?,
-                .map => vm.map_class.?,
-                .range => vm.range_class.?,
-                .set => vm.set_class.?,
-                .string => vm.string_class.?,
-                else => unreachable,
-            },
-            else => unreachable,
-        };
-    }
+pub fn stdClass(val: Value, vm: *Vm) *ObjClass {
+    if (isBool(val)) return vm.bool_class.?;
+    if (isNil(val)) return vm.nil_class.?;
+    if (isNumber(val)) return vm.number_class.?;
+    if (isObject(val)) return switch (asObject(val).type) {
+        .class => vm.class_class.?,
+        .closure, .function, .native => vm.function_class.?,
+        .list => vm.list_class.?,
+        .map => vm.map_class.?,
+        .range => vm.range_class.?,
+        .set => vm.set_class.?,
+        .string => vm.string_class.?,
+        else => unreachable,
+    };
+    unreachable;
+}
 
-    pub fn print(self: Value) void {
-        switch (self.getType()) {
-            .empty => std.debug.print("empty", .{}),
-            .bool => std.debug.print("{s}", .{if (self.asBool()) "true" else "false"}),
-            .nil => std.debug.print("nil", .{}),
-            .number => std.debug.print("{d}", .{self.asNumber()}),
-            .object => self.asObject().print(),
-        }
+pub fn print(val: Value) void {
+    if (isBool(val)) {
+        std.debug.print("{s}", .{if (asBool(val)) "true" else "false"});
+    } else if (isNil(val)) {
+        std.debug.print("nil", .{});
+    } else if (isNumber(val)) {
+        std.debug.print("{d}", .{asNumber(val)});
+    } else if (isObject(val)) {
+        asObject(val).print();
+    } else {
+        std.debug.print("empty", .{});
     }
+}
 
-    pub fn mark(self: Value, vm: *Vm) void {
-        if (self.is(.object)) self.asObject().mark(vm);
-    }
+pub fn mark(val: Value, vm: *Vm) void {
+    if (isObject(val)) asObject(val).mark(vm);
+}
 
-    pub fn hash(self: Value) u32 {
-        return switch (self.getType()) {
-            .empty => unreachable,
-            .bool => calcPtrHash(&self.asBool()),
-            .nil => 0,
-            .number => calcPtrHash(&self.asNumber()),
-            .object => switch (self.asObject().type) {
-                .class => calcPtrHash(&self.asClass()),
-                .closure => calcPtrHash(&self.asClosure()),
-                .function => calcPtrHash(&self.asFunction()),
-                .instance => calcPtrHash(&self.asInstance()),
-                .list => calcPtrHash(&self.asList()),
-                .map => calcPtrHash(&self.asMap()),
-                .native => calcPtrHash(&self.asNative()),
-                .range => calcPtrHash(&self.asRange()),
-                .set => calcPtrHash(&self.asSet()),
-                .string => self.asString().hash,
-                .upvalue => calcPtrHash(&self.asUpvalue()),
-            },
-        };
-    }
+pub fn hash(val: Value) u32 {
+    if (isBool(val)) return calcPtrHash(&asBool(val));
+    if (isNil(val)) return 0;
+    if (isNumber(val)) return calcPtrHash(&asNumber(val));
+    if (isObject(val)) return switch (asObject(val).type) {
+        .class => calcPtrHash(&asClass(val)),
+        .closure => calcPtrHash(&asClosure(val)),
+        .function => calcPtrHash(&asFunction(val)),
+        .instance => calcPtrHash(&asInstance(val)),
+        .list => calcPtrHash(&asList(val)),
+        .map => calcPtrHash(&asMap(val)),
+        .native => calcPtrHash(&asNative(val)),
+        .range => calcPtrHash(&asRange(val)),
+        .set => calcPtrHash(&asSet(val)),
+        .string => asString(val).hash,
+        .upvalue => calcPtrHash(&asUpvalue(val)),
+    };
+    unreachable;
+}
 
-    fn calcPtrHash(ptr: anytype) u32 {
-        const bytes = std.mem.asBytes(ptr);
-        return calcHash(bytes);
-    }
+fn calcPtrHash(ptr: anytype) u32 {
+    const bytes = std.mem.asBytes(ptr);
+    return calcHash(bytes);
+}
 
-    pub fn calcHash(bytes: []const u8) u32 {
-        var result: u32 = 2166136261;
-        var i: usize = 0;
-        while (i < bytes.len) : (i += 1) {
-            result ^= bytes[i];
-            result *%= 16777619;
-        }
-        return result;
+pub fn calcHash(bytes: []const u8) u32 {
+    var result: u32 = 2166136261;
+    var i: usize = 0;
+    while (i < bytes.len) : (i += 1) {
+        result ^= bytes[i];
+        result *%= 16777619;
     }
-};
+    return result;
+}

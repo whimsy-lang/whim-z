@@ -8,7 +8,8 @@ const Token = @import("lexer.zig").Token;
 const TokenType = @import("lexer.zig").TokenType;
 const ObjFunction = @import("object.zig").ObjFunction;
 const ObjString = @import("object.zig").ObjString;
-const Value = @import("value.zig").Value;
+const value = @import("value.zig");
+const Value = value.Value;
 const Vm = @import("vm.zig").Vm;
 
 pub const Parser = struct {
@@ -215,8 +216,8 @@ pub const Compiler = struct {
         vm.emitOp(.return_);
     }
 
-    fn makeConstant(vm: *Vm, value: Value) u29 {
-        const constant = vm.currentChunk().getAddConstant(vm, value);
+    fn makeConstant(vm: *Vm, val: Value) u29 {
+        const constant = vm.currentChunk().getAddConstant(vm, val);
         if (constant > std.math.maxInt(u29)) {
             error_(vm, "Too many constants in one chunk.");
             return 0;
@@ -224,12 +225,12 @@ pub const Compiler = struct {
         return @intCast(u29, constant);
     }
 
-    fn emitConstant(vm: *Vm, value: Value) void {
-        vm.emitOpNum(.constant, makeConstant(vm, value));
+    fn emitConstant(vm: *Vm, val: Value) void {
+        vm.emitOpNum(.constant, makeConstant(vm, val));
     }
 
-    fn emitNumber(vm: *Vm, value: f64) void {
-        emitConstant(vm, Value.number(value));
+    fn emitNumber(vm: *Vm, val: f64) void {
+        emitConstant(vm, value.number(val));
     }
 
     fn parseNum(str: []const u8) f64 {
@@ -326,7 +327,7 @@ pub const Compiler = struct {
     }
 
     fn identifierConstant(vm: *Vm, name: *Token) u29 {
-        return makeConstant(vm, Value.string(ObjString.copy(vm, name.value)));
+        return makeConstant(vm, value.string(ObjString.copy(vm, name.value)));
     }
 
     fn addLocal(vm: *Vm, identifier: Token, constant: bool) void {
@@ -650,10 +651,10 @@ pub const Compiler = struct {
 
         vm.emitOp(.class);
         if (vm.compiler.?.encountered_identifier) |name| {
-            const name_const = makeConstant(vm, Value.string(ObjString.copy(vm, name)));
+            const name_const = makeConstant(vm, value.string(ObjString.copy(vm, name)));
             vm.emitNum(name_const);
         } else {
-            const name_const = makeConstant(vm, Value.string(vm.empty_string.?));
+            const name_const = makeConstant(vm, value.string(vm.empty_string.?));
             vm.emitNum(name_const);
         }
 
@@ -766,7 +767,7 @@ pub const Compiler = struct {
         block(vm, .fn_end, "Expect '/fn' after block.");
 
         const new_func = endCompiler(vm);
-        vm.emitOpNum(.closure, makeConstant(vm, Value.function(new_func)));
+        vm.emitOpNum(.closure, makeConstant(vm, value.function(new_func)));
 
         var i: usize = 0;
         while (i < new_func.upvalue_count) : (i += 1) {
@@ -916,8 +917,8 @@ pub const Compiler = struct {
 
     fn negate(vm: *Vm) void {
         if (match(vm, .number)) {
-            const value = parseNum(vm.parser.previous.value);
-            emitNumber(vm, -value);
+            const val = parseNum(vm.parser.previous.value);
+            emitNumber(vm, -val);
         } else {
             // compile the operand
             parsePrecedence(vm, .unary);
@@ -932,8 +933,8 @@ pub const Compiler = struct {
     }
 
     fn number(vm: *Vm) void {
-        const value = parseNum(vm.parser.previous.value);
-        emitNumber(vm, value);
+        const val = parseNum(vm.parser.previous.value);
+        emitNumber(vm, val);
     }
 
     fn orOp(vm: *Vm) void {
@@ -968,7 +969,7 @@ pub const Compiler = struct {
     }
 
     fn string(vm: *Vm) void {
-        emitConstant(vm, Value.string(ObjString.copyEscape(vm, vm.parser.previous.value)));
+        emitConstant(vm, value.string(ObjString.copyEscape(vm, vm.parser.previous.value)));
     }
 
     fn variablePrimary(vm: *Vm) bool {

@@ -5,7 +5,8 @@ const Compiler = @import("compiler.zig").Compiler;
 const debug = @import("debug.zig");
 const Object = @import("object.zig").Object;
 const ObjString = @import("object.zig").ObjString;
-const Value = @import("value.zig").Value;
+const value = @import("value.zig");
+const Value = value.Value;
 const Vm = @import("vm.zig").Vm;
 
 pub const GcAllocater = struct {
@@ -99,7 +100,7 @@ pub const GcAllocater = struct {
     fn markRoots(vm: *Vm) void {
         var slot: [*]Value = &vm.stack;
         while (@ptrToInt(slot) < @ptrToInt(vm.stack_top)) : (slot += 1) {
-            slot[0].mark(vm);
+            value.mark(slot[0], vm);
         }
 
         var i: usize = 0;

@@ -3,8 +3,9 @@ const Allocator = std.mem.Allocator;
 
 const GcAllocator = @import("memory.zig").GcAllocater;
 const ObjString = @import("object.zig").ObjString;
-const Value = @import("value.zig").Value;
-const ValueContainer = @import("value.zig").ValueContainer;
+const value = @import("value.zig");
+const Value = value.Value;
+const ValueContainer = value.ValueContainer;
 const Vm = @import("vm.zig").Vm;
 
 pub const Map = struct {
@@ -44,13 +45,13 @@ pub const Map = struct {
             std.process.exit(1);
         };
         for (entries) |*entry| {
-            entry.key = Value.empty();
-            entry.value = .{ .value = Value.empty() };
+            entry.key = value.empty();
+            entry.value = .{ .value = value.empty() };
         }
 
         self.count = 0;
         for (self.entries) |entry| {
-            if (entry.key.is(.empty)) continue;
+            if (value.isEmpty(entry.key)) continue;
 
             const dest = findEntry(entries, entry.key);
             dest.key = entry.key;
@@ -63,20 +64,20 @@ pub const Map = struct {
     }
 
     fn findEntry(entries: []Entry, key: Value) *Entry {
-        var index = key.hash() & (entries.len - 1);
+        var index = value.hash(key) & (entries.len - 1);
         var tombstone: ?*Entry = null;
 
         while (true) {
             const entry = &entries[index];
-            if (entry.key.is(.empty)) {
-                if (entry.value.value.is(.empty)) {
+            if (value.isEmpty(entry.key)) {
+                if (value.isEmpty(entry.value.value)) {
                     // empty entry
                     return if (tombstone != null) tombstone.? else entry;
                 } else {
                     // found a tombstone
                     if (tombstone == null) tombstone = entry;
                 }
-            } else if (entry.key.equal(key)) {
+            } else if (entry.key == key) {
                 // found the key
                 return entry;
             }
@@ -93,43 +94,43 @@ pub const Map = struct {
     }
 
     // adds an item if it doesn't already exist, and returns whether the add succeeded
-    pub fn add(self: *Map, key: Value, value: Value, constant: bool) bool {
+    pub fn add(self: *Map, key: Value, val: Value, constant: bool) bool {
         self.ensureCapacity();
 
         const entry = findEntry(self.entries, key);
-        const is_new_key = entry.key.is(.empty);
+        const is_new_key = value.isEmpty(entry.key);
         if (is_new_key) {
             // only increment if it's a new key and not a tombstone
-            if (entry.value.value.is(.empty)) self.count += 1;
+            if (value.isEmpty(entry.value.value)) self.count += 1;
             entry.key = key;
-            entry.value.value = value;
+            entry.value.value = val;
             entry.value.constant = constant;
         }
 
         return is_new_key;
     }
 
-    pub fn get(self: *Map, key: Value, value: *Value) bool {
+    pub fn get(self: *Map, key: Value, val: *Value) bool {
         if (self.count == 0) return false;
 
         const entry = findEntry(self.entries, key);
-        if (entry.key.is(.empty)) return false;
+        if (value.isEmpty(entry.key)) return false;
 
-        value.* = entry.value.value;
+        val.* = entry.value.value;
         return true;
     }
 
-    pub fn getPtr(self: *Map, key: Value, value: **ValueContainer) bool {
+    pub fn getPtr(self: *Map, key: Value, vc: **ValueContainer) bool {
         if (self.count == 0) return false;
 
         const entry = findEntry(self.entries, key);
-        if (entry.key.is(.empty)) return false;
+        if (value.isEmpty(entry.key)) return false;
 
-        value.* = &entry.value;
+        vc.* = &entry.value;
         return true;
     }
 
-    pub fn set(self: *Map, key: Value, value: Value) bool {
+    pub fn set(self: *Map, key: Value, val: Value) bool {
         self.ensureCapacity();
 
         const entry = findEntry(self.entries, key);
@@ -138,7 +139,7 @@ pub const Map = struct {
         if (is_new_key and entry.value.value.is(.empty)) self.count += 1;
 
         entry.key = key;
-        entry.value.value = value;
+        entry.value.value = val;
         return is_new_key;
     }
 
@@ -147,17 +148,17 @@ pub const Map = struct {
 
         // find the entry
         const entry = findEntry(self.entries, key);
-        if (entry.key.is(.empty)) return false;
+        if (value.isEmpty(entry.key)) return false;
 
         // tombstone
-        entry.key = Value.empty();
+        entry.key = value.empty();
         return true;
     }
 
     pub fn mark(self: *Map, vm: *Vm) void {
         for (self.entries) |entry| {
-            entry.key.mark(vm);
-            entry.value.value.mark(vm);
+            value.mark(entry.key, vm);
+            value.mark(entry.value.value, vm);
         }
     }
 };

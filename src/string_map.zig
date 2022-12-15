@@ -3,8 +3,9 @@ const Allocator = std.mem.Allocator;
 
 const GcAllocator = @import("memory.zig").GcAllocater;
 const ObjString = @import("object.zig").ObjString;
-const Value = @import("value.zig").Value;
-const ValueContainer = @import("value.zig").ValueContainer;
+const value = @import("value.zig");
+const Value = value.Value;
+const ValueContainer = value.ValueContainer;
 const Vm = @import("vm.zig").Vm;
 
 pub const StringMap = struct {
@@ -45,7 +46,7 @@ pub const StringMap = struct {
         };
         for (entries) |*entry| {
             entry.key = null;
-            entry.value = .{ .value = Value.empty() };
+            entry.value = .{ .value = value.empty() };
         }
 
         self.count = 0;
@@ -69,7 +70,7 @@ pub const StringMap = struct {
         while (true) {
             const entry = &entries[index];
             if (entry.key == null) {
-                if (entry.value.value.is(.empty)) {
+                if (value.isEmpty(entry.value.value)) {
                     // empty entry
                     return if (tombstone != null) tombstone.? else entry;
                 } else {
@@ -93,7 +94,7 @@ pub const StringMap = struct {
             const entry = &self.entries[index];
             if (entry.key == null) {
                 // stop if we find an empty non-tombstone entry
-                if (entry.value.value.is(.empty)) return null;
+                if (value.isEmpty(entry.value.value)) return null;
             } else if (entry.key.?.hash == hash and std.mem.eql(u8, entry.key.?.chars, chars)) {
                 // found string
                 return entry.key;
@@ -111,52 +112,52 @@ pub const StringMap = struct {
     }
 
     // adds an item if it doesn't already exist, and returns whether the add succeeded
-    pub fn add(self: *StringMap, key: *ObjString, value: Value, constant: bool) bool {
+    pub fn add(self: *StringMap, key: *ObjString, val: Value, constant: bool) bool {
         self.ensureCapacity();
 
         const entry = findEntry(self.entries, key);
         const is_new_key = entry.key == null;
         if (is_new_key) {
             // only increment if it's a new key and not a tombstone
-            if (entry.value.value.is(.empty)) self.count += 1;
+            if (value.isEmpty(entry.value.value)) self.count += 1;
             entry.key = key;
-            entry.value.value = value;
+            entry.value.value = val;
             entry.value.constant = constant;
         }
 
         return is_new_key;
     }
 
-    pub fn get(self: *StringMap, key: *ObjString, value: *Value) bool {
+    pub fn get(self: *StringMap, key: *ObjString, val: *Value) bool {
         if (self.count == 0) return false;
 
         const entry = findEntry(self.entries, key);
         if (entry.key == null) return false;
 
-        value.* = entry.value.value;
+        val.* = entry.value.value;
         return true;
     }
 
-    pub fn getPtr(self: *StringMap, key: *ObjString, value: **ValueContainer) bool {
+    pub fn getPtr(self: *StringMap, key: *ObjString, vc: **ValueContainer) bool {
         if (self.count == 0) return false;
 
         const entry = findEntry(self.entries, key);
         if (entry.key == null) return false;
 
-        value.* = &entry.value;
+        vc.* = &entry.value;
         return true;
     }
 
-    pub fn set(self: *StringMap, key: *ObjString, value: Value) bool {
+    pub fn set(self: *StringMap, key: *ObjString, val: Value) bool {
         self.ensureCapacity();
 
         const entry = findEntry(self.entries, key);
         const is_new_key = entry.key == null;
         // only increment if it's a new key and not a tombstone
-        if (is_new_key and entry.value.value.is(.empty)) self.count += 1;
+        if (is_new_key and value.isEmpty(entry.value.value)) self.count += 1;
 
         entry.key = key;
-        entry.value.value = value;
+        entry.value.value = val;
         return is_new_key;
     }
 
@@ -169,14 +170,14 @@ pub const StringMap = struct {
 
         // tombstone
         entry.key = null;
-        entry.value.value = Value.boolean(true);
+        entry.value.value = value.boolean(true);
         return true;
     }
 
     pub fn mark(self: *StringMap, vm: *Vm) void {
         for (self.entries) |entry| {
             if (entry.key) |key| key.obj.mark(vm);
-            entry.value.value.mark(vm);
+            value.mark(entry.value.value, vm);
         }
     }
 

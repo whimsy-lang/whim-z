@@ -5,7 +5,8 @@ const Chunk = @import("chunk.zig").Chunk;
 const debug = @import("debug.zig");
 const Map = @import("map.zig").Map;
 const StringMap = @import("string_map.zig").StringMap;
-const Value = @import("value.zig").Value;
+const value = @import("value.zig");
+const Value = value.Value;
 const Vm = @import("vm.zig").Vm;
 
 pub const ObjectType = enum {
@@ -97,7 +98,7 @@ pub const Object = struct {
                     } else {
                         std.debug.print(", ", .{});
                     }
-                    item.print();
+                    value.print(item);
                 }
                 std.debug.print(")", .{});
             },
@@ -105,15 +106,15 @@ pub const Object = struct {
                 std.debug.print("[", .{});
                 var first = true;
                 for (self.asMap().items.entries) |entry| {
-                    if (!entry.key.is(.empty)) {
+                    if (!value.isEmpty(entry.key)) {
                         if (first) {
                             first = false;
                         } else {
                             std.debug.print(", ", .{});
                         }
-                        entry.key.print();
+                        value.print(entry.key);
                         std.debug.print(" {s} ", .{if (entry.value.constant) "::" else ":="});
-                        entry.value.value.print();
+                        value.print(entry.value.value);
                     }
                 }
                 std.debug.print("]", .{});
@@ -121,22 +122,22 @@ pub const Object = struct {
             .native => std.debug.print("<native fn>", .{}),
             .range => {
                 const r = self.asRange();
-                r.start.print();
+                value.print(r.start);
                 std.debug.print("{s}", .{if (r.inclusive) "..=" else ".."});
-                r.end.print();
+                value.print(r.end);
                 if (r.step != 1) std.debug.print(" by {d}", .{r.step});
             },
             .set => {
                 std.debug.print("[", .{});
                 var first = true;
                 for (self.asSet().items.entries) |entry| {
-                    if (!entry.key.is(.empty)) {
+                    if (!value.isEmpty(entry.key)) {
                         if (first) {
                             first = false;
                         } else {
                             std.debug.print(", ", .{});
                         }
-                        entry.key.print();
+                        value.print(entry.key);
                     }
                 }
                 std.debug.print("]", .{});
@@ -168,7 +169,7 @@ pub const Object = struct {
     }
 
     fn markArray(arr: *std.ArrayList(Value), vm: *Vm) void {
-        for (arr.items) |val| val.mark(vm);
+        for (arr.items) |val| value.mark(val, vm);
     }
 
     pub fn blacken(self: *Object, vm: *Vm) void {
@@ -206,11 +207,11 @@ pub const Object = struct {
             .map => self.asMap().items.mark(vm),
             .range => {
                 const r = self.asRange();
-                r.start.mark(vm);
-                r.end.mark(vm);
+                value.mark(r.start, vm);
+                value.mark(r.end, vm);
             },
             .set => self.asSet().items.mark(vm),
-            .upvalue => self.asUpvalue().closed.mark(vm),
+            .upvalue => value.mark(self.asUpvalue().closed, vm),
             else => unreachable,
         }
     }
@@ -232,15 +233,15 @@ pub const ObjClass = struct {
         };
         vm.registerObject(&class.obj);
 
-        vm.push(Value.class(class));
+        vm.push(value.class(class));
 
         class.obj = .{ .type = .class };
 
         class.name = if (class_name != vm.empty_string) class_name else null;
         class.super = super_class;
         class.fields = StringMap.init(vm.allocator);
-        _ = class.fields.add(vm.super_string.?, if (super_class) |s| Value.class(s) else Value.nil(), true);
-        _ = class.fields.add(vm.type_string.?, Value.nil(), true);
+        _ = class.fields.add(vm.super_string.?, if (super_class) |s| value.class(s) else value.nil(), true);
+        _ = class.fields.add(vm.type_string.?, value.nil(), true);
 
         _ = vm.pop();
 
@@ -301,7 +302,7 @@ pub const ObjFunction = struct {
         };
         vm.registerObject(&function.obj);
 
-        vm.push(Value.function(function));
+        vm.push(value.function(function));
 
         function.obj = .{ .type = .function };
 
@@ -343,13 +344,13 @@ pub const ObjInstance = struct {
         };
         vm.registerObject(&instance.obj);
 
-        vm.push(Value.instance(instance));
+        vm.push(value.instance(instance));
 
         instance.obj = .{ .type = .instance };
 
         instance.type = class;
         instance.fields = StringMap.init(vm.allocator);
-        _ = instance.fields.add(vm.type_string.?, Value.class(class), true);
+        _ = instance.fields.add(vm.type_string.?, value.class(class), true);
 
         _ = vm.pop();
 
@@ -375,7 +376,7 @@ pub const ObjList = struct {
         };
         vm.registerObject(&list.obj);
 
-        vm.push(Value.list(list));
+        vm.push(value.list(list));
 
         list.obj = .{ .type = .list };
 
@@ -405,7 +406,7 @@ pub const ObjMap = struct {
         };
         vm.registerObject(&map.obj);
 
-        vm.push(Value.map(map));
+        vm.push(value.map(map));
 
         map.obj = .{ .type = .map };
 
@@ -485,7 +486,7 @@ pub const ObjSet = struct {
         };
         vm.registerObject(&set.obj);
 
-        vm.push(Value.set(set));
+        vm.push(value.set(set));
 
         set.obj = .{ .type = .set };
 
@@ -516,13 +517,13 @@ pub const ObjString = struct {
         };
         vm.registerObject(&string.obj);
 
-        vm.push(Value.string(string));
+        vm.push(value.string(string));
 
         string.obj = .{ .type = .string };
 
         string.chars = chars;
         string.hash = hash;
-        _ = vm.strings.set(string, Value.nil());
+        _ = vm.strings.set(string, value.nil());
 
         _ = vm.pop();
 
@@ -534,7 +535,7 @@ pub const ObjString = struct {
     }
 
     pub fn take(vm: *Vm, chars: []const u8) *ObjString {
-        const hash = Value.calcHash(chars);
+        const hash = value.calcHash(chars);
         const interned = vm.strings.findString(chars, hash);
         if (interned) |intr| {
             vm.allocator.free(chars);
@@ -545,7 +546,7 @@ pub const ObjString = struct {
     }
 
     pub fn copy(vm: *Vm, chars: []const u8) *ObjString {
-        const hash = Value.calcHash(chars);
+        const hash = value.calcHash(chars);
         const interned = vm.strings.findString(chars, hash);
         if (interned) |intr| return intr;
 
@@ -613,7 +614,7 @@ pub const ObjUpvalue = struct {
         upvalue.obj = .{ .type = .upvalue };
 
         upvalue.location = slot;
-        upvalue.closed = Value.nil();
+        upvalue.closed = value.nil();
         upvalue.next = null;
         return upvalue;
     }

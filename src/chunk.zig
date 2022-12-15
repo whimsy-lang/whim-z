@@ -132,13 +132,13 @@ pub const Chunk = struct {
         return vle.sumTo(self.lines.items, index);
     }
 
-    pub fn getAddConstant(self: *Chunk, vm: *Vm, value: Value) usize {
-        for (self.constants.items) |val, ind| {
-            if (value.equal(val)) return ind;
+    pub fn getAddConstant(self: *Chunk, vm: *Vm, val: Value) usize {
+        for (self.constants.items) |v, i| {
+            if (val == v) return i;
         }
 
-        vm.push(value);
-        self.constants.append(value) catch {
+        vm.push(val);
+        self.constants.append(val) catch {
             std.debug.print("Could not add constant to chunk.", .{});
             std.process.exit(1);
         };

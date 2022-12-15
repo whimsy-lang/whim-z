@@ -108,10 +108,10 @@ fn closureInstruction(name: []const u8, chunk: *Chunk, offset: usize) usize {
     const constant = vle.get(chunk.code.items.ptr + cur_offset);
     cur_offset += vle.valueLength(chunk.code.items.ptr + cur_offset);
     std.debug.print("{s: <20} {d:4} ", .{ name, constant });
-    chunk.constants.items[constant].print();
+    value.print(chunk.constants.items[constant]);
     std.debug.print("\n", .{});
 
-    const function = chunk.constants.items[constant].asFunction();
+    const function = value.asFunction(chunk.constants.items[constant]);
     var i: usize = 0;
     while (i < function.upvalue_count) : (i += 1) {
         const is_local = chunk.code.items[cur_offset];
@@ -127,7 +127,7 @@ fn closureInstruction(name: []const u8, chunk: *Chunk, offset: usize) usize {
 fn constantInstruction(name: []const u8, chunk: *Chunk, offset: usize) usize {
     const constant = vle.get(chunk.code.items.ptr + offset + 1);
     std.debug.print("{s: <20} {d:4} '", .{ name, constant });
-    chunk.constants.items[constant].print();
+    value.print(chunk.constants.items[constant]);
     std.debug.print("'\n", .{});
     return offset + vle.valueLength(chunk.code.items.ptr + offset + 1) + 1;
 }
@@ -139,7 +139,7 @@ fn invokeInstruction(name: []const u8, chunk: *Chunk, offset: usize) usize {
     const arg_count = vle.get(chunk.code.items.ptr + cur_offset);
     cur_offset += vle.valueLength(chunk.code.items.ptr + cur_offset);
     std.debug.print("{s: <20} {d:4} '", .{ name, constant });
-    chunk.constants.items[constant].print();
+    value.print(chunk.constants.items[constant]);
     std.debug.print("' ({d})\n", .{arg_count});
     return cur_offset;
 }
