@@ -202,5 +202,5 @@ fn n_std_string_length(vm: *Vm, values: []Value) Value {
     if (values.len != 1 or !value.isObjType(values[0], .string)) {
         return vm.nativeError("std.string.length takes a string", .{});
     }
-    return value.number(@intToFloat(f64, value.asString(values[0]).chars.len));
+    return value.number(@intToFloat(f64, value.asString(values[0]).length()));
 }

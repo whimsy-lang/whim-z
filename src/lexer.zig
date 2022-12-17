@@ -1,4 +1,5 @@
 const std = @import("std");
+const unicode = std.unicode;
 
 pub const TokenType = enum {
     // symbols
@@ -94,12 +95,36 @@ pub const Lexer = struct {
     }
 
     fn advance(self: *Lexer, count: usize) void {
-        self.current += count;
+        var i: usize = 0;
+        while (i < count and !self.isAtEnd()) : (i += 1) {
+            self.current += unicode.utf8ByteSequenceLength(self.source[self.current]) catch {
+                std.debug.print("Invalid character encoding.", .{});
+                std.process.exit(1);
+            };
+        }
         if (self.isAtEnd()) self.current = self.source.len;
     }
 
     fn peek(self: *Lexer, offset: usize) u21 {
-        return if ((self.current + offset) < self.source.len) self.source[self.current + offset] else 0;
+        var i: usize = 0;
+        var ind = self.current;
+        while (i < offset and ind < self.source.len) : (i += 1) {
+            ind += unicode.utf8ByteSequenceLength(self.source[ind]) catch {
+                std.debug.print("Invalid character encoding.", .{});
+                std.process.exit(1);
+            };
+        }
+        if (ind < self.source.len) {
+            const len = unicode.utf8ByteSequenceLength(self.source[ind]) catch {
+                std.debug.print("Invalid character encoding.", .{});
+                std.process.exit(1);
+            };
+            return unicode.utf8Decode(self.source[ind .. ind + len]) catch {
+                std.debug.print("Invalid character encoding.", .{});
+                std.process.exit(1);
+            };
+        }
+        return 0;
     }
 
     fn match(self: *Lexer, expected: u21) bool {
@@ -244,8 +269,8 @@ pub const Lexer = struct {
         while (check(self.peek(0))) self.advance(1);
 
         if (self.peek(0) == '.' and check(self.peek(1))) {
-            // accept the .
-            self.advance(1);
+            // accept the . and digit
+            self.advance(2);
 
             while (check(self.peek(0))) self.advance(1);
         }

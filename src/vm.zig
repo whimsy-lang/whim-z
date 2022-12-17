@@ -706,6 +706,7 @@ pub const Vm = struct {
         if (value.isNumber(key)) {
             const index = @floatToInt(isize, value.asNumber(key));
 
+            // TODO - unicode
             if (index < 0 or index >= string.chars.len) {
                 self.runtimeError("Index {d} is out of bounds (0-{d}).", .{ index, string.chars.len - 1 });
                 return false;
@@ -723,6 +724,7 @@ pub const Vm = struct {
                 var end = @floatToInt(isize, value.asNumber(range.end));
                 if (range.inclusive) end += 1;
 
+                // TODO - unicode
                 if (start < 0 or start > string.chars.len) {
                     self.runtimeError("Start {d} is out of bounds (0-{d}).", .{ start, string.chars.len });
                     return false;
@@ -1139,6 +1141,7 @@ pub const Vm = struct {
                                 }
                             },
                             .string => {
+                                // TODO - unicode
                                 const str = obj.asString();
                                 if (uindex < str.chars.len) {
                                     self.push(value.string(ObjString.copy(self, str.chars[uindex .. uindex + 1])));
@@ -1187,6 +1190,7 @@ pub const Vm = struct {
                 .range, .range_inclusive => {
                     const end = self.peek(0);
                     const start = self.peek(1);
+                    // TODO - unicode
                     if ((value.isNumber(start) and value.isNumber(end)) or
                         (value.isObjType(start, .string) and value.isObjType(end, .string) and value.asString(start).chars.len == 1 and value.asString(end).chars.len == 1))
                     {
@@ -1202,6 +1206,7 @@ pub const Vm = struct {
                     const step = self.peek(0);
                     const end = self.peek(1);
                     const start = self.peek(2);
+                    // TODO - unicode
                     if (((value.isNumber(start) and value.isNumber(end)) or
                         (value.isObjType(start, .string) and value.isObjType(end, .string) and value.asString(start).chars.len == 1 and value.asString(end).chars.len == 1)) and value.isNumber(step))
                     {

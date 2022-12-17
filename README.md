@@ -195,7 +195,6 @@ compiled: *.whir
 * error handling
 * strings - flexible array members
 * string hash set (instead of table with nil values) for interning
-* utf8
 * separate sized jumps
 * have exit jumps jump straight to the end instead of chaining
 * don't emit (nil and return) if the last line is already a return
@@ -208,4 +207,6 @@ compiled: *.whir
 * operator overloading
   * explore generic operator support
 * assignment on ranges for lists and strings
+* assignment on index for strings
 * std library type conversions
+* utf8: string index by number and range, iterator, character ranges

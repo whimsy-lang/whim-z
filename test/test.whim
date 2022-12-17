@@ -1,40 +1,42 @@
 // simple test file
 
 
-// c :: class one :: 1 /class
-// c['first'] := 1
-// c.second := 2
-
-
-
+s :: '★ test'
+std.print(s, ', ', s:length())
+std.print(s[0])
+std.print(s[1])
+std.print(s[2])
+std.print(s[3])
+std.print(s[4])
+std.print(s[5])
 
 // zig build -Drelease-fast run -- test/test.whim
 
-overall_start :: std.time()
+// overall_start :: std.time()
 
-do
-    o := 0
-    a := 0
-    b := 0
-    c := 0
-    f :: fn(x, y) return x + y /fn
-    loop break o > 9
-        start :: std.time()
-        o += 1
-        i := 0
-        loop break i > 10000000
-            i += 1
-            a = 0
-            b = 0
-            c = 0
-            a += 1 + 2 + 3 + 4 + 5
-            b += 1 + 2 + 3 + 4 + 5
-            c += 1 + 2 + 3 + 4 + 5
-            f(a, b)
-            f(b, c)
-        /loop
-        std.print(std.time() - start)
-    /loop
-/do
+// do
+//     o := 0
+//     a := 0
+//     b := 0
+//     c := 0
+//     f :: fn(x, y) return x + y /fn
+//     loop break o > 9
+//         start :: std.time()
+//         o += 1
+//         i := 0
+//         loop break i > 10000000
+//             i += 1
+//             a = 0
+//             b = 0
+//             c = 0
+//             a += 1 + 2 + 3 + 4 + 5
+//             b += 1 + 2 + 3 + 4 + 5
+//             c += 1 + 2 + 3 + 4 + 5
+//             f(a, b)
+//             f(b, c)
+//         /loop
+//         std.print(std.time() - start)
+//     /loop
+// /do
 
-std.print('overall: ', std.time() - overall_start)
+// std.print('overall: ', std.time() - overall_start)
