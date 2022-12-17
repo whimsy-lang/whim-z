@@ -49,8 +49,7 @@ fn repl(vm: *Vm) !void {
         try writer.flush();
 
         if (try stdin.readUntilDelimiterOrEof(&buffer, '\n')) |line| {
-            buffer[line.len] = 0;
-            _ = vm.interpret(buffer[0..line.len :0]);
+            _ = vm.interpret(line);
         }
     }
 }
@@ -59,7 +58,7 @@ fn runFile(allocator: Allocator, vm: *Vm, path: []const u8) !void {
     var file = try std.fs.cwd().openFile(path, .{});
     defer file.close();
 
-    const source = try file.readToEndAllocOptions(allocator, std.math.maxInt(usize), null, @alignOf(u8), 0);
+    const source = try file.readToEndAlloc(allocator, std.math.maxInt(usize));
     defer allocator.free(source);
 
     const result = vm.interpret(source);

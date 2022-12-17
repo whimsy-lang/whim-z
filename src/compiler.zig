@@ -1365,7 +1365,7 @@ pub const Compiler = struct {
         }
     }
 
-    pub fn compile(vm: *Vm, source: [:0]const u8) ?*ObjFunction {
+    pub fn compile(vm: *Vm, source: []const u8) ?*ObjFunction {
         vm.lexer = Lexer.init(source);
 
         vm.parser.had_error = false;

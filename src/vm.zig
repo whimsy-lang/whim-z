@@ -1231,7 +1231,7 @@ pub const Vm = struct {
         }
     }
 
-    pub fn interpret(self: *Vm, source: [:0]const u8) InterpretResult {
+    pub fn interpret(self: *Vm, source: []const u8) InterpretResult {
         const function = Compiler.compile(self, source);
         if (function == null) return .compile_error;
 

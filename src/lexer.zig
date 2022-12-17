@@ -75,12 +75,12 @@ pub const Token = struct {
 };
 
 pub const Lexer = struct {
-    source: [:0]const u8,
+    source: []const u8,
     start: usize,
     current: usize,
     line: u29,
 
-    pub fn init(source: [:0]const u8) Lexer {
+    pub fn init(source: []const u8) Lexer {
         return .{
             .source = source,
             .start = 0,
@@ -90,29 +90,21 @@ pub const Lexer = struct {
     }
 
     pub fn isAtEnd(self: *Lexer) bool {
-        return self.source[self.current] == 0;
+        return self.current >= self.source.len;
     }
 
-    fn advance(self: *Lexer) u8 {
-        self.current += 1;
-        return self.source[self.current - 1];
-    }
-
-    fn advanceMulti(self: *Lexer, count: usize) void {
+    fn advance(self: *Lexer, count: usize) void {
         self.current += count;
+        if (self.isAtEnd()) self.current = self.source.len;
     }
 
-    fn peek(self: *Lexer) u8 {
-        return self.source[self.current];
+    fn peek(self: *Lexer, offset: usize) u21 {
+        return if ((self.current + offset) < self.source.len) self.source[self.current + offset] else 0;
     }
 
-    fn peekAt(self: *Lexer, offset: usize) u8 {
-        return self.source[self.current + offset];
-    }
-
-    fn match(self: *Lexer, expected: u8) bool {
-        if (self.peek() != expected) return false;
-        self.current += 1;
+    fn match(self: *Lexer, expected: u21) bool {
+        if (self.peek(0) != expected) return false;
+        self.advance(1);
         return true;
     }
 
@@ -120,38 +112,36 @@ pub const Lexer = struct {
         self.start = self.current;
     }
 
-    fn isDigit(c: u8) bool {
+    fn isDigit(c: u21) bool {
         return c >= '0' and c <= '9';
     }
 
-    fn isAlpha(c: u8) bool {
+    fn isAlpha(c: u21) bool {
         return (c >= 'a' and c <= 'z') or (c >= 'A' and c <= 'Z') or c == '_';
     }
 
-    fn isAlphaOrDigit(c: u8) bool {
+    fn isAlphaOrDigit(c: u21) bool {
         return isAlpha(c) or isDigit(c);
     }
 
-    fn isBinary(c: u8) bool {
+    fn isBinary(c: u21) bool {
         return c == '0' or c == '1' or c == '_';
     }
 
-    fn isOctal(c: u8) bool {
+    fn isOctal(c: u21) bool {
         return (c >= '0' and c <= '7') or c == '_';
     }
 
-    fn isDecimal(c: u8) bool {
+    fn isDecimal(c: u21) bool {
         return isDigit(c) or c == '_';
     }
 
-    fn isHex(c: u8) bool {
+    fn isHex(c: u21) bool {
         return isDecimal(c) or (c >= 'a' and c <= 'f') or (c >= 'A' and c <= 'F');
     }
 
     fn checkKeyword(cur_part: []const u8, rest: []const u8, token_type: TokenType) TokenType {
-        if (std.mem.eql(u8, cur_part, rest)) {
-            return token_type;
-        }
+        if (std.mem.eql(u8, cur_part, rest)) return token_type;
         return .identifier;
     }
 
@@ -224,53 +214,53 @@ pub const Lexer = struct {
     }
 
     fn identifier(self: *Lexer) Token {
-        while (isAlphaOrDigit(self.peek())) _ = self.advance();
+        while (isAlphaOrDigit(self.peek(0))) self.advance(1);
 
         return self.token(self.identifierType());
     }
 
-    const numDigitFn = *const fn (u8) bool;
+    const numDigitFn = *const fn (u21) bool;
 
-    fn number(self: *Lexer, first: u8) Token {
+    fn number(self: *Lexer, first: u21) Token {
         var check: numDigitFn = isDecimal;
         if (first == '0') {
-            switch (self.peek()) {
+            switch (self.peek(0)) {
                 'b', 'B' => {
-                    _ = self.advance();
+                    self.advance(1);
                     check = isBinary;
                 },
                 'o', 'O' => {
-                    _ = self.advance();
+                    self.advance(1);
                     check = isOctal;
                 },
                 'x', 'X' => {
-                    _ = self.advance();
+                    self.advance(1);
                     check = isHex;
                 },
                 else => {},
             }
         }
 
-        while (check(self.peek())) _ = self.advance();
+        while (check(self.peek(0))) self.advance(1);
 
-        if (self.peek() == '.' and check(self.peekAt(1))) {
+        if (self.peek(0) == '.' and check(self.peek(1))) {
             // accept the .
-            _ = self.advance();
+            self.advance(1);
 
-            while (check(self.peek())) _ = self.advance();
+            while (check(self.peek(0))) self.advance(1);
         }
 
         return self.token(.number);
     }
 
-    fn string(self: *Lexer, first: u8) Token {
+    fn string(self: *Lexer, first: u21) Token {
         // discard opening quote
         self.resetLength();
 
-        while (self.peek() != first and !self.isAtEnd()) {
-            if (self.peek() == '\n') self.line += 1;
-            if (self.peek() == '\\' and self.peekAt(1) != 0 and self.peekAt(1) != '\n') _ = self.advance();
-            _ = self.advance();
+        while (self.peek(0) != first and !self.isAtEnd()) {
+            if (self.peek(0) == '\n') self.line += 1;
+            if (self.peek(0) == '\\' and self.peek(1) != 0 and self.peek(1) != '\n') self.advance(1);
+            self.advance(1);
         }
 
         if (self.isAtEnd()) return self.errorToken("Unterminated string.");
@@ -278,7 +268,7 @@ pub const Lexer = struct {
         const tok = self.token(.string);
 
         // discard closing quote
-        _ = self.advance();
+        self.advance(1);
         self.resetLength();
 
         return tok;
@@ -288,7 +278,8 @@ pub const Lexer = struct {
         self.resetLength();
 
         while (!self.isAtEnd()) {
-            const c = self.advance();
+            const c = self.peek(0);
+            self.advance(1);
 
             if (isAlpha(c)) return self.identifier();
             if (isDigit(c)) return self.number(c);
@@ -304,26 +295,26 @@ pub const Lexer = struct {
                 '[' => return self.token(.left_bracket),
                 ']' => return self.token(.right_bracket),
                 ',' => return self.token(.comma),
-                '.' => switch (self.peek()) {
+                '.' => switch (self.peek(0)) {
                     '.' => {
-                        if (self.peekAt(1) == '=') {
-                            self.advanceMulti(2);
+                        if (self.peek(1) == '=') {
+                            self.advance(2);
                             return self.token(.dot_dot_equal);
                         } else {
-                            _ = self.advance();
+                            self.advance(1);
                             return self.token(.dot_dot);
                         }
                     },
                     else => return self.token(.dot),
                 },
                 ';' => return self.token(.semicolon),
-                ':' => switch (self.peek()) {
+                ':' => switch (self.peek(0)) {
                     ':' => {
-                        _ = self.advance();
+                        self.advance(1);
                         return self.token(.colon_colon);
                     },
                     '=' => {
-                        _ = self.advance();
+                        self.advance(1);
                         return self.token(.colon_equal);
                     },
                     else => return self.token(.colon),
@@ -335,50 +326,50 @@ pub const Lexer = struct {
                 '+' => return self.token(if (self.match('=')) .plus_equal else .plus),
                 '-' => return self.token(if (self.match('=')) .minus_equal else .minus),
                 '%' => return self.token(if (self.match('=')) .percent_equal else .percent),
-                '*' => switch (self.peek()) {
+                '*' => switch (self.peek(0)) {
                     '=' => {
-                        _ = self.advance();
+                        self.advance(1);
                         return self.token(.star_equal);
                     },
                     else => return self.token(.star),
                 },
-                '/' => switch (self.peek()) {
+                '/' => switch (self.peek(0)) {
                     '=' => {
-                        _ = self.advance();
+                        self.advance(1);
                         return self.token(.slash_equal);
                     },
                     '/' => {
-                        _ = self.advance();
-                        while (self.peek() != '\n' and !self.isAtEnd()) _ = self.advance();
+                        self.advance(1);
+                        while (self.peek(0) != '\n' and !self.isAtEnd()) self.advance(1);
                         self.resetLength();
                     },
                     'c' => {
-                        if (self.peekAt(1) == 'l' and
-                            self.peekAt(2) == 'a' and
-                            self.peekAt(3) == 's' and
-                            self.peekAt(4) == 's' and
-                            !isAlphaOrDigit(self.peekAt(5)))
+                        if (self.peek(1) == 'l' and
+                            self.peek(2) == 'a' and
+                            self.peek(3) == 's' and
+                            self.peek(4) == 's' and
+                            !isAlphaOrDigit(self.peek(5)))
                         {
-                            self.advanceMulti(5);
+                            self.advance(5);
                             return self.token(.class_end);
                         }
                         return self.token(.slash);
                     },
                     'd' => {
-                        if (self.peekAt(1) == 'o' and !isAlphaOrDigit(self.peekAt(2))) {
-                            self.advanceMulti(2);
+                        if (self.peek(1) == 'o' and !isAlphaOrDigit(self.peek(2))) {
+                            self.advance(2);
                             return self.token(.do_end);
                         }
                         return self.token(.slash);
                     },
                     'f' => {
-                        switch (self.peekAt(1)) {
-                            'n' => if (!isAlphaOrDigit(self.peekAt(2))) {
-                                self.advanceMulti(2);
+                        switch (self.peek(1)) {
+                            'n' => if (!isAlphaOrDigit(self.peek(2))) {
+                                self.advance(2);
                                 return self.token(.fn_end);
                             },
-                            'o' => if (self.peekAt(2) == 'r' and !isAlphaOrDigit(self.peekAt(3))) {
-                                self.advanceMulti(3);
+                            'o' => if (self.peek(2) == 'r' and !isAlphaOrDigit(self.peek(3))) {
+                                self.advance(3);
                                 return self.token(.for_end);
                             },
                             else => {},
@@ -386,19 +377,19 @@ pub const Lexer = struct {
                         return self.token(.slash);
                     },
                     'i' => {
-                        if (self.peekAt(1) == 'f' and !isAlphaOrDigit(self.peekAt(2))) {
-                            self.advanceMulti(2);
+                        if (self.peek(1) == 'f' and !isAlphaOrDigit(self.peek(2))) {
+                            self.advance(2);
                             return self.token(.if_end);
                         }
                         return self.token(.slash);
                     },
                     'l' => {
-                        if (self.peekAt(1) == 'o' and
-                            self.peekAt(2) == 'o' and
-                            self.peekAt(3) == 'p' and
-                            !isAlphaOrDigit(self.peekAt(4)))
+                        if (self.peek(1) == 'o' and
+                            self.peek(2) == 'o' and
+                            self.peek(3) == 'p' and
+                            !isAlphaOrDigit(self.peek(4)))
                         {
-                            self.advanceMulti(4);
+                            self.advance(4);
                             return self.token(.loop_end);
                         }
                         return self.token(.slash);
