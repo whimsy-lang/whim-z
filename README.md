@@ -93,6 +93,12 @@ MyClass :: class is Parent      // optional inheritance, Parent is assigned to M
   /fn
 /class
 
+// custom operators can use the following: ~!@#$%^&*-+={}\|;:<>.?/
+a ->> b
+// you can also call any two-parameter function as an infix operator
+// by prefixing it with `
+a `calc b
+
 // initialization is just the type used as a function,
 // this automatically creates a new instance and passes it in as the first argument
 myInst :: MyClass(1, 2)

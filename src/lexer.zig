@@ -253,6 +253,19 @@ pub const Lexer = struct {
         return self.token(self.identifierType());
     }
 
+    fn infix(self: *Lexer) Token {
+        if (!isAlpha(self.peek(0))) {
+            return self.errorToken("Invalid infix operator.");
+        }
+        // discard `
+        self.resetLength();
+
+        self.advance(1);
+        while (isAlphaOrDigit(self.peek(0))) self.advance(1);
+
+        return self.token(.symbol);
+    }
+
     const numDigitFn = *const fn (u21) bool;
 
     fn number(self: *Lexer, first: u21) Token {
@@ -409,6 +422,8 @@ pub const Lexer = struct {
                 '[' => return self.token(.left_bracket),
                 ']' => return self.token(.right_bracket),
                 ',' => return self.token(.comma),
+                '\'', '"' => return self.string(c),
+                '`' => return self.infix(),
 
                 '/' => switch (self.peek(0)) {
                     '/' => {
@@ -469,7 +484,6 @@ pub const Lexer = struct {
                     },
                     else => return self.symbol(),
                 },
-                '\'', '"' => return self.string(c),
                 else => {
                     if (isSymbol(c)) return self.symbol();
                     return self.errorToken("Unexpected character.");

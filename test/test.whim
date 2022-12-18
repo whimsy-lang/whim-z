@@ -24,6 +24,10 @@ c :: class
         self.x *= i
         self.y *= i
     /fn
+
+    calc :: fn(self, i)
+        return (self.x + self.y) * i
+    /fn
 /class
 
 i :: c()
@@ -32,8 +36,10 @@ i + 12
 i:print()
 i - 4
 i:print()
-i /@ 7
+i /@ 10
 i:print()
+r := i `calc 0.1
+std.print('result: ', r)
 
 
 // zig build -Drelease-fast run -- test/test.whim
