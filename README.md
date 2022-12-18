@@ -187,8 +187,7 @@ val := 3 + someStr:num()
 message :: "Value is " + val:str()
 ```
 
-text: *.whim  
-compiled: *.whir
+extension: *.whim  
 
 ## TODO
 
@@ -210,3 +209,4 @@ compiled: *.whir
 * assignment on index for strings
 * std library type conversions
 * utf8: string index by number and range, iterator, character ranges
+* character (byte?) number instead of line number

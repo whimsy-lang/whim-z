@@ -858,9 +858,23 @@ pub const Vm = struct {
                     const constant = frame.readConstant();
                     self.push(constant);
                 },
+
                 .nil => self.push(value.nil()),
                 .true => self.push(value.boolean(true)),
                 .false => self.push(value.boolean(false)),
+
+                .num_n1 => self.push(value.number(-1)),
+                .num_0 => self.push(value.number(0)),
+                .num_1 => self.push(value.number(1)),
+                .num_2 => self.push(value.number(2)),
+                .num_3 => self.push(value.number(3)),
+                .num_4 => self.push(value.number(4)),
+                .num_5 => self.push(value.number(5)),
+                .num_6 => self.push(value.number(6)),
+                .num_7 => self.push(value.number(7)),
+                .num_8 => self.push(value.number(8)),
+                .num_9 => self.push(value.number(9)),
+                .num_10 => self.push(value.number(10)),
 
                 .dup => self.push(self.peek(0)),
                 .pop => _ = self.pop(),

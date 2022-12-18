@@ -19,10 +19,10 @@ const Vm = @import("vm.zig").Vm;
 const quiet_nan: u64 = 0b01111111_11111100_00000000_00000000_00000000_00000000_00000000_00000000;
 const sign_bit: u64 = 0b10000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000;
 const obj_tag = sign_bit | quiet_nan;
-const empty_val = quiet_nan | 1;
-const nil_val = quiet_nan | 2;
-const true_val = quiet_nan | 3;
-const false_val = quiet_nan | 4;
+const empty_val = quiet_nan;
+const nil_val = quiet_nan | 1;
+const true_val = quiet_nan | 2;
+const false_val = quiet_nan | 3;
 
 pub const ValueContainer = struct {
     value: Value,

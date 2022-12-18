@@ -230,7 +230,33 @@ pub const Compiler = struct {
     }
 
     fn emitNumber(vm: *Vm, val: f64) void {
-        emitConstant(vm, value.number(val));
+        if (val == -1) {
+            vm.emitOp(.num_n1);
+        } else if (val == 0) {
+            vm.emitOp(.num_0);
+        } else if (val == 1) {
+            vm.emitOp(.num_1);
+        } else if (val == 2) {
+            vm.emitOp(.num_2);
+        } else if (val == 3) {
+            vm.emitOp(.num_3);
+        } else if (val == 4) {
+            vm.emitOp(.num_4);
+        } else if (val == 5) {
+            vm.emitOp(.num_5);
+        } else if (val == 6) {
+            vm.emitOp(.num_6);
+        } else if (val == 7) {
+            vm.emitOp(.num_7);
+        } else if (val == 8) {
+            vm.emitOp(.num_8);
+        } else if (val == 9) {
+            vm.emitOp(.num_9);
+        } else if (val == 10) {
+            vm.emitOp(.num_10);
+        } else {
+            emitConstant(vm, value.number(val));
+        }
     }
 
     fn parseNum(str: []const u8) f64 {
