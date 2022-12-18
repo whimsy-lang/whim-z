@@ -123,6 +123,16 @@ pub const GcAllocater = struct {
         if (vm.type_string) |s| s.obj.mark(vm);
         if (vm.super_string) |s| s.obj.mark(vm);
 
+        if (vm.greater_string) |s| s.obj.mark(vm);
+        if (vm.greater_equal_string) |s| s.obj.mark(vm);
+        if (vm.less_string) |s| s.obj.mark(vm);
+        if (vm.less_equal_string) |s| s.obj.mark(vm);
+        if (vm.add_string) |s| s.obj.mark(vm);
+        if (vm.subtract_string) |s| s.obj.mark(vm);
+        if (vm.multiply_string) |s| s.obj.mark(vm);
+        if (vm.divide_string) |s| s.obj.mark(vm);
+        if (vm.remainder_string) |s| s.obj.mark(vm);
+
         if (vm.bool_class) |c| c.obj.mark(vm);
         if (vm.class_class) |c| c.obj.mark(vm);
         if (vm.function_class) |c| c.obj.mark(vm);

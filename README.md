@@ -191,6 +191,9 @@ extension: *.whim
 
 ## TODO
 
+* test if updating frame on every binop affects performance
+* lexer peekByte and advanceByte
+* character (byte?) number instead of line number
 * error handling
 * strings - flexible array members
 * string hash set (instead of table with nil values) for interning
@@ -203,9 +206,6 @@ extension: *.whim
 
 ### Language Features
 
-* operator overloading
-  * explore generic operator support
 * assignment on ranges for lists and strings
 * assignment on index for strings
 * std library type conversions
-* character (byte?) number instead of line number

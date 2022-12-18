@@ -28,6 +28,7 @@ const Precedence = enum {
     range, // .. ..=
     term, // + -
     factor, // * / %
+    custom,
     unary, // ! -
     call, // . : () []
     primary,
@@ -352,7 +353,7 @@ pub const Compiler = struct {
         }
     }
 
-    fn identifierConstant(vm: *Vm, name: *Token) u29 {
+    fn identifierConstant(vm: *Vm, name: *const Token) u29 {
         return makeConstant(vm, value.string(ObjString.copy(vm, name.value)));
     }
 
@@ -526,6 +527,7 @@ pub const Compiler = struct {
             .dot => dot,
             .colon => method,
             .left_bracket => indexer,
+            .symbol => binary,
             .bang_equal, .equal_equal => binary,
             .less, .less_equal, .greater, .greater_equal, .is => binary,
             .dot_dot, .dot_dot_equal => range,
@@ -539,6 +541,7 @@ pub const Compiler = struct {
     fn getPrecedence(tok_type: TokenType) Precedence {
         return switch (tok_type) {
             .left_paren, .dot, .colon, .left_bracket => .call,
+            .symbol => .custom,
             .bang_equal, .equal_equal => .equality,
             .less, .less_equal, .greater, .greater_equal, .is => .comparison,
             .dot_dot, .dot_dot_equal => .range,
@@ -576,11 +579,11 @@ pub const Compiler = struct {
     }
 
     fn binary(vm: *Vm) void {
-        const op_type = vm.parser.previous.type;
-        const precedence = getPrecedence(op_type);
+        const op = vm.parser.previous;
+        const precedence = getPrecedence(op.type);
         parsePrecedence(vm, @intToEnum(Precedence, @enumToInt(precedence) + 1));
 
-        switch (op_type) {
+        switch (op.type) {
             .bang_equal => vm.emitOp(.not_equal),
             .equal_equal => vm.emitOp(.equal),
             .greater => vm.emitOp(.greater),
@@ -593,6 +596,10 @@ pub const Compiler = struct {
             .star => vm.emitOp(.multiply),
             .slash => vm.emitOp(.divide),
             .percent => vm.emitOp(.remainder),
+            .symbol => {
+                const symbol = identifierConstant(vm, &op);
+                vm.emitOpNum(.binary_op, symbol);
+            },
             else => unreachable,
         }
     }

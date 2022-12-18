@@ -96,6 +96,7 @@ pub fn disassembleInstruction(chunk: *Chunk, offset: usize) usize {
         .jump_if_false => jumpInstruction("jump if false", 1, chunk, offset),
         .jump_if_false_pop => jumpInstruction("jump if false (pop)", 1, chunk, offset),
 
+        .binary_op => constantInstruction("binary op", chunk, offset),
         .call => numInstruction("call", chunk, offset),
         .invoke => invokeInstruction("invoke", chunk, offset),
 

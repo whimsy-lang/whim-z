@@ -35,8 +35,9 @@ pub const TokenType = enum {
     percent_equal,
     // literals
     identifier,
-    string,
     number,
+    string,
+    symbol,
     // keywords
     and_,
     break_,
@@ -163,6 +164,14 @@ pub const Lexer = struct {
 
     fn isHex(c: u21) bool {
         return isDecimal(c) or (c >= 'a' and c <= 'f') or (c >= 'A' and c <= 'F');
+    }
+
+    fn isSymbol(c: u21) bool {
+        return switch (c) {
+            '~', '!', '@', '#', '$', '%', '^', '&', '*', '-', '+', '=' => true,
+            '{', '}', '\\', '|', ';', ':', '<', '>', '.', '?', '/' => true,
+            else => false,
+        };
     }
 
     fn checkKeyword(cur_part: []const u8, rest: []const u8, token_type: TokenType) TokenType {
@@ -299,6 +308,86 @@ pub const Lexer = struct {
         return tok;
     }
 
+    fn symbolType(self: *Lexer) TokenType {
+        const cur = self.source[self.start..self.current];
+        switch (cur[0]) {
+            '.' => if (cur.len == 1) {
+                return .dot;
+            } else if (cur[1] == '.') {
+                if (cur.len == 2) {
+                    return .dot_dot;
+                } else if (cur.len == 3 and cur[2] == '=') {
+                    return .dot_dot_equal;
+                }
+            },
+            ';' => if (cur.len == 1) return .semicolon,
+            ':' => if (cur.len == 1) {
+                return .colon;
+            } else if (cur.len == 2) {
+                switch (cur[1]) {
+                    ':' => return .colon_colon,
+                    '=' => return .colon_equal,
+                    else => {},
+                }
+            },
+            '!' => if (cur.len == 1) {
+                return .bang;
+            } else if (cur.len == 2 and cur[1] == '=') {
+                return .bang_equal;
+            },
+            '=' => if (cur.len == 1) {
+                return .equal;
+            } else if (cur.len == 2 and cur[1] == '=') {
+                return .equal_equal;
+            },
+            '<' => if (cur.len == 1) {
+                return .less;
+            } else if (cur.len == 2 and cur[1] == '=') {
+                return .less_equal;
+            },
+            '>' => if (cur.len == 1) {
+                return .greater;
+            } else if (cur.len == 2 and cur[1] == '=') {
+                return .greater_equal;
+            },
+            '+' => if (cur.len == 1) {
+                return .plus;
+            } else if (cur.len == 2 and cur[1] == '=') {
+                return .plus_equal;
+            },
+            '-' => if (cur.len == 1) {
+                return .minus;
+            } else if (cur.len == 2 and cur[1] == '=') {
+                return .minus_equal;
+            },
+            '%' => if (cur.len == 1) {
+                return .percent;
+            } else if (cur.len == 2 and cur[1] == '=') {
+                return .percent_equal;
+            },
+            '*' => if (cur.len == 1) {
+                return .star;
+            } else if (cur.len == 2 and cur[1] == '=') {
+                return .star_equal;
+            },
+            '/' => if (cur.len == 1) {
+                return .slash;
+            } else if (cur.len == 2 and cur[1] == '=') {
+                return .slash_equal;
+            },
+            else => {},
+        }
+        return .symbol;
+    }
+
+    fn symbol(self: *Lexer) Token {
+        while (isSymbol(self.peek(0)) and !(self.peek(0) == '/' and self.peek(1) == '/')) {
+            self.advance(1);
+        }
+
+        return self.token(self.symbolType());
+    }
+
     pub fn lexToken(self: *Lexer) Token {
         self.resetLength();
 
@@ -320,49 +409,8 @@ pub const Lexer = struct {
                 '[' => return self.token(.left_bracket),
                 ']' => return self.token(.right_bracket),
                 ',' => return self.token(.comma),
-                '.' => switch (self.peek(0)) {
-                    '.' => {
-                        if (self.peek(1) == '=') {
-                            self.advance(2);
-                            return self.token(.dot_dot_equal);
-                        } else {
-                            self.advance(1);
-                            return self.token(.dot_dot);
-                        }
-                    },
-                    else => return self.token(.dot),
-                },
-                ';' => return self.token(.semicolon),
-                ':' => switch (self.peek(0)) {
-                    ':' => {
-                        self.advance(1);
-                        return self.token(.colon_colon);
-                    },
-                    '=' => {
-                        self.advance(1);
-                        return self.token(.colon_equal);
-                    },
-                    else => return self.token(.colon),
-                },
-                '!' => return self.token(if (self.match('=')) .bang_equal else .bang),
-                '=' => return self.token(if (self.match('=')) .equal_equal else .equal),
-                '<' => return self.token(if (self.match('=')) .less_equal else .less),
-                '>' => return self.token(if (self.match('=')) .greater_equal else .greater),
-                '+' => return self.token(if (self.match('=')) .plus_equal else .plus),
-                '-' => return self.token(if (self.match('=')) .minus_equal else .minus),
-                '%' => return self.token(if (self.match('=')) .percent_equal else .percent),
-                '*' => switch (self.peek(0)) {
-                    '=' => {
-                        self.advance(1);
-                        return self.token(.star_equal);
-                    },
-                    else => return self.token(.star),
-                },
+
                 '/' => switch (self.peek(0)) {
-                    '=' => {
-                        self.advance(1);
-                        return self.token(.slash_equal);
-                    },
                     '/' => {
                         self.advance(1);
                         while (self.peek(0) != '\n' and !self.isAtEnd()) self.advance(1);
@@ -419,10 +467,13 @@ pub const Lexer = struct {
                         }
                         return self.token(.slash);
                     },
-                    else => return self.token(.slash),
+                    else => return self.symbol(),
                 },
                 '\'', '"' => return self.string(c),
-                else => return self.errorToken("Unexpected character."),
+                else => {
+                    if (isSymbol(c)) return self.symbol();
+                    return self.errorToken("Unexpected character.");
+                },
             }
         }
 

@@ -1,11 +1,40 @@
 // simple test file
 
+c :: class
+    init :: fn(self)
+        self.x := 0
+        self.y := 0
+    /fn
 
-for c in 'a'..='★'
-    std.print(c)
-/for
-s :: '★ test'
-std.print(s, ', ', s:length())
+    print :: fn(self)
+        std.print('(', self.x, ', ', self.y, ')')
+    /fn
+
+    '+' :: fn(self, i)
+        self.x += i
+        self.y += i
+    /fn
+
+    '-' :: fn(self, i)
+        self.x -= i
+        self.y -= i
+    /fn
+
+    '/@' :: fn(self, i)
+        self.x *= i
+        self.y *= i
+    /fn
+/class
+
+i :: c()
+i:print()
+i + 12
+i:print()
+i - 4
+i:print()
+i /@ 7
+i:print()
+
 
 // zig build -Drelease-fast run -- test/test.whim
 

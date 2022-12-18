@@ -84,6 +84,16 @@ pub const Vm = struct {
     type_string: ?*ObjString,
     super_string: ?*ObjString,
 
+    greater_string: ?*ObjString,
+    greater_equal_string: ?*ObjString,
+    less_string: ?*ObjString,
+    less_equal_string: ?*ObjString,
+    add_string: ?*ObjString,
+    subtract_string: ?*ObjString,
+    multiply_string: ?*ObjString,
+    divide_string: ?*ObjString,
+    remainder_string: ?*ObjString,
+
     bool_class: ?*ObjClass,
     class_class: ?*ObjClass,
     function_class: ?*ObjClass,
@@ -123,6 +133,16 @@ pub const Vm = struct {
         self.type_string = null;
         self.super_string = null;
 
+        self.greater_string = null;
+        self.greater_equal_string = null;
+        self.less_string = null;
+        self.less_equal_string = null;
+        self.add_string = null;
+        self.subtract_string = null;
+        self.multiply_string = null;
+        self.divide_string = null;
+        self.remainder_string = null;
+
         // classes
         self.bool_class = null;
         self.class_class = null;
@@ -140,6 +160,16 @@ pub const Vm = struct {
         self.type_string = ObjString.copy(self, "type");
         self.super_string = ObjString.copy(self, "super");
 
+        self.greater_string = ObjString.copy(self, ">");
+        self.greater_equal_string = ObjString.copy(self, ">=");
+        self.less_string = ObjString.copy(self, "<");
+        self.less_equal_string = ObjString.copy(self, "<=");
+        self.add_string = ObjString.copy(self, "+");
+        self.subtract_string = ObjString.copy(self, "-");
+        self.multiply_string = ObjString.copy(self, "*");
+        self.divide_string = ObjString.copy(self, "/");
+        self.remainder_string = ObjString.copy(self, "%");
+
         whimsy_std.register(self);
     }
 
@@ -152,6 +182,16 @@ pub const Vm = struct {
         self.init_string = null;
         self.type_string = null;
         self.super_string = null;
+
+        self.greater_string = null;
+        self.greater_equal_string = null;
+        self.less_string = null;
+        self.less_equal_string = null;
+        self.add_string = null;
+        self.subtract_string = null;
+        self.multiply_string = null;
+        self.divide_string = null;
+        self.remainder_string = null;
 
         // classes
         self.bool_class = null;
@@ -264,6 +304,13 @@ pub const Vm = struct {
         frame.slots = self.stack_top - arg_count;
         frame.pop_one = pop_one;
         return true;
+    }
+
+    fn binaryOp(self: *Vm, op: *ObjString) bool {
+        const b = self.pop();
+        self.push(self.peek(0));
+        self.push(b);
+        return self.invoke(op, 2);
     }
 
     fn callValue(self: *Vm, callee: Value, arg_count: u29) bool {
@@ -435,10 +482,9 @@ pub const Vm = struct {
     const NumBinaryOp = struct {
         const NumBinaryOpFn = *const fn (f64, f64) Value;
 
-        fn run(vm: *Vm, comptime op_fn: NumBinaryOpFn) bool {
+        fn run(vm: *Vm, comptime op_fn: NumBinaryOpFn, op: *ObjString) bool {
             if (!value.isNumber(vm.peek(0)) or !value.isNumber(vm.peek(1))) {
-                vm.runtimeError("Operands must be numbers.", .{});
-                return false;
+                return vm.binaryOp(op);
             }
             const b = value.asNumber(vm.pop());
             const a = value.asNumber(vm.pop());
@@ -867,7 +913,7 @@ pub const Vm = struct {
                 var slot: [*]Value = &self.stack;
                 while (@ptrToInt(slot) < @ptrToInt(self.stack_top)) : (slot += 1) {
                     std.debug.print("[ ", .{});
-                    slot[0].print();
+                    value.print(slot[0]);
                     std.debug.print(" ]", .{});
                 }
                 std.debug.print("\n", .{});
@@ -997,10 +1043,30 @@ pub const Vm = struct {
                     const a = self.pop();
                     self.push(value.boolean(a != b));
                 },
-                .greater => if (!NumBinaryOp.run(self, NumBinaryOp.greater)) return .runtime_error,
-                .greater_equal => if (!NumBinaryOp.run(self, NumBinaryOp.greaterEqual)) return .runtime_error,
-                .less => if (!NumBinaryOp.run(self, NumBinaryOp.less)) return .runtime_error,
-                .less_equal => if (!NumBinaryOp.run(self, NumBinaryOp.lessEqual)) return .runtime_error,
+                .greater => {
+                    if (!NumBinaryOp.run(self, NumBinaryOp.greater, self.greater_string.?)) {
+                        return .runtime_error;
+                    }
+                    frame = &self.frames[self.frame_count - 1];
+                },
+                .greater_equal => {
+                    if (!NumBinaryOp.run(self, NumBinaryOp.greaterEqual, self.greater_equal_string.?)) {
+                        return .runtime_error;
+                    }
+                    frame = &self.frames[self.frame_count - 1];
+                },
+                .less => {
+                    if (!NumBinaryOp.run(self, NumBinaryOp.less, self.less_string.?)) {
+                        return .runtime_error;
+                    }
+                    frame = &self.frames[self.frame_count - 1];
+                },
+                .less_equal => {
+                    if (!NumBinaryOp.run(self, NumBinaryOp.lessEqual, self.less_equal_string.?)) {
+                        return .runtime_error;
+                    }
+                    frame = &self.frames[self.frame_count - 1];
+                },
                 .is => if (!checkIs(self)) return .runtime_error,
                 .add => {
                     if (value.isNumber(self.peek(0)) and value.isNumber(self.peek(1))) {
@@ -1009,15 +1075,36 @@ pub const Vm = struct {
                         self.push(value.number(a + b));
                     } else if (value.isObjType(self.peek(0), .string) and value.isObjType(self.peek(1), .string)) {
                         self.concatenate();
+                    } else if (self.binaryOp(self.add_string.?)) {
+                        frame = &self.frames[self.frame_count - 1];
                     } else {
-                        self.runtimeError("Operands must both be numbers or strings.", .{});
                         return .runtime_error;
                     }
                 },
-                .subtract => if (!NumBinaryOp.run(self, NumBinaryOp.subtract)) return .runtime_error,
-                .multiply => if (!NumBinaryOp.run(self, NumBinaryOp.multiply)) return .runtime_error,
-                .divide => if (!NumBinaryOp.run(self, NumBinaryOp.divide)) return .runtime_error,
-                .remainder => if (!NumBinaryOp.run(self, NumBinaryOp.remainder)) return .runtime_error,
+                .subtract => {
+                    if (!NumBinaryOp.run(self, NumBinaryOp.subtract, self.subtract_string.?)) {
+                        return .runtime_error;
+                    }
+                    frame = &self.frames[self.frame_count - 1];
+                },
+                .multiply => {
+                    if (!NumBinaryOp.run(self, NumBinaryOp.multiply, self.multiply_string.?)) {
+                        return .runtime_error;
+                    }
+                    frame = &self.frames[self.frame_count - 1];
+                },
+                .divide => {
+                    if (!NumBinaryOp.run(self, NumBinaryOp.divide, self.divide_string.?)) {
+                        return .runtime_error;
+                    }
+                    frame = &self.frames[self.frame_count - 1];
+                },
+                .remainder => {
+                    if (!NumBinaryOp.run(self, NumBinaryOp.remainder, self.remainder_string.?)) {
+                        return .runtime_error;
+                    }
+                    frame = &self.frames[self.frame_count - 1];
+                },
 
                 .negate => {
                     if (!value.isNumber(self.peek(0))) {
@@ -1049,6 +1136,13 @@ pub const Vm = struct {
                     if (value.isFalsey(self.pop())) frame.ip += offset;
                 },
 
+                .binary_op => {
+                    const binop = frame.readString();
+                    if (!self.binaryOp(binop)) {
+                        return .runtime_error;
+                    }
+                    frame = &self.frames[self.frame_count - 1];
+                },
                 .call => {
                     const arg_count = frame.readNum();
                     if (!self.callValue(self.peek(arg_count), arg_count)) {

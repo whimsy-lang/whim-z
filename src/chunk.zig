@@ -73,6 +73,7 @@ pub const OpCode = enum(u8) {
     jump_if_false,
     jump_if_false_pop,
 
+    binary_op,
     call,
     invoke,
 
