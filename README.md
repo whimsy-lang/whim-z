@@ -208,5 +208,4 @@ extension: *.whim
 * assignment on ranges for lists and strings
 * assignment on index for strings
 * std library type conversions
-* utf8 iterate on character ranges
 * character (byte?) number instead of line number

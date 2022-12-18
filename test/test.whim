@@ -1,11 +1,11 @@
 // simple test file
 
 
-s :: '★ test'
-std.print(s, ', ', s:length())
 for c in 'a'..='★'
     std.print(c)
 /for
+s :: '★ test'
+std.print(s, ', ', s:length())
 
 // zig build -Drelease-fast run -- test/test.whim
 

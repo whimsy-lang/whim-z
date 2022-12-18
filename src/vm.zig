@@ -1167,12 +1167,23 @@ pub const Vm = struct {
                                         frame.ip += offset;
                                     }
                                 } else {
-                                    // TODO - unicode
-                                    const val = @intCast(u8, value.asString(range.start).chars[0] + @floatToInt(isize, index * range.step));
-                                    const end = value.asString(range.end).chars[0];
+                                    const start = unicode.utf8Decode(value.asString(range.start).chars) catch {
+                                        std.debug.print("Invalid character encoding.", .{});
+                                        std.process.exit(1);
+                                    };
+                                    const end = unicode.utf8Decode(value.asString(range.end).chars) catch {
+                                        std.debug.print("Invalid character encoding.", .{});
+                                        std.process.exit(1);
+                                    };
+
+                                    const val = @intCast(u21, start + @floatToInt(isize, index * range.step));
                                     if ((range.step > 0 and val < end) or (range.step < 0 and val > end) or (range.inclusive and val == end)) {
-                                        const next_char = [_]u8{val};
-                                        self.push(value.string(ObjString.copy(self, &next_char)));
+                                        var buf: [4]u8 = undefined;
+                                        const len = unicode.utf8Encode(val, &buf) catch {
+                                            std.debug.print("Unable to encode character.", .{});
+                                            std.process.exit(1);
+                                        };
+                                        self.push(value.string(ObjString.copy(self, buf[0..len])));
                                     } else {
                                         frame.ip += offset;
                                     }
