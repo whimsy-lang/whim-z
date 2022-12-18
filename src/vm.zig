@@ -1,4 +1,5 @@
 const std = @import("std");
+const unicode = std.unicode;
 const Allocator = std.mem.Allocator;
 
 const Chunk = @import("chunk.zig").Chunk;
@@ -706,15 +707,28 @@ pub const Vm = struct {
         if (value.isNumber(key)) {
             const index = @floatToInt(isize, value.asNumber(key));
 
-            // TODO - unicode
-            if (index < 0 or index >= string.chars.len) {
-                self.runtimeError("Index {d} is out of bounds (0-{d}).", .{ index, string.chars.len - 1 });
+            var byte_idx: usize = 0;
+            var length: usize = 0;
+            var i: usize = 0;
+            while (i < string.chars.len) : (length += 1) {
+                if (length == index) byte_idx = i;
+                i += unicode.utf8ByteSequenceLength(string.chars[i]) catch {
+                    std.debug.print("Invalid character encoding.", .{});
+                    std.process.exit(1);
+                };
+            }
+
+            if (index < 0 or index >= length) {
+                self.runtimeError("Index {d} is out of bounds (0-{d}).", .{ index, length - 1 });
                 return false;
             }
 
             self.stack_top -= pop_count;
-            const uindex = @intCast(usize, index);
-            self.push(value.string(ObjString.copy(self, string.chars[uindex .. uindex + 1])));
+            const ch_len = unicode.utf8ByteSequenceLength(string.chars[byte_idx]) catch {
+                std.debug.print("Invalid character encoding.", .{});
+                std.process.exit(1);
+            };
+            self.push(value.string(ObjString.copy(self, string.chars[byte_idx .. byte_idx + ch_len])));
             return true;
         }
         if (value.isObjType(key, .range)) {
@@ -724,13 +738,25 @@ pub const Vm = struct {
                 var end = @floatToInt(isize, value.asNumber(range.end));
                 if (range.inclusive) end += 1;
 
-                // TODO - unicode
-                if (start < 0 or start > string.chars.len) {
-                    self.runtimeError("Start {d} is out of bounds (0-{d}).", .{ start, string.chars.len });
+                var byte_start: usize = 0;
+                var byte_end = string.chars.len;
+                var length: usize = 0;
+                var i: usize = 0;
+                while (i < string.chars.len) : (length += 1) {
+                    if (length == start) byte_start = i;
+                    if (length == end) byte_end = i;
+                    i += unicode.utf8ByteSequenceLength(string.chars[i]) catch {
+                        std.debug.print("Invalid character encoding.", .{});
+                        std.process.exit(1);
+                    };
+                }
+
+                if (start < 0 or start > length) {
+                    self.runtimeError("Start {d} is out of bounds (0-{d}).", .{ start, length });
                     return false;
                 }
-                if (end < 0 or end > string.chars.len) {
-                    self.runtimeError("End {d} is out of bounds (0-{d}).", .{ end, string.chars.len });
+                if (end < 0 or end > length) {
+                    self.runtimeError("End {d} is out of bounds (0-{d}).", .{ end, length });
                     return false;
                 }
                 if (end < start) {
@@ -738,11 +764,8 @@ pub const Vm = struct {
                     return false;
                 }
 
-                const ustart = @intCast(usize, start);
-                const uend = @intCast(usize, end);
-
                 self.stack_top -= pop_count;
-                self.push(value.string(ObjString.copy(self, string.chars[ustart..uend])));
+                self.push(value.string(ObjString.copy(self, string.chars[byte_start..byte_end])));
                 return true;
             }
             self.runtimeError("Only numeric ranges with a step of 1 can be used to index a string.", .{});
@@ -1144,6 +1167,7 @@ pub const Vm = struct {
                                         frame.ip += offset;
                                     }
                                 } else {
+                                    // TODO - unicode
                                     const val = @intCast(u8, value.asString(range.start).chars[0] + @floatToInt(isize, index * range.step));
                                     const end = value.asString(range.end).chars[0];
                                     if ((range.step > 0 and val < end) or (range.step < 0 and val > end) or (range.inclusive and val == end)) {
@@ -1155,10 +1179,25 @@ pub const Vm = struct {
                                 }
                             },
                             .string => {
-                                // TODO - unicode
                                 const str = obj.asString();
-                                if (uindex < str.chars.len) {
-                                    self.push(value.string(ObjString.copy(self, str.chars[uindex .. uindex + 1])));
+
+                                var byte_idx: usize = 0;
+                                var length: usize = 0;
+                                var i: usize = 0;
+                                while (i < str.chars.len) : (length += 1) {
+                                    if (length == uindex) byte_idx = i;
+                                    i += unicode.utf8ByteSequenceLength(str.chars[i]) catch {
+                                        std.debug.print("Invalid character encoding.", .{});
+                                        std.process.exit(1);
+                                    };
+                                }
+
+                                if (uindex < length) {
+                                    const ch_len = unicode.utf8ByteSequenceLength(str.chars[byte_idx]) catch {
+                                        std.debug.print("Invalid character encoding.", .{});
+                                        std.process.exit(1);
+                                    };
+                                    self.push(value.string(ObjString.copy(self, str.chars[byte_idx .. byte_idx + ch_len])));
                                 } else {
                                     frame.ip += offset;
                                 }
@@ -1204,9 +1243,8 @@ pub const Vm = struct {
                 .range, .range_inclusive => {
                     const end = self.peek(0);
                     const start = self.peek(1);
-                    // TODO - unicode
                     if ((value.isNumber(start) and value.isNumber(end)) or
-                        (value.isObjType(start, .string) and value.isObjType(end, .string) and value.asString(start).chars.len == 1 and value.asString(end).chars.len == 1))
+                        (value.isObjType(start, .string) and value.isObjType(end, .string) and value.asString(start).length() == 1 and value.asString(end).length() == 1))
                     {
                         const range = ObjRange.init(self, start, end, 1, op == .range_inclusive);
                         self.stack_top -= 2;
@@ -1220,9 +1258,8 @@ pub const Vm = struct {
                     const step = self.peek(0);
                     const end = self.peek(1);
                     const start = self.peek(2);
-                    // TODO - unicode
                     if (((value.isNumber(start) and value.isNumber(end)) or
-                        (value.isObjType(start, .string) and value.isObjType(end, .string) and value.asString(start).chars.len == 1 and value.asString(end).chars.len == 1)) and value.isNumber(step))
+                        (value.isObjType(start, .string) and value.isObjType(end, .string) and value.asString(start).length() == 1 and value.asString(end).length() == 1)) and value.isNumber(step))
                     {
                         if (value.asNumber(step) == 0) {
                             self.runtimeError("Step cannot be 0.", .{});

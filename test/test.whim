@@ -3,12 +3,9 @@
 
 s :: '★ test'
 std.print(s, ', ', s:length())
-std.print(s[0])
-std.print(s[1])
-std.print(s[2])
-std.print(s[3])
-std.print(s[4])
-std.print(s[5])
+for c in 'a'..='★'
+    std.print(c)
+/for
 
 // zig build -Drelease-fast run -- test/test.whim
 
