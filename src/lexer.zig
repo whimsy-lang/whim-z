@@ -106,6 +106,11 @@ pub const Lexer = struct {
         if (self.isAtEnd()) self.current = self.source.len;
     }
 
+    fn advanceByte(self: *Lexer, count: usize) void {
+        self.current += count;
+        if (self.isAtEnd()) self.current = self.source.len;
+    }
+
     fn peek(self: *Lexer, offset: usize) u21 {
         var i: usize = 0;
         var ind = self.current;
@@ -126,12 +131,6 @@ pub const Lexer = struct {
             };
         }
         return 0;
-    }
-
-    fn match(self: *Lexer, expected: u21) bool {
-        if (self.peek(0) != expected) return false;
-        self.advance(1);
-        return true;
     }
 
     fn resetLength(self: *Lexer) void {
@@ -177,6 +176,32 @@ pub const Lexer = struct {
     fn checkKeyword(cur_part: []const u8, rest: []const u8, token_type: TokenType) TokenType {
         if (std.mem.eql(u8, cur_part, rest)) return token_type;
         return .identifier;
+    }
+
+    // checks starting at self.current + 1, checking for rest and then !isAlphaOrDigit
+    // assumes each character is a byte
+    // returns a token with token_type on success or .slash
+    fn checkEnd(self: *Lexer, rest: []const u8, token_type: TokenType) Token {
+        const start = self.current + 1;
+        const end = self.current + 1 + rest.len;
+        if (end <= self.source.len and std.mem.eql(u8, self.source[start..end], rest)) {
+            var end_val: u21 = 0;
+            if (end < self.source.len) {
+                const len = unicode.utf8ByteSequenceLength(self.source[end]) catch {
+                    std.debug.print("Invalid character encoding.", .{});
+                    std.process.exit(1);
+                };
+                end_val = unicode.utf8Decode(self.source[end .. end + len]) catch {
+                    std.debug.print("Invalid character encoding.", .{});
+                    std.process.exit(1);
+                };
+            }
+            if (!isAlphaOrDigit(end_val)) {
+                self.advanceByte(rest.len + 1);
+                return self.token(token_type);
+            }
+        }
+        return self.token(.slash);
     }
 
     fn token(self: *Lexer, token_type: TokenType) Token {
@@ -431,25 +456,8 @@ pub const Lexer = struct {
                         while (self.peek(0) != '\n' and !self.isAtEnd()) self.advance(1);
                         self.resetLength();
                     },
-                    'c' => {
-                        if (self.peek(1) == 'l' and
-                            self.peek(2) == 'a' and
-                            self.peek(3) == 's' and
-                            self.peek(4) == 's' and
-                            !isAlphaOrDigit(self.peek(5)))
-                        {
-                            self.advance(5);
-                            return self.token(.class_end);
-                        }
-                        return self.token(.slash);
-                    },
-                    'd' => {
-                        if (self.peek(1) == 'o' and !isAlphaOrDigit(self.peek(2))) {
-                            self.advance(2);
-                            return self.token(.do_end);
-                        }
-                        return self.token(.slash);
-                    },
+                    'c' => return self.checkEnd("lass", .class_end),
+                    'd' => return self.checkEnd("o", .do_end),
                     'f' => {
                         switch (self.peek(1)) {
                             'n' => if (!isAlphaOrDigit(self.peek(2))) {
@@ -464,24 +472,8 @@ pub const Lexer = struct {
                         }
                         return self.token(.slash);
                     },
-                    'i' => {
-                        if (self.peek(1) == 'f' and !isAlphaOrDigit(self.peek(2))) {
-                            self.advance(2);
-                            return self.token(.if_end);
-                        }
-                        return self.token(.slash);
-                    },
-                    'l' => {
-                        if (self.peek(1) == 'o' and
-                            self.peek(2) == 'o' and
-                            self.peek(3) == 'p' and
-                            !isAlphaOrDigit(self.peek(4)))
-                        {
-                            self.advance(4);
-                            return self.token(.loop_end);
-                        }
-                        return self.token(.slash);
-                    },
+                    'i' => return self.checkEnd("f", .if_end),
+                    'l' => return self.checkEnd("oop", .loop_end),
                     else => return self.symbol(),
                 },
                 else => {

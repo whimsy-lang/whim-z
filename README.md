@@ -198,7 +198,6 @@ extension: *.whim
 ## TODO
 
 * test if updating frame on every binop affects performance
-* lexer peekByte and advanceByte
 * character (byte?) number instead of line number
 * error handling
 * strings - flexible array members
