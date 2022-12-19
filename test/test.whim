@@ -1,74 +1,26 @@
 // simple test file
 
-c :: class
-    init :: fn(self)
-        self.x := 0
-        self.y := 0
-    /fn
-
-    print :: fn(self)
-        std.print('(', self.x, ', ', self.y, ')')
-    /fn
-
-    '+' :: fn(self, i)
-        self.x += i
-        self.y += i
-    /fn
-
-    '-' :: fn(self, i)
-        self.x -= i
-        self.y -= i
-    /fn
-
-    '/@' :: fn(self, i)
-        self.x *= i
-        self.y *= i
-    /fn
-
-    calc :: fn(self, i)
-        return (self.x + self.y) * i
-    /fn
-/class
-
-i :: c()
-i:print()
-i + 12
-i:print()
-i - 4
-i:print()
-i /@ 10
-i:print()
-r := i `calc 0.1
-std.print('result: ', r)
-
 
 // zig build -Drelease-fast run -- test/test.whim
 
-// overall_start :: std.time()
+overall_start :: std.time()
 
-// do
-//     o := 0
-//     a := 0
-//     b := 0
-//     c := 0
-//     f :: fn(x, y) return x + y /fn
-//     loop break o > 9
-//         start :: std.time()
-//         o += 1
-//         i := 0
-//         loop break i > 10000000
-//             i += 1
-//             a = 0
-//             b = 0
-//             c = 0
-//             a += 1 + 2 + 3 + 4 + 5
-//             b += 1 + 2 + 3 + 4 + 5
-//             c += 1 + 2 + 3 + 4 + 5
-//             f(a, b)
-//             f(b, c)
-//         /loop
-//         std.print(std.time() - start)
-//     /loop
-// /do
+do
+    o := 0
+    loop break o > 9
+        start :: std.time()
+        o += 1
+        i := 0
+        loop break i > 10000000
+            i += 1
+            1-2-3-4-5-6-7-8-9-0
+            1-2-3-4-5-6-7-8-9-0
+            1-2-3-4-5-6-7-8-9-0
+            1-2-3-4-5-6-7-8-9-0
+            1-2-3-4-5-6-7-8-9-0
+        /loop
+        std.print(std.time() - start)
+    /loop
+/do
 
-// std.print('overall: ', std.time() - overall_start)
+std.print('overall: ', std.time() - overall_start)

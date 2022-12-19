@@ -479,52 +479,6 @@ pub const Vm = struct {
         }
     }
 
-    const NumBinaryOp = struct {
-        const NumBinaryOpFn = *const fn (f64, f64) Value;
-
-        fn run(vm: *Vm, comptime op_fn: NumBinaryOpFn, op: *ObjString) bool {
-            if (!value.isNumber(vm.peek(0)) or !value.isNumber(vm.peek(1))) {
-                return vm.binaryOp(op);
-            }
-            const b = value.asNumber(vm.pop());
-            const a = value.asNumber(vm.pop());
-            vm.push(op_fn(a, b));
-            return true;
-        }
-
-        fn greater(a: f64, b: f64) Value {
-            return value.boolean(a > b);
-        }
-
-        fn greaterEqual(a: f64, b: f64) Value {
-            return value.boolean(a >= b);
-        }
-
-        fn less(a: f64, b: f64) Value {
-            return value.boolean(a < b);
-        }
-
-        fn lessEqual(a: f64, b: f64) Value {
-            return value.boolean(a <= b);
-        }
-
-        fn subtract(a: f64, b: f64) Value {
-            return value.number(a - b);
-        }
-
-        fn multiply(a: f64, b: f64) Value {
-            return value.number(a * b);
-        }
-
-        fn divide(a: f64, b: f64) Value {
-            return value.number(a / b);
-        }
-
-        fn remainder(a: f64, b: f64) Value {
-            return value.number(@rem(a, b));
-        }
-    };
-
     fn checkIs(self: *Vm) bool {
         const b = self.pop();
         const a = self.pop();
@@ -1044,28 +998,48 @@ pub const Vm = struct {
                     self.push(value.boolean(a != b));
                 },
                 .greater => {
-                    if (!NumBinaryOp.run(self, NumBinaryOp.greater, self.greater_string.?)) {
+                    if (value.isNumber(self.peek(0)) and value.isNumber(self.peek(1))) {
+                        const b = value.asNumber(self.pop());
+                        const a = value.asNumber(self.pop());
+                        self.push(value.boolean(a > b));
+                    } else if (self.binaryOp(self.greater_string.?)) {
+                        frame = &self.frames[self.frame_count - 1];
+                    } else {
                         return .runtime_error;
                     }
-                    frame = &self.frames[self.frame_count - 1];
                 },
                 .greater_equal => {
-                    if (!NumBinaryOp.run(self, NumBinaryOp.greaterEqual, self.greater_equal_string.?)) {
+                    if (value.isNumber(self.peek(0)) and value.isNumber(self.peek(1))) {
+                        const b = value.asNumber(self.pop());
+                        const a = value.asNumber(self.pop());
+                        self.push(value.boolean(a >= b));
+                    } else if (self.binaryOp(self.greater_equal_string.?)) {
+                        frame = &self.frames[self.frame_count - 1];
+                    } else {
                         return .runtime_error;
                     }
-                    frame = &self.frames[self.frame_count - 1];
                 },
                 .less => {
-                    if (!NumBinaryOp.run(self, NumBinaryOp.less, self.less_string.?)) {
+                    if (value.isNumber(self.peek(0)) and value.isNumber(self.peek(1))) {
+                        const b = value.asNumber(self.pop());
+                        const a = value.asNumber(self.pop());
+                        self.push(value.boolean(a < b));
+                    } else if (self.binaryOp(self.less_string.?)) {
+                        frame = &self.frames[self.frame_count - 1];
+                    } else {
                         return .runtime_error;
                     }
-                    frame = &self.frames[self.frame_count - 1];
                 },
                 .less_equal => {
-                    if (!NumBinaryOp.run(self, NumBinaryOp.lessEqual, self.less_equal_string.?)) {
+                    if (value.isNumber(self.peek(0)) and value.isNumber(self.peek(1))) {
+                        const b = value.asNumber(self.pop());
+                        const a = value.asNumber(self.pop());
+                        self.push(value.boolean(a <= b));
+                    } else if (self.binaryOp(self.less_equal_string.?)) {
+                        frame = &self.frames[self.frame_count - 1];
+                    } else {
                         return .runtime_error;
                     }
-                    frame = &self.frames[self.frame_count - 1];
                 },
                 .is => if (!checkIs(self)) return .runtime_error,
                 .add => {
@@ -1082,28 +1056,48 @@ pub const Vm = struct {
                     }
                 },
                 .subtract => {
-                    if (!NumBinaryOp.run(self, NumBinaryOp.subtract, self.subtract_string.?)) {
+                    if (value.isNumber(self.peek(0)) and value.isNumber(self.peek(1))) {
+                        const b = value.asNumber(self.pop());
+                        const a = value.asNumber(self.pop());
+                        self.push(value.number(a - b));
+                    } else if (self.binaryOp(self.subtract_string.?)) {
+                        frame = &self.frames[self.frame_count - 1];
+                    } else {
                         return .runtime_error;
                     }
-                    frame = &self.frames[self.frame_count - 1];
                 },
                 .multiply => {
-                    if (!NumBinaryOp.run(self, NumBinaryOp.multiply, self.multiply_string.?)) {
+                    if (value.isNumber(self.peek(0)) and value.isNumber(self.peek(1))) {
+                        const b = value.asNumber(self.pop());
+                        const a = value.asNumber(self.pop());
+                        self.push(value.number(a * b));
+                    } else if (self.binaryOp(self.multiply_string.?)) {
+                        frame = &self.frames[self.frame_count - 1];
+                    } else {
                         return .runtime_error;
                     }
-                    frame = &self.frames[self.frame_count - 1];
                 },
                 .divide => {
-                    if (!NumBinaryOp.run(self, NumBinaryOp.divide, self.divide_string.?)) {
+                    if (value.isNumber(self.peek(0)) and value.isNumber(self.peek(1))) {
+                        const b = value.asNumber(self.pop());
+                        const a = value.asNumber(self.pop());
+                        self.push(value.number(a / b));
+                    } else if (self.binaryOp(self.divide_string.?)) {
+                        frame = &self.frames[self.frame_count - 1];
+                    } else {
                         return .runtime_error;
                     }
-                    frame = &self.frames[self.frame_count - 1];
                 },
                 .remainder => {
-                    if (!NumBinaryOp.run(self, NumBinaryOp.remainder, self.remainder_string.?)) {
+                    if (value.isNumber(self.peek(0)) and value.isNumber(self.peek(1))) {
+                        const b = value.asNumber(self.pop());
+                        const a = value.asNumber(self.pop());
+                        self.push(value.number(@rem(a, b)));
+                    } else if (self.binaryOp(self.remainder_string.?)) {
+                        frame = &self.frames[self.frame_count - 1];
+                    } else {
                         return .runtime_error;
                     }
-                    frame = &self.frames[self.frame_count - 1];
                 },
 
                 .negate => {
