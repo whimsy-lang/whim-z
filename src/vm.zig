@@ -540,9 +540,9 @@ pub const Vm = struct {
         if (value.isObject(target)) {
             const obj = value.asObject(target);
             switch (obj.type) {
-                .class => return defineOnStringMap(self, &obj.asClass().fields, key, val, constant),
-                .instance => return defineOnStringMap(self, &obj.asInstance().fields, key, val, constant),
-                .map => return defineOnMap(self, obj.asMap(), key, val, constant),
+                .class => return self.defineOnStringMap(&obj.asClass().fields, key, val, constant),
+                .instance => return self.defineOnStringMap(&obj.asInstance().fields, key, val, constant),
+                .map => return self.defineOnMap(obj.asMap(), key, val, constant),
                 else => {},
             }
         }
@@ -577,10 +577,10 @@ pub const Vm = struct {
         if (value.isObject(target)) {
             const obj = value.asObject(target);
             switch (obj.type) {
-                .list => return getOnList(self, obj.asList(), key, pop_count),
-                .map => return getOnMap(self, obj.asMap(), key, pop_count),
-                .set => return getOnSet(self, obj.asSet(), key, pop_count),
-                .string => return getOnString(self, obj.asString(), key, pop_count),
+                .list => return self.getOnList(obj.asList(), key, pop_count),
+                .map => return self.getOnMap(obj.asMap(), key, pop_count),
+                .set => return self.getOnSet(obj.asSet(), key, pop_count),
+                .string => return self.getOnString(obj.asString(), key, pop_count),
                 else => {},
             }
         }
@@ -778,8 +778,8 @@ pub const Vm = struct {
     fn setOnValue(self: *Vm, target: Value, key: Value, val: Value) bool {
         if (value.isObject(target)) {
             switch (value.asObject(target).type) {
-                .list => return setOnList(self, value.asList(target), key, val),
-                .map => return setOnMap(self, value.asMap(target), key, val),
+                .list => return self.setOnList(value.asList(target), key, val),
+                .map => return self.setOnMap(value.asMap(target), key, val),
                 else => {},
             }
         }
@@ -1041,7 +1041,7 @@ pub const Vm = struct {
                         return .runtime_error;
                     }
                 },
-                .is => if (!checkIs(self)) return .runtime_error,
+                .is => if (!self.checkIs()) return .runtime_error,
                 .add => {
                     if (value.isNumber(self.peek(0)) and value.isNumber(self.peek(1))) {
                         const b = value.asNumber(self.pop());
