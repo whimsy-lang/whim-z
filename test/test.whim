@@ -7,24 +7,17 @@ overall_start :: std.time()
 
 do
     o := 0
-    a := 0
-    b := 0
-    c := 0
-    f :: fn(x, y) return x + y /fn
     loop break o > 9
         start :: std.time()
         o += 1
         i := 0
         loop break i > 10000000
             i += 1
-            a = 0
-            b = 0
-            c = 0
-            a += 1 + 2 + 3 + 4 + 5
-            b += 1 + 2 + 3 + 4 + 5
-            c += 1 + 2 + 3 + 4 + 5
-            f(a, b)
-            f(b, c)
+            1-2-3-4-5-6-7-8-9-0
+            1-2-3-4-5-6-7-8-9-0
+            1-2-3-4-5-6-7-8-9-0
+            1-2-3-4-5-6-7-8-9-0
+            1-2-3-4-5-6-7-8-9-0
         /loop
         std.print(std.time() - start)
     /loop

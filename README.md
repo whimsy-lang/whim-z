@@ -197,6 +197,7 @@ extension: *.whim
 
 ## TODO
 
+* test if updating frame on every binop affects performance
 * character (byte?) number instead of line number
 * error handling
 * strings - flexible array members
@@ -204,6 +205,7 @@ extension: *.whim
 * separate sized jumps
 * have exit jumps jump straight to the end instead of chaining
 * don't emit (nil and return) if the last line is already a return
+* ip in a local and flag it as a register
 * closures only for functions that need it?
 * generational gc
 

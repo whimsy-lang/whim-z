@@ -46,12 +46,28 @@ pub const Vm = struct {
         slots: [*]Value,
         pop_one: bool,
 
-        fn readConstant(self: *CallFrame, ip: *[*]u8) Value {
-            return self.closure.function.chunk.constants.items[readNum(ip)];
+        fn readByte(self: *CallFrame) u8 {
+            const val = self.ip[0];
+            self.ip += 1;
+            return val;
         }
 
-        fn readString(self: *CallFrame, ip: *[*]u8) *ObjString {
-            return value.asString(self.readConstant(ip));
+        fn readShort(self: *CallFrame) u16 {
+            const val = (@as(u16, self.ip[0]) << 8) | (self.ip[1]);
+            self.ip += 2;
+            return val;
+        }
+
+        fn readNum(self: *CallFrame) u29 {
+            return vle.getIncrement(&self.ip);
+        }
+
+        fn readConstant(self: *CallFrame) Value {
+            return self.closure.function.chunk.constants.items[self.readNum()];
+        }
+
+        fn readString(self: *CallFrame) *ObjString {
+            return value.asString(self.readConstant());
         }
     };
 
@@ -206,9 +222,7 @@ pub const Vm = struct {
         self.open_upvalues = null;
     }
 
-    fn runtimeError(self: *Vm, ip: [*]u8, comptime fmt: []const u8, args: anytype) void {
-        self.frames[self.frame_count - 1].ip = ip;
-
+    fn runtimeError(self: *Vm, comptime fmt: []const u8, args: anytype) void {
         std.debug.print(fmt, args);
         std.debug.print("\n", .{});
 
@@ -226,14 +240,6 @@ pub const Vm = struct {
         }
 
         self.resetStack();
-    }
-
-    fn readShort(ip: [*]u8) u16 {
-        return (@as(u16, ip[0]) << 8) | ip[1];
-    }
-
-    fn readNum(ip: *[*]u8) u29 {
-        return vle.getIncrement(ip);
     }
 
     pub fn peek(self: *Vm, offset: usize) Value {
@@ -280,42 +286,34 @@ pub const Vm = struct {
         return value.string(ObjString.take(self, chars));
     }
 
-    fn call(self: *Vm, ip: [*]u8, closure: *ObjClosure, arg_count: u29, pop_one: bool) bool {
-        self.frames[self.frame_count - 1].ip = ip;
-
+    fn call(self: *Vm, closure: *ObjClosure, arg_count: u29, pop_one: bool) bool {
         if (arg_count != closure.function.arity) {
-            self.runtimeError(ip, "Expected {d} arguments but got {d}.", .{ closure.function.arity, arg_count });
+            self.runtimeError("Expected {d} arguments but got {d}.", .{ closure.function.arity, arg_count });
             return false;
         }
 
         if (self.frame_count == frames_max) {
-            self.runtimeError(ip, "Stack overflow.", .{});
+            self.runtimeError("Stack overflow.", .{});
             return false;
         }
 
-        self.initFrame(closure, arg_count, pop_one);
-        return true;
-    }
-
-    fn initFrame(self: *Vm, closure: *ObjClosure, arg_count: u29, pop_one: bool) void {
         const frame = &self.frames[self.frame_count];
         self.frame_count += 1;
         frame.closure = closure;
         frame.ip = closure.function.chunk.code.items.ptr;
         frame.slots = self.stack_top - arg_count;
         frame.pop_one = pop_one;
+        return true;
     }
 
-    fn binaryOp(self: *Vm, ip: [*]u8, op: *ObjString) bool {
+    fn binaryOp(self: *Vm, op: *ObjString) bool {
         const b = self.pop();
         self.push(self.peek(0));
         self.push(b);
-        return self.invoke(ip, op, 2);
+        return self.invoke(op, 2);
     }
 
-    fn callValue(self: *Vm, ip: [*]u8, callee: Value, arg_count: u29) bool {
-        self.frames[self.frame_count - 1].ip = ip;
-
+    fn callValue(self: *Vm, callee: Value, arg_count: u29) bool {
         if (value.isObject(callee)) {
             const obj = value.asObject(callee);
             switch (obj.type) {
@@ -333,7 +331,7 @@ pub const Vm = struct {
                     }
                     if (class == self.map_class) {
                         if (arg_count != 0) {
-                            self.runtimeError(ip, "Expected 0 arguments but got {d}.", .{arg_count});
+                            self.runtimeError("Expected 0 arguments but got {d}.", .{arg_count});
                             return false;
                         }
                         const map = ObjMap.init(self);
@@ -357,7 +355,7 @@ pub const Vm = struct {
                         class == self.range_class or
                         class == self.string_class)
                     {
-                        self.runtimeError(ip, "Cannot use an initializer on a primitive type.", .{});
+                        self.runtimeError("Cannot use an initializer on a primitive type.", .{});
                         return false;
                     }
 
@@ -366,19 +364,19 @@ pub const Vm = struct {
                     var initializer: Value = undefined;
                     while (class) |cl| {
                         if (cl.fields.get(self.init_string.?, &initializer)) {
-                            return self.call(ip, value.asClosure(initializer), arg_count + 1, false);
+                            return self.call(value.asClosure(initializer), arg_count + 1, false);
                         }
                         class = cl.super;
                     }
 
                     if (arg_count != 0) {
-                        self.runtimeError(ip, "Expected 0 arguments but got {d}.", .{arg_count});
+                        self.runtimeError("Expected 0 arguments but got {d}.", .{arg_count});
                         return false;
                     }
 
                     return true;
                 },
-                .closure => return self.call(ip, obj.asClosure(), arg_count, true),
+                .closure => return self.call(obj.asClosure(), arg_count, true),
                 .native => {
                     self.has_native_error = false;
                     const native = obj.asNative().function;
@@ -386,7 +384,7 @@ pub const Vm = struct {
                     self.stack_top -= arg_count + 1;
                     self.push(result);
                     if (self.has_native_error) {
-                        self.runtimeError(ip, "{s}", .{value.asString(result).chars});
+                        self.runtimeError("{s}", .{value.asString(result).chars});
                         return false;
                     }
                     return true;
@@ -394,11 +392,11 @@ pub const Vm = struct {
                 else => {},
             }
         }
-        self.runtimeError(ip, "Can only call functions and classes.", .{});
+        self.runtimeError("Can only call functions and classes.", .{});
         return false;
     }
 
-    fn invoke(self: *Vm, ip: [*]u8, name: *ObjString, arg_count: u29) bool {
+    fn invoke(self: *Vm, name: *ObjString, arg_count: u29) bool {
         const receiver = self.peek(arg_count);
 
         if (value.isObjType(receiver, .instance)) {
@@ -407,19 +405,19 @@ pub const Vm = struct {
             var val: Value = undefined;
             if (instance.fields.get(name, &val)) {
                 (self.stack_top - (arg_count + 1))[0] = val;
-                return self.callValue(ip, val, arg_count);
+                return self.callValue(val, arg_count);
             }
 
             var current: ?*ObjClass = instance.type;
             var method: Value = undefined;
             while (current) |cur| {
                 if (cur.fields.get(name, &method)) {
-                    return self.call(ip, value.asClosure(method), arg_count, true);
+                    return self.call(value.asClosure(method), arg_count, true);
                 }
                 current = cur.super;
             }
 
-            self.runtimeError(ip, "Undefined property '{s}'.", .{name.chars});
+            self.runtimeError("Undefined property '{s}'.", .{name.chars});
             return false;
         } else if (value.hasStdClass(receiver)) {
             const std_class = value.stdClass(receiver, self);
@@ -429,22 +427,22 @@ pub const Vm = struct {
             if (name == self.type_string) {
                 const val = value.class(std_class);
                 (self.stack_top - (arg_count + 1))[0] = val;
-                return self.callValue(ip, val, arg_count);
+                return self.callValue(val, arg_count);
             }
 
             var val: Value = undefined;
             while (class) |cl| {
                 if (cl.fields.get(name, &val)) {
                     (self.stack_top - (arg_count + 1))[0] = val;
-                    return self.callValue(ip, val, arg_count);
+                    return self.callValue(val, arg_count);
                 }
                 class = cl.super;
             }
 
-            self.runtimeError(ip, "Undefined property '{s}'.", .{name.chars});
+            self.runtimeError("Undefined property '{s}'.", .{name.chars});
             return false;
         }
-        self.runtimeError(ip, "Only classes and instances have properties.", .{});
+        self.runtimeError("Only classes and instances have properties.", .{});
         return false;
     }
 
@@ -481,12 +479,12 @@ pub const Vm = struct {
         }
     }
 
-    fn checkIs(self: *Vm, ip: [*]u8) bool {
+    fn checkIs(self: *Vm) bool {
         const b = self.pop();
         const a = self.pop();
 
         if (!value.isObjType(b, .class)) {
-            self.runtimeError(ip, "Right operand of 'is' must be a class.", .{});
+            self.runtimeError("Right operand of 'is' must be a class.", .{});
             return false;
         }
 
@@ -504,7 +502,7 @@ pub const Vm = struct {
         } else if (value.hasStdClass(a)) {
             class = value.stdClass(a, self);
         } else {
-            self.runtimeError(ip, "Left operand of 'is' must by a class or instance.", .{});
+            self.runtimeError("Left operand of 'is' must by a class or instance.", .{});
             return false;
         }
 
@@ -538,58 +536,58 @@ pub const Vm = struct {
         self.push(value.string(result));
     }
 
-    fn defineOnValue(self: *Vm, ip: [*]u8, target: Value, key: Value, val: Value, constant: bool) bool {
+    fn defineOnValue(self: *Vm, target: Value, key: Value, val: Value, constant: bool) bool {
         if (value.isObject(target)) {
             const obj = value.asObject(target);
             switch (obj.type) {
-                .class => return self.defineOnStringMap(ip, &obj.asClass().fields, key, val, constant),
-                .instance => return self.defineOnStringMap(ip, &obj.asInstance().fields, key, val, constant),
-                .map => return self.defineOnMap(ip, obj.asMap(), key, val, constant),
+                .class => return defineOnStringMap(self, &obj.asClass().fields, key, val, constant),
+                .instance => return defineOnStringMap(self, &obj.asInstance().fields, key, val, constant),
+                .map => return defineOnMap(self, obj.asMap(), key, val, constant),
                 else => {},
             }
         }
-        self.runtimeError(ip, "Only classes, instances, and maps have properties.", .{});
+        self.runtimeError("Only classes, instances, and maps have properties.", .{});
         return false;
     }
 
-    fn defineOnMap(self: *Vm, ip: [*]u8, map: *ObjMap, key: Value, val: Value, constant: bool) bool {
+    fn defineOnMap(self: *Vm, map: *ObjMap, key: Value, val: Value, constant: bool) bool {
         if (!map.items.add(key, val, constant)) {
-            self.runtimeError(ip, "Map already contains key.", .{});
+            self.runtimeError("Map already contains key.", .{});
             return false;
         }
         return true;
     }
 
-    fn defineOnStringMap(self: *Vm, ip: [*]u8, str_map: *StringMap, key: Value, val: Value, constant: bool) bool {
+    fn defineOnStringMap(self: *Vm, str_map: *StringMap, key: Value, val: Value, constant: bool) bool {
         if (!value.isObjType(key, .string)) {
-            self.runtimeError(ip, "Key must be a string.", .{});
+            self.runtimeError("Key must be a string.", .{});
             return false;
         }
 
         const key_str = value.asString(key);
         if (!str_map.add(key_str, val, constant)) {
-            self.runtimeError(ip, "Property '{s}' already exists.", .{key_str.chars});
+            self.runtimeError("Property '{s}' already exists.", .{key_str.chars});
             return false;
         }
 
         return true;
     }
 
-    fn getOnValue(self: *Vm, ip: [*]u8, target: Value, key: Value, pop_count: usize) bool {
+    fn getOnValue(self: *Vm, target: Value, key: Value, pop_count: usize) bool {
         if (value.isObject(target)) {
             const obj = value.asObject(target);
             switch (obj.type) {
-                .list => return self.getOnList(ip, obj.asList(), key, pop_count),
-                .map => return self.getOnMap(ip, obj.asMap(), key, pop_count),
-                .set => return self.getOnSet(obj.asSet(), key, pop_count),
-                .string => return self.getOnString(ip, obj.asString(), key, pop_count),
+                .list => return getOnList(self, obj.asList(), key, pop_count),
+                .map => return getOnMap(self, obj.asMap(), key, pop_count),
+                .set => return getOnSet(self, obj.asSet(), key, pop_count),
+                .string => return getOnString(self, obj.asString(), key, pop_count),
                 else => {},
             }
         }
 
         // class/instance
         if (!value.isObjType(key, .string)) {
-            self.runtimeError(ip, "Class and instance keys must be a string.", .{});
+            self.runtimeError("Class and instance keys must be a string.", .{});
             return false;
         }
 
@@ -616,7 +614,7 @@ pub const Vm = struct {
                 return true;
             }
         } else {
-            self.runtimeError(ip, "Only classes and instances have properties.", .{});
+            self.runtimeError("Only classes and instances have properties.", .{});
             return false;
         }
 
@@ -630,15 +628,15 @@ pub const Vm = struct {
             class = cl.super;
         }
 
-        self.runtimeError(ip, "Undefined property '{s}'.", .{key_str.chars});
+        self.runtimeError("Undefined property '{s}'.", .{key_str.chars});
         return false;
     }
 
-    fn getOnList(self: *Vm, ip: [*]u8, list: *ObjList, key: Value, pop_count: usize) bool {
+    fn getOnList(self: *Vm, list: *ObjList, key: Value, pop_count: usize) bool {
         if (value.isNumber(key)) {
             const index = @floatToInt(isize, value.asNumber(key));
             if (index < 0 or index >= list.items.items.len) {
-                self.runtimeError(ip, "Index {d} is out of bounds (0-{d}).", .{ index, list.items.items.len - 1 });
+                self.runtimeError("Index {d} is out of bounds (0-{d}).", .{ index, list.items.items.len - 1 });
                 return false;
             }
             self.stack_top -= pop_count;
@@ -653,15 +651,15 @@ pub const Vm = struct {
                 if (range.inclusive) end += 1;
 
                 if (start < 0 or start > list.items.items.len) {
-                    self.runtimeError(ip, "Start {d} is out of bounds (0-{d}).", .{ start, list.items.items.len });
+                    self.runtimeError("Start {d} is out of bounds (0-{d}).", .{ start, list.items.items.len });
                     return false;
                 }
                 if (end < 0 or end > list.items.items.len) {
-                    self.runtimeError(ip, "End {d} is out of bounds (0-{d}).", .{ end, list.items.items.len });
+                    self.runtimeError("End {d} is out of bounds (0-{d}).", .{ end, list.items.items.len });
                     return false;
                 }
                 if (end < start) {
-                    self.runtimeError(ip, "End {d} is before start {d}.", .{ end, start });
+                    self.runtimeError("End {d} is before start {d}.", .{ end, start });
                     return false;
                 }
 
@@ -679,17 +677,17 @@ pub const Vm = struct {
                 self.push(value.list(new_list));
                 return true;
             }
-            self.runtimeError(ip, "Only numeric ranges with a step of 1 can be used to index a list.", .{});
+            self.runtimeError("Only numeric ranges with a step of 1 can be used to index a list.", .{});
             return false;
         }
-        self.runtimeError(ip, "Only numbers and ranges can be used to index a list.", .{});
+        self.runtimeError("Only numbers and ranges can be used to index a list.", .{});
         return false;
     }
 
-    fn getOnMap(self: *Vm, ip: [*]u8, map: *ObjMap, key: Value, pop_count: usize) bool {
+    fn getOnMap(self: *Vm, map: *ObjMap, key: Value, pop_count: usize) bool {
         var val: Value = undefined;
         if (!map.items.get(key, &val)) {
-            self.runtimeError(ip, "Map does not contain key.", .{});
+            self.runtimeError("Map does not contain key.", .{});
             return false;
         }
         self.stack_top -= pop_count;
@@ -705,7 +703,7 @@ pub const Vm = struct {
         return true;
     }
 
-    fn getOnString(self: *Vm, ip: [*]u8, string: *ObjString, key: Value, pop_count: usize) bool {
+    fn getOnString(self: *Vm, string: *ObjString, key: Value, pop_count: usize) bool {
         if (value.isNumber(key)) {
             const index = @floatToInt(isize, value.asNumber(key));
 
@@ -721,7 +719,7 @@ pub const Vm = struct {
             }
 
             if (index < 0 or index >= length) {
-                self.runtimeError(ip, "Index {d} is out of bounds (0-{d}).", .{ index, length - 1 });
+                self.runtimeError("Index {d} is out of bounds (0-{d}).", .{ index, length - 1 });
                 return false;
             }
 
@@ -754,15 +752,15 @@ pub const Vm = struct {
                 }
 
                 if (start < 0 or start > length) {
-                    self.runtimeError(ip, "Start {d} is out of bounds (0-{d}).", .{ start, length });
+                    self.runtimeError("Start {d} is out of bounds (0-{d}).", .{ start, length });
                     return false;
                 }
                 if (end < 0 or end > length) {
-                    self.runtimeError(ip, "End {d} is out of bounds (0-{d}).", .{ end, length });
+                    self.runtimeError("End {d} is out of bounds (0-{d}).", .{ end, length });
                     return false;
                 }
                 if (end < start) {
-                    self.runtimeError(ip, "End {d} is before start {d}.", .{ end, start });
+                    self.runtimeError("End {d} is before start {d}.", .{ end, start });
                     return false;
                 }
 
@@ -770,25 +768,25 @@ pub const Vm = struct {
                 self.push(value.string(ObjString.copy(self, string.chars[byte_start..byte_end])));
                 return true;
             }
-            self.runtimeError(ip, "Only numeric ranges with a step of 1 can be used to index a string.", .{});
+            self.runtimeError("Only numeric ranges with a step of 1 can be used to index a string.", .{});
             return false;
         }
-        self.runtimeError(ip, "Only numbers and ranges can be used to index a string.", .{});
+        self.runtimeError("Only numbers and ranges can be used to index a string.", .{});
         return false;
     }
 
-    fn setOnValue(self: *Vm, ip: [*]u8, target: Value, key: Value, val: Value) bool {
+    fn setOnValue(self: *Vm, target: Value, key: Value, val: Value) bool {
         if (value.isObject(target)) {
             switch (value.asObject(target).type) {
-                .list => return self.setOnList(ip, value.asList(target), key, val),
-                .map => return self.setOnMap(ip, value.asMap(target), key, val),
+                .list => return setOnList(self, value.asList(target), key, val),
+                .map => return setOnMap(self, value.asMap(target), key, val),
                 else => {},
             }
         }
 
         // class/instance
         if (!value.isObjType(key, .string)) {
-            self.runtimeError(ip, "Class and instance keys must be a string.", .{});
+            self.runtimeError("Class and instance keys must be a string.", .{});
             return false;
         }
 
@@ -806,7 +804,7 @@ pub const Vm = struct {
         } else if (value.isObjType(target, .class)) {
             class = value.asClass(target);
         } else {
-            self.runtimeError(ip, "Only classes and instances have properties.", .{});
+            self.runtimeError("Only classes and instances have properties.", .{});
             return false;
         }
 
@@ -818,11 +816,11 @@ pub const Vm = struct {
         }
 
         if (!found) {
-            self.runtimeError(ip, "Undefined property '{s}'.", .{key_str.chars});
+            self.runtimeError("Undefined property '{s}'.", .{key_str.chars});
             return false;
         }
         if (vc.constant) {
-            self.runtimeError(ip, "Property '{s}' is constant.", .{key_str.chars});
+            self.runtimeError("Property '{s}' is constant.", .{key_str.chars});
             return false;
         }
 
@@ -830,29 +828,29 @@ pub const Vm = struct {
         return true;
     }
 
-    fn setOnList(self: *Vm, ip: [*]u8, list: *ObjList, key: Value, val: Value) bool {
+    fn setOnList(self: *Vm, list: *ObjList, key: Value, val: Value) bool {
         if (value.isNumber(key)) {
             const index = @floatToInt(isize, value.asNumber(key));
             if (index < 0 or index >= list.items.items.len) {
-                self.runtimeError(ip, "Index {d} is out of bounds (0-{d}).", .{ index, list.items.items.len - 1 });
+                self.runtimeError("Index {d} is out of bounds (0-{d}).", .{ index, list.items.items.len - 1 });
                 return false;
             }
             list.items.items[@intCast(usize, index)] = val;
             return true;
         }
 
-        self.runtimeError(ip, "List index must be a number.", .{});
+        self.runtimeError("List index must be a number.", .{});
         return false;
     }
 
-    fn setOnMap(self: *Vm, ip: [*]u8, map: *ObjMap, key: Value, val: Value) bool {
+    fn setOnMap(self: *Vm, map: *ObjMap, key: Value, val: Value) bool {
         var vc: *ValueContainer = undefined;
         if (!map.items.getPtr(key, &vc)) {
-            self.runtimeError(ip, "Map does not contain key.", .{});
+            self.runtimeError("Map does not contain key.", .{});
             return false;
         }
         if (vc.constant) {
-            self.runtimeError(ip, "Map item is constant.", .{});
+            self.runtimeError("Map item is constant.", .{});
             return false;
         }
         vc.value = val;
@@ -862,7 +860,6 @@ pub const Vm = struct {
 
     fn run(self: *Vm) InterpretResult {
         var frame = &self.frames[self.frame_count - 1];
-        var ip = frame.ip;
 
         while (true) {
             if (debug.trace_execution) {
@@ -874,15 +871,14 @@ pub const Vm = struct {
                     std.debug.print(" ]", .{});
                 }
                 std.debug.print("\n", .{});
-                _ = debug.disassembleInstruction(&frame.closure.function.chunk, @ptrToInt(ip) - @ptrToInt(frame.closure.function.chunk.code.items.ptr));
+                _ = debug.disassembleInstruction(&frame.closure.function.chunk, @ptrToInt(frame.ip) - @ptrToInt(frame.closure.function.chunk.code.items.ptr));
             }
 
-            const instruction = ip[0];
-            ip += 1;
+            const instruction = frame.readByte();
             const op = @intToEnum(OpCode, instruction);
             switch (op) {
                 .constant => {
-                    const constant = frame.readConstant(&ip);
+                    const constant = frame.readConstant();
                     self.push(constant);
                 },
 
@@ -907,85 +903,85 @@ pub const Vm = struct {
                 .pop => _ = self.pop(),
 
                 .define_global_const, .define_global_var => {
-                    const name = frame.readString(&ip);
+                    const name = frame.readString();
                     if (!self.globals.add(name, self.peek(0), op == .define_global_const)) {
-                        self.runtimeError(ip, "Global '{s}' already exists.", .{name.chars});
+                        self.runtimeError("Global '{s}' already exists.", .{name.chars});
                         return .runtime_error;
                     }
                     _ = self.pop();
                 },
                 .get_global => {
-                    const name = frame.readString(&ip);
+                    const name = frame.readString();
                     var val: Value = undefined;
                     if (!self.globals.get(name, &val)) {
-                        self.runtimeError(ip, "Undefined variable '{s}'.", .{name.chars});
+                        self.runtimeError("Undefined variable '{s}'.", .{name.chars});
                         return .runtime_error;
                     }
                     self.push(val);
                 },
                 .set_global => {
-                    const name = frame.readString(&ip);
+                    const name = frame.readString();
                     var vc: *ValueContainer = undefined;
                     if (!self.globals.getPtr(name, &vc)) {
-                        self.runtimeError(ip, "Undefined variable '{s}'.", .{name.chars});
+                        self.runtimeError("Undefined variable '{s}'.", .{name.chars});
                         return .runtime_error;
                     }
                     if (vc.constant) {
-                        self.runtimeError(ip, "Global '{s}' is constant.", .{name.chars});
+                        self.runtimeError("Global '{s}' is constant.", .{name.chars});
                         return .runtime_error;
                     }
                     vc.value = self.pop();
                 },
 
                 .get_local => {
-                    const index = readNum(&ip);
+                    const index = frame.readNum();
                     self.push(frame.slots[index]);
                 },
                 .set_local => {
-                    const index = readNum(&ip);
+                    const index = frame.readNum();
                     frame.slots[index] = self.pop();
                 },
 
                 .get_upvalue => {
-                    const index = readNum(&ip);
+                    const index = frame.readNum();
                     self.push(frame.closure.upvalues[index].?.location.*);
                 },
                 .set_upvalue => {
-                    const index = readNum(&ip);
+                    const index = frame.readNum();
                     frame.closure.upvalues[index].?.location.* = self.pop();
                 },
 
                 .define_const, .define_const_pop, .define_var, .define_var_pop => {
                     const constant = (op == .define_const) or (op == .define_const_pop);
                     const pop_count: usize = if (op == .define_const_pop or op == .define_var_pop) 3 else 2;
-                    if (!self.defineOnValue(ip, self.peek(2), self.peek(1), self.peek(0), constant)) {
+                    if (!self.defineOnValue(self.peek(2), self.peek(1), self.peek(0), constant)) {
                         return .runtime_error;
                     }
                     self.stack_top -= pop_count;
                 },
                 .get, .get_pop => {
                     const pop_count: usize = if (op == .get_pop) 2 else 0;
-                    if (!self.getOnValue(ip, self.peek(1), self.peek(0), pop_count)) {
+                    if (!self.getOnValue(self.peek(1), self.peek(0), pop_count)) {
                         return .runtime_error;
                     }
                 },
                 .set => {
-                    if (!self.setOnValue(ip, self.peek(2), self.peek(1), self.peek(0))) {
+                    if (!self.setOnValue(self.peek(2), self.peek(1), self.peek(0))) {
                         return .runtime_error;
                     }
                     self.stack_top -= 3;
                 },
 
                 .get_by_const, .get_by_const_pop => {
-                    const key = frame.readConstant(&ip);
+                    const key = frame.readConstant();
                     const pop_count: usize = if (op == .get_by_const_pop) 1 else 0;
-                    if (!self.getOnValue(ip, self.peek(0), key, pop_count)) {
+                    if (!self.getOnValue(self.peek(0), key, pop_count)) {
                         return .runtime_error;
                     }
                 },
                 .set_by_const => {
-                    const key = frame.readConstant(&ip);
-                    if (!self.setOnValue(ip, self.peek(1), key, self.peek(0))) {
+                    const key = frame.readConstant();
+                    if (!self.setOnValue(self.peek(1), key, self.peek(0))) {
                         return .runtime_error;
                     }
                     self.stack_top -= 2;
@@ -1006,9 +1002,8 @@ pub const Vm = struct {
                         const b = value.asNumber(self.pop());
                         const a = value.asNumber(self.pop());
                         self.push(value.boolean(a > b));
-                    } else if (self.binaryOp(ip, self.greater_string.?)) {
+                    } else if (self.binaryOp(self.greater_string.?)) {
                         frame = &self.frames[self.frame_count - 1];
-                        ip = frame.ip;
                     } else {
                         return .runtime_error;
                     }
@@ -1018,9 +1013,8 @@ pub const Vm = struct {
                         const b = value.asNumber(self.pop());
                         const a = value.asNumber(self.pop());
                         self.push(value.boolean(a >= b));
-                    } else if (self.binaryOp(ip, self.greater_equal_string.?)) {
+                    } else if (self.binaryOp(self.greater_equal_string.?)) {
                         frame = &self.frames[self.frame_count - 1];
-                        ip = frame.ip;
                     } else {
                         return .runtime_error;
                     }
@@ -1030,9 +1024,8 @@ pub const Vm = struct {
                         const b = value.asNumber(self.pop());
                         const a = value.asNumber(self.pop());
                         self.push(value.boolean(a < b));
-                    } else if (self.binaryOp(ip, self.less_string.?)) {
+                    } else if (self.binaryOp(self.less_string.?)) {
                         frame = &self.frames[self.frame_count - 1];
-                        ip = frame.ip;
                     } else {
                         return .runtime_error;
                     }
@@ -1042,14 +1035,13 @@ pub const Vm = struct {
                         const b = value.asNumber(self.pop());
                         const a = value.asNumber(self.pop());
                         self.push(value.boolean(a <= b));
-                    } else if (self.binaryOp(ip, self.less_equal_string.?)) {
+                    } else if (self.binaryOp(self.less_equal_string.?)) {
                         frame = &self.frames[self.frame_count - 1];
-                        ip = frame.ip;
                     } else {
                         return .runtime_error;
                     }
                 },
-                .is => if (!self.checkIs(ip)) return .runtime_error,
+                .is => if (!checkIs(self)) return .runtime_error,
                 .add => {
                     if (value.isNumber(self.peek(0)) and value.isNumber(self.peek(1))) {
                         const b = value.asNumber(self.pop());
@@ -1057,9 +1049,8 @@ pub const Vm = struct {
                         self.push(value.number(a + b));
                     } else if (value.isObjType(self.peek(0), .string) and value.isObjType(self.peek(1), .string)) {
                         self.concatenate();
-                    } else if (self.binaryOp(ip, self.add_string.?)) {
+                    } else if (self.binaryOp(self.add_string.?)) {
                         frame = &self.frames[self.frame_count - 1];
-                        ip = frame.ip;
                     } else {
                         return .runtime_error;
                     }
@@ -1069,9 +1060,8 @@ pub const Vm = struct {
                         const b = value.asNumber(self.pop());
                         const a = value.asNumber(self.pop());
                         self.push(value.number(a - b));
-                    } else if (self.binaryOp(ip, self.subtract_string.?)) {
+                    } else if (self.binaryOp(self.subtract_string.?)) {
                         frame = &self.frames[self.frame_count - 1];
-                        ip = frame.ip;
                     } else {
                         return .runtime_error;
                     }
@@ -1081,9 +1071,8 @@ pub const Vm = struct {
                         const b = value.asNumber(self.pop());
                         const a = value.asNumber(self.pop());
                         self.push(value.number(a * b));
-                    } else if (self.binaryOp(ip, self.multiply_string.?)) {
+                    } else if (self.binaryOp(self.multiply_string.?)) {
                         frame = &self.frames[self.frame_count - 1];
-                        ip = frame.ip;
                     } else {
                         return .runtime_error;
                     }
@@ -1093,9 +1082,8 @@ pub const Vm = struct {
                         const b = value.asNumber(self.pop());
                         const a = value.asNumber(self.pop());
                         self.push(value.number(a / b));
-                    } else if (self.binaryOp(ip, self.divide_string.?)) {
+                    } else if (self.binaryOp(self.divide_string.?)) {
                         frame = &self.frames[self.frame_count - 1];
-                        ip = frame.ip;
                     } else {
                         return .runtime_error;
                     }
@@ -1105,9 +1093,8 @@ pub const Vm = struct {
                         const b = value.asNumber(self.pop());
                         const a = value.asNumber(self.pop());
                         self.push(value.number(@rem(a, b)));
-                    } else if (self.binaryOp(ip, self.remainder_string.?)) {
+                    } else if (self.binaryOp(self.remainder_string.?)) {
                         frame = &self.frames[self.frame_count - 1];
-                        ip = frame.ip;
                     } else {
                         return .runtime_error;
                     }
@@ -1115,7 +1102,7 @@ pub const Vm = struct {
 
                 .negate => {
                     if (!value.isNumber(self.peek(0))) {
-                        self.runtimeError(ip, "Operand must be a number.", .{});
+                        self.runtimeError("Operand must be a number.", .{});
                         return .runtime_error;
                     }
                     self.push(value.number(-value.asNumber(self.pop())));
@@ -1123,67 +1110,58 @@ pub const Vm = struct {
                 .not => self.push(value.boolean(value.isFalsey(self.pop()))),
 
                 .jump => {
-                    const offset = readShort(ip);
-                    ip += 2;
-                    ip += offset;
+                    const offset = frame.readShort();
+                    frame.ip += offset;
                 },
                 .jump_back => {
-                    const offset = readShort(ip);
-                    ip += 2;
-                    ip -= offset;
+                    const offset = frame.readShort();
+                    frame.ip -= offset;
                 },
                 .jump_if_true => {
-                    const offset = readShort(ip);
-                    ip += 2;
-                    if (!value.isFalsey(self.peek(0))) ip += offset;
+                    const offset = frame.readShort();
+                    if (!value.isFalsey(self.peek(0))) frame.ip += offset;
                 },
                 .jump_if_false => {
-                    const offset = readShort(ip);
-                    ip += 2;
-                    if (value.isFalsey(self.peek(0))) ip += offset;
+                    const offset = frame.readShort();
+                    if (value.isFalsey(self.peek(0))) frame.ip += offset;
                 },
                 .jump_if_false_pop => {
-                    const offset = readShort(ip);
-                    ip += 2;
-                    if (value.isFalsey(self.pop())) ip += offset;
+                    const offset = frame.readShort();
+                    if (value.isFalsey(self.pop())) frame.ip += offset;
                 },
 
                 .binary_op => {
-                    const binop = frame.readString(&ip);
-                    if (!self.binaryOp(ip, binop)) {
+                    const binop = frame.readString();
+                    if (!self.binaryOp(binop)) {
                         return .runtime_error;
                     }
                     frame = &self.frames[self.frame_count - 1];
-                    ip = frame.ip;
                 },
                 .call => {
-                    const arg_count = readNum(&ip);
-                    if (!self.callValue(ip, self.peek(arg_count), arg_count)) {
+                    const arg_count = frame.readNum();
+                    if (!self.callValue(self.peek(arg_count), arg_count)) {
                         return .runtime_error;
                     }
                     frame = &self.frames[self.frame_count - 1];
-                    ip = frame.ip;
                 },
                 .invoke => {
-                    const name = frame.readString(&ip);
-                    const arg_count = readNum(&ip);
-                    if (!self.invoke(ip, name, arg_count)) {
+                    const name = frame.readString();
+                    const arg_count = frame.readNum();
+                    if (!self.invoke(name, arg_count)) {
                         return .runtime_error;
                     }
                     frame = &self.frames[self.frame_count - 1];
-                    ip = frame.ip;
                 },
 
                 .closure => {
-                    const function = value.asFunction(frame.readConstant(&ip));
+                    const function = value.asFunction(frame.readConstant());
                     const closure = ObjClosure.init(self, function);
                     self.push(value.closure(closure));
 
                     var i: usize = 0;
                     while (i < closure.upvalues.len) : (i += 1) {
-                        const is_local = ip[0];
-                        ip += 1;
-                        const index = readNum(&ip);
+                        const is_local = frame.readByte();
+                        const index = frame.readNum();
                         if (is_local == 1) {
                             closure.upvalues[i] = self.captureUpvalue(&frame.slots[index]);
                         } else {
@@ -1210,7 +1188,6 @@ pub const Vm = struct {
                     self.stack_top = new_top;
                     self.push(result);
                     frame = &self.frames[self.frame_count - 1];
-                    ip = frame.ip;
                 },
                 .class => {
                     var super: ?*ObjClass = null;
@@ -1227,21 +1204,20 @@ pub const Vm = struct {
                             super == self.set_class or
                             super == self.string_class)
                         {
-                            self.runtimeError(ip, "Cannot inherit from a builtin type.", .{});
+                            self.runtimeError("Cannot inherit from a builtin type.", .{});
                             return .runtime_error;
                         }
                     } else if (!value.isNil(self.peek(0))) {
-                        self.runtimeError(ip, "Superclass must be a class or nil.", .{});
+                        self.runtimeError("Superclass must be a class or nil.", .{});
                         return .runtime_error;
                     }
 
-                    const class = ObjClass.init(self, frame.readString(&ip), super);
+                    const class = ObjClass.init(self, frame.readString(), super);
                     _ = self.pop();
                     self.push(value.class(class));
                 },
                 .iterate_check => {
-                    const offset = readShort(ip);
-                    ip += 2;
+                    const offset = frame.readShort();
 
                     // stack: [object being iterated over] [index]
                     // if index is valid, push the current value onto the stack
@@ -1255,7 +1231,7 @@ pub const Vm = struct {
                         if (index < value.asNumber(iter)) {
                             self.push(self.peek(0));
                         } else {
-                            ip += offset;
+                            frame.ip += offset;
                         }
                     } else if (value.isObject(iter)) {
                         const obj = value.asObject(iter);
@@ -1265,7 +1241,7 @@ pub const Vm = struct {
                                 if (uindex < list.items.items.len) {
                                     self.push(list.items.items[uindex]);
                                 } else {
-                                    ip += offset;
+                                    frame.ip += offset;
                                 }
                             },
                             .range => {
@@ -1276,7 +1252,7 @@ pub const Vm = struct {
                                     if ((range.step > 0 and val < end) or (range.step < 0 and val > end) or (range.inclusive and val == end)) {
                                         self.push(value.number(val));
                                     } else {
-                                        ip += offset;
+                                        frame.ip += offset;
                                     }
                                 } else {
                                     const start = unicode.utf8Decode(value.asString(range.start).chars) catch {
@@ -1297,7 +1273,7 @@ pub const Vm = struct {
                                         };
                                         self.push(value.string(ObjString.copy(self, buf[0..len])));
                                     } else {
-                                        ip += offset;
+                                        frame.ip += offset;
                                     }
                                 }
                             },
@@ -1322,16 +1298,16 @@ pub const Vm = struct {
                                     };
                                     self.push(value.string(ObjString.copy(self, str.chars[byte_idx .. byte_idx + ch_len])));
                                 } else {
-                                    ip += offset;
+                                    frame.ip += offset;
                                 }
                             },
                             else => {
-                                self.runtimeError(ip, "Only lists, numbers, ranges, and strings can be iterated on.", .{});
+                                self.runtimeError("Only lists, numbers, ranges, and strings can be iterated on.", .{});
                                 return .runtime_error;
                             },
                         }
                     } else {
-                        self.runtimeError(ip, "Only lists, numbers, ranges, and strings can be iterated on.", .{});
+                        self.runtimeError("Only lists, numbers, ranges, and strings can be iterated on.", .{});
                         return .runtime_error;
                     }
                 },
@@ -1339,12 +1315,11 @@ pub const Vm = struct {
                     // stack: [object being iterated over] [index]
                     self.push(value.number(value.asNumber(self.pop()) + 1));
 
-                    const offset = readShort(ip);
-                    ip += 2;
-                    ip -= offset;
+                    const offset = frame.readShort();
+                    frame.ip -= offset;
                 },
                 .list => {
-                    const count = readNum(&ip);
+                    const count = frame.readNum();
                     const list = ObjList.init(self);
                     self.push(value.list(list));
                     list.items.appendSlice((self.stack_top - (count + 1))[0..count]) catch {
@@ -1374,7 +1349,7 @@ pub const Vm = struct {
                         self.stack_top -= 2;
                         self.push(value.range(range));
                     } else {
-                        self.runtimeError(ip, "Start and end must both be numbers or strings of length 1.", .{});
+                        self.runtimeError("Start and end must both be numbers or strings of length 1.", .{});
                         return .runtime_error;
                     }
                 },
@@ -1386,19 +1361,19 @@ pub const Vm = struct {
                         (value.isObjType(start, .string) and value.isObjType(end, .string) and value.asString(start).length() == 1 and value.asString(end).length() == 1)) and value.isNumber(step))
                     {
                         if (value.asNumber(step) == 0) {
-                            self.runtimeError(ip, "Step cannot be 0.", .{});
+                            self.runtimeError("Step cannot be 0.", .{});
                             return .runtime_error;
                         }
                         const range = ObjRange.init(self, start, end, value.asNumber(step), op == .range_inclusive_step);
                         self.stack_top -= 3;
                         self.push(value.range(range));
                     } else {
-                        self.runtimeError(ip, "Start and end must both be numbers or strings of length 1, and step must be a number.", .{});
+                        self.runtimeError("Start and end must both be numbers or strings of length 1, and step must be a number.", .{});
                         return .runtime_error;
                     }
                 },
                 .new_set => {
-                    const count = readNum(&ip);
+                    const count = frame.readNum();
                     const set = ObjSet.init(self);
                     self.push(value.set(set));
                     for ((self.stack_top - (count + 1))[0..count]) |val| {
@@ -1419,7 +1394,7 @@ pub const Vm = struct {
         const closure = ObjClosure.init(self, function.?);
         _ = self.pop();
         self.push(value.closure(closure));
-        self.initFrame(closure, 0, true);
+        _ = self.call(closure, 0, true);
 
         return self.run();
     }
