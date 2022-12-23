@@ -228,16 +228,8 @@ pub const Vm = struct {
         self.resetStack();
     }
 
-    fn readByte(ip: *[*]u8) u8 {
-        const val = ip.*[0];
-        ip.* += 1;
-        return val;
-    }
-
-    fn readShort(ip: *[*]u8) u16 {
-        const val = (@as(u16, ip.*[0]) << 8) | ip.*[1];
-        ip.* += 2;
-        return val;
+    fn readShort(ip: [*]u8) u16 {
+        return (@as(u16, ip[0]) << 8) | ip[1];
     }
 
     fn readNum(ip: *[*]u8) u29 {
@@ -885,7 +877,8 @@ pub const Vm = struct {
                 _ = debug.disassembleInstruction(&frame.closure.function.chunk, @ptrToInt(ip) - @ptrToInt(frame.closure.function.chunk.code.items.ptr));
             }
 
-            const instruction = readByte(&ip);
+            const instruction = ip[0];
+            ip += 1;
             const op = @intToEnum(OpCode, instruction);
             switch (op) {
                 .constant => {
@@ -1130,23 +1123,28 @@ pub const Vm = struct {
                 .not => self.push(value.boolean(value.isFalsey(self.pop()))),
 
                 .jump => {
-                    const offset = readShort(&ip);
+                    const offset = readShort(ip);
+                    ip += 2;
                     ip += offset;
                 },
                 .jump_back => {
-                    const offset = readShort(&ip);
+                    const offset = readShort(ip);
+                    ip += 2;
                     ip -= offset;
                 },
                 .jump_if_true => {
-                    const offset = readShort(&ip);
+                    const offset = readShort(ip);
+                    ip += 2;
                     if (!value.isFalsey(self.peek(0))) ip += offset;
                 },
                 .jump_if_false => {
-                    const offset = readShort(&ip);
+                    const offset = readShort(ip);
+                    ip += 2;
                     if (value.isFalsey(self.peek(0))) ip += offset;
                 },
                 .jump_if_false_pop => {
-                    const offset = readShort(&ip);
+                    const offset = readShort(ip);
+                    ip += 2;
                     if (value.isFalsey(self.pop())) ip += offset;
                 },
 
@@ -1183,7 +1181,8 @@ pub const Vm = struct {
 
                     var i: usize = 0;
                     while (i < closure.upvalues.len) : (i += 1) {
-                        const is_local = readByte(&ip);
+                        const is_local = ip[0];
+                        ip += 1;
                         const index = readNum(&ip);
                         if (is_local == 1) {
                             closure.upvalues[i] = self.captureUpvalue(&frame.slots[index]);
@@ -1241,7 +1240,8 @@ pub const Vm = struct {
                     self.push(value.class(class));
                 },
                 .iterate_check => {
-                    const offset = readShort(&ip);
+                    const offset = readShort(ip);
+                    ip += 2;
 
                     // stack: [object being iterated over] [index]
                     // if index is valid, push the current value onto the stack
@@ -1339,7 +1339,8 @@ pub const Vm = struct {
                     // stack: [object being iterated over] [index]
                     self.push(value.number(value.asNumber(self.pop()) + 1));
 
-                    const offset = readShort(&ip);
+                    const offset = readShort(ip);
+                    ip += 2;
                     ip -= offset;
                 },
                 .list => {
