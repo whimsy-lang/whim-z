@@ -346,6 +346,15 @@ pub const Lexer = struct {
         return tok;
     }
 
+    fn followedByEq(cur: []const u8, tok_single: TokenType, tok_eq: TokenType) TokenType {
+        if (cur.len == 1) {
+            return tok_single;
+        } else if (cur.len == 2 and cur[1] == '=') {
+            return tok_eq;
+        }
+        return .symbol;
+    }
+
     fn symbolType(self: *Lexer) TokenType {
         const cur = self.source[self.start..self.current];
         switch (cur[0]) {
@@ -368,51 +377,15 @@ pub const Lexer = struct {
                     else => {},
                 }
             },
-            '!' => if (cur.len == 1) {
-                return .bang;
-            } else if (cur.len == 2 and cur[1] == '=') {
-                return .bang_equal;
-            },
-            '=' => if (cur.len == 1) {
-                return .equal;
-            } else if (cur.len == 2 and cur[1] == '=') {
-                return .equal_equal;
-            },
-            '<' => if (cur.len == 1) {
-                return .less;
-            } else if (cur.len == 2 and cur[1] == '=') {
-                return .less_equal;
-            },
-            '>' => if (cur.len == 1) {
-                return .greater;
-            } else if (cur.len == 2 and cur[1] == '=') {
-                return .greater_equal;
-            },
-            '+' => if (cur.len == 1) {
-                return .plus;
-            } else if (cur.len == 2 and cur[1] == '=') {
-                return .plus_equal;
-            },
-            '-' => if (cur.len == 1) {
-                return .minus;
-            } else if (cur.len == 2 and cur[1] == '=') {
-                return .minus_equal;
-            },
-            '%' => if (cur.len == 1) {
-                return .percent;
-            } else if (cur.len == 2 and cur[1] == '=') {
-                return .percent_equal;
-            },
-            '*' => if (cur.len == 1) {
-                return .star;
-            } else if (cur.len == 2 and cur[1] == '=') {
-                return .star_equal;
-            },
-            '/' => if (cur.len == 1) {
-                return .slash;
-            } else if (cur.len == 2 and cur[1] == '=') {
-                return .slash_equal;
-            },
+            '!' => return followedByEq(cur, .bang, .bang_equal),
+            '=' => return followedByEq(cur, .equal, .equal_equal),
+            '<' => return followedByEq(cur, .less, .less_equal),
+            '>' => return followedByEq(cur, .greater, .greater_equal),
+            '+' => return followedByEq(cur, .plus, .plus_equal),
+            '-' => return followedByEq(cur, .minus, .minus_equal),
+            '%' => return followedByEq(cur, .percent, .percent_equal),
+            '*' => return followedByEq(cur, .star, .star_equal),
+            '/' => return followedByEq(cur, .slash, .slash_equal),
             else => {},
         }
         return .symbol;
