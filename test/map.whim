@@ -1,6 +1,6 @@
-// map performance test
+# map performance test
 
-// zig build -Drelease-fast run -- test/map.whim
+# zig build -Drelease-fast run -- test/map.whim
 
 start :: std.time()
 

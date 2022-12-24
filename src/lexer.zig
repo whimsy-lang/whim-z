@@ -167,7 +167,7 @@ pub const Lexer = struct {
 
     fn isSymbol(c: u21) bool {
         return switch (c) {
-            '~', '!', '@', '#', '$', '%', '^', '&', '*', '-', '+', '=' => true,
+            '~', '!', '@', '$', '%', '^', '&', '*', '-', '+', '=' => true,
             '{', '}', '\\', '|', ';', ':', '<', '>', '.', '?', '/' => true,
             else => false,
         };
@@ -419,9 +419,7 @@ pub const Lexer = struct {
     }
 
     fn symbol(self: *Lexer) Token {
-        while (isSymbol(self.peek(0)) and !(self.peek(0) == '/' and self.peek(1) == '/')) {
-            self.advance(1);
-        }
+        while (isSymbol(self.peek(0))) self.advance(1);
 
         return self.token(self.symbolType());
     }
@@ -449,13 +447,12 @@ pub const Lexer = struct {
                 ',' => return self.token(.comma),
                 '\'', '"' => return self.string(c),
                 '`' => return self.infix(),
+                '#' => {
+                    while (self.peek(0) != '\n' and !self.isAtEnd()) self.advance(1);
+                    self.resetLength();
+                },
 
                 '/' => switch (self.peek(0)) {
-                    '/' => {
-                        self.advance(1);
-                        while (self.peek(0) != '\n' and !self.isAtEnd()) self.advance(1);
-                        self.resetLength();
-                    },
                     'c' => return self.checkEnd("lass", .class_end),
                     'd' => return self.checkEnd("o", .do_end),
                     'f' => {
