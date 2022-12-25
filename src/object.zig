@@ -506,6 +506,7 @@ pub const ObjSet = struct {
 pub const ObjString = struct {
     obj: Object,
     chars: []const u8,
+    length: usize,
     hash: u32,
 
     fn init(vm: *Vm, chars: []const u8, hash: u32) *ObjString {
@@ -522,7 +523,17 @@ pub const ObjString = struct {
 
         string.obj = .{ .type = .string };
 
+        var len: usize = 0;
+        var i: usize = 0;
+        while (i < chars.len) : (len += 1) {
+            i += unicode.utf8ByteSequenceLength(chars[i]) catch {
+                std.debug.print("Invalid character encoding.", .{});
+                std.process.exit(1);
+            };
+        }
+
         string.chars = chars;
+        string.length = len;
         string.hash = hash;
         _ = vm.strings.set(string, value.nil());
 
@@ -533,18 +544,6 @@ pub const ObjString = struct {
 
     pub fn deinit(self: *ObjString, allocator: Allocator) void {
         allocator.free(self.chars);
-    }
-
-    pub fn length(self: *ObjString) usize {
-        var len: usize = 0;
-        var i: usize = 0;
-        while (i < self.chars.len) : (len += 1) {
-            i += unicode.utf8ByteSequenceLength(self.chars[i]) catch {
-                std.debug.print("Invalid character encoding.", .{});
-                std.process.exit(1);
-            };
-        }
-        return len;
     }
 
     pub fn take(vm: *Vm, chars: []const u8) *ObjString {

@@ -1391,7 +1391,7 @@ pub const Vm = struct {
                     const end = self.peek(0);
                     const start = self.peek(1);
                     if ((value.isNumber(start) and value.isNumber(end)) or
-                        (value.isObjType(start, .string) and value.isObjType(end, .string) and value.asString(start).length() == 1 and value.asString(end).length() == 1))
+                        (value.isObjType(start, .string) and value.isObjType(end, .string) and value.asString(start).length == 1 and value.asString(end).length == 1))
                     {
                         const range = ObjRange.init(self, start, end, 1, op == .range_inclusive);
                         self.stack_top -= 2;
@@ -1406,7 +1406,7 @@ pub const Vm = struct {
                     const end = self.peek(1);
                     const start = self.peek(2);
                     if (((value.isNumber(start) and value.isNumber(end)) or
-                        (value.isObjType(start, .string) and value.isObjType(end, .string) and value.asString(start).length() == 1 and value.asString(end).length() == 1)) and value.isNumber(step))
+                        (value.isObjType(start, .string) and value.isObjType(end, .string) and value.asString(start).length == 1 and value.asString(end).length == 1)) and value.isNumber(step))
                     {
                         if (value.asNumber(step) == 0) {
                             self.runtimeError("Step cannot be 0.", .{});

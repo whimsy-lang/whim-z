@@ -107,6 +107,7 @@ myInst :: MyClass(1, 2)
 # () is an empty list, (1,) is a list with one item (the comma is required to distinguish it from grouping)
 # (1, 2, 3,) items are separated by commas, the final comma is optional
 # indexes start at 0
+# a negative index is equivalent to (length + index)
 list := (1, 2.3, 'hi', myObj, MyClass, myFunc)
 list[1]        # this is 2.3
 list[2] = 42   # this has now changed from a string to an int
@@ -205,6 +206,7 @@ extension: *.whim
 ### Language Features
 
 * assignment on ranges for lists and strings
+* negative indices
 
 ### Standard Library
 
@@ -215,6 +217,7 @@ extension: *.whim
   * x class
     * _ to_string()
   * _ debug
+  * _ error
   * x function
     * _ to_string()
   * _ gc
@@ -233,16 +236,17 @@ extension: *.whim
     * _ pop()
     * _ push()
     * _ reduce()
-    * _ reduce_right()
     * x remove()
     * _ reverse()
     * _ sort()
     * _ to_string()
     * _ where()
   * x map
+    * _ keys()
     * x length()
     * x remove()
     * _ to_string()
+    * _ values()
   * _ math
     * _ max()
     * _ min()

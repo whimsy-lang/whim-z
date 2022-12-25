@@ -1,8 +1,12 @@
 # simple test file
 
-s :: 'test'
-s[1] = 'rickie'
-std.print("'", s, "' length ", s:length())
+s :: 'hello world!'
+std.print(s, ', ', s:length())
+std.print(s[0])
+std.print(s[1])
+std.print(s[9])
+std.print(s[10])
+std.print(s[11])
 
 # zig build -Drelease-fast run -- test/test.whim
 
