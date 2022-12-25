@@ -1,6 +1,8 @@
 # simple test file
 
-std.print('hello world')
+s :: 'test'
+s[1] = 'rickie'
+std.print("'", s, "' length ", s:length())
 
 # zig build -Drelease-fast run -- test/test.whim
 

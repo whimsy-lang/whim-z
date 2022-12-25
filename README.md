@@ -205,5 +205,90 @@ extension: *.whim
 ### Language Features
 
 * assignment on ranges for lists and strings
-* assignment on index for strings
-* std library type conversions
+
+### Standard Library
+
+* x std
+  * _ assert()
+  * x bool
+    * _ to_string()
+  * x class
+    * _ to_string()
+  * _ debug
+  * x function
+    * _ to_string()
+  * _ gc
+    * _ collect()
+  * _ io
+  * x list
+    * x add()
+    * _ all()
+    * _ any()
+    * _ first()
+    * _ index_of()
+    * _ last()
+    * _ last_index_of()
+    * x length()
+    * _ map()
+    * _ pop()
+    * _ push()
+    * _ reduce()
+    * _ reduce_right()
+    * x remove()
+    * _ reverse()
+    * _ sort()
+    * _ to_string()
+    * _ where()
+  * x map
+    * x length()
+    * x remove()
+    * _ to_string()
+  * _ math
+    * _ max()
+    * _ min()
+    * _ pi
+  * x nil
+    * _ to_string()
+  * x number
+    * _ abs()
+    * _ acos()
+    * _ asin()
+    * _ atan()
+    * _ ceiling()
+    * _ cos()
+    * _ floor()
+    * _ log()
+    * _ max
+    * _ min
+    * _ pow()
+    * _ sin()
+    * _ sqrt()
+    * _ tan()
+    * _ to_degrees()
+    * _ to_radians()
+    * _ to_string()
+  * _ os
+  * x print()
+  * x range
+    * _ to_string()
+  * x set
+    * x add()
+    * x length()
+    * x remove()
+    * _ to_string()
+  * x string
+    * _ format()
+    * _ index_of()
+    * _ join()
+    * _ last_index_of()
+    * x length()
+    * _ repeat()
+    * _ reverse()
+    * _ split()
+    * _ to_bool()
+    * _ to_lower()
+    * _ to_number()
+    * _ to_string()
+    * _ to_upper()
+  * x time()
+  * _ version
