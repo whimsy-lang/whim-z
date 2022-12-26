@@ -506,7 +506,7 @@ pub const ObjSet = struct {
 pub const ObjString = struct {
     obj: Object,
     chars: []const u8,
-    length: usize,
+    length: isize,
     hash: u32,
 
     fn init(vm: *Vm, chars: []const u8, hash: u32) *ObjString {
@@ -523,7 +523,7 @@ pub const ObjString = struct {
 
         string.obj = .{ .type = .string };
 
-        var len: usize = 0;
+        var len: isize = 0;
         var i: usize = 0;
         while (i < chars.len) : (len += 1) {
             i += unicode.utf8ByteSequenceLength(chars[i]) catch {
@@ -544,6 +544,36 @@ pub const ObjString = struct {
 
     pub fn deinit(self: *ObjString, allocator: Allocator) void {
         allocator.free(self.chars);
+    }
+
+    const Range = struct {
+        start: usize,
+        end: usize,
+    };
+
+    // get byte range based on utf8 indices
+    pub fn byteRange(self: *ObjString, start: usize, end: usize) Range {
+        var br = Range{ .start = 0, .end = 0 };
+
+        var i: usize = 0;
+        while (br.start < self.chars.len) : (i += 1) {
+            if (i == start) break;
+            br.start += unicode.utf8ByteSequenceLength(self.chars[br.start]) catch {
+                std.debug.print("Invalid character encoding.", .{});
+                std.process.exit(1);
+            };
+        }
+
+        br.end = br.start;
+        while (br.end < self.chars.len) : (i += 1) {
+            if (i == end) break;
+            br.end += unicode.utf8ByteSequenceLength(self.chars[br.end]) catch {
+                std.debug.print("Invalid character encoding.", .{});
+                std.process.exit(1);
+            };
+        }
+
+        return br;
     }
 
     pub fn take(vm: *Vm, chars: []const u8) *ObjString {

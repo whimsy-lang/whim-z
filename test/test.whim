@@ -7,6 +7,10 @@ std.print(s[1])
 std.print(s[9])
 std.print(s[10])
 std.print(s[11])
+std.print()
+std.print(s[-1])
+std.print(s[-2])
+std.print(s[-12])
 
 # zig build -Drelease-fast run -- test/test.whim
 

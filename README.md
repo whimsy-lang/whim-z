@@ -205,8 +205,10 @@ extension: *.whim
 
 ### Language Features
 
-* assignment on ranges for lists and strings
+* get with range step != 1 on string and list?
 * negative indices
+  * get - string range, list number, list range
+  * set - string number, string range, list number, list range
 
 ### Standard Library
 

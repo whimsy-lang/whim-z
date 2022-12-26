@@ -705,30 +705,19 @@ pub const Vm = struct {
 
     fn getOnString(self: *Vm, string: *ObjString, key: Value, pop_count: usize) bool {
         if (value.isNumber(key)) {
-            const index = @floatToInt(isize, value.asNumber(key));
+            var index = @floatToInt(isize, value.asNumber(key));
 
-            var byte_idx: usize = 0;
-            var length: usize = 0;
-            var i: usize = 0;
-            while (i < string.chars.len) : (length += 1) {
-                if (length == index) byte_idx = i;
-                i += unicode.utf8ByteSequenceLength(string.chars[i]) catch {
-                    std.debug.print("Invalid character encoding.", .{});
-                    std.process.exit(1);
-                };
-            }
-
-            if (index < 0 or index >= length) {
-                self.runtimeError("Index {d} is out of bounds (0-{d}).", .{ index, length - 1 });
+            if (index < -string.length or index >= string.length) {
+                self.runtimeError("Index {d} is out of bounds ({d} to {d}).", .{ index, -string.length, string.length - 1 });
                 return false;
             }
 
+            if (index < 0) index += string.length;
+            const uindex = @intCast(usize, index);
+            const br = string.byteRange(uindex, uindex + 1);
+
             self.stack_top -= pop_count;
-            const ch_len = unicode.utf8ByteSequenceLength(string.chars[byte_idx]) catch {
-                std.debug.print("Invalid character encoding.", .{});
-                std.process.exit(1);
-            };
-            self.push(value.string(ObjString.copy(self, string.chars[byte_idx .. byte_idx + ch_len])));
+            self.push(value.string(ObjString.copy(self, string.chars[br.start..br.end])));
             return true;
         }
         if (value.isObjType(key, .range)) {
