@@ -536,6 +536,37 @@ pub const Vm = struct {
         self.push(value.string(result));
     }
 
+    const NormalizedRangeResult = struct {
+        valid: bool,
+        start: usize,
+        end: usize,
+    };
+
+    fn normalizeRange(self: *Vm, start: isize, end: isize, inclusive: bool, length: isize) NormalizedRangeResult {
+        var res = NormalizedRangeResult{ .valid = false, .start = 0, .end = 0 };
+        if (start < -length or start > length) {
+            self.runtimeError("Start {d} is out of bounds ({d} to {d}).", .{ start, -length, length });
+            return res;
+        }
+        if (inclusive and end >= length) {
+            self.runtimeError("End {d} is out of bounds ({d} to {d}).", .{ end, -length, length - 1 });
+            return res;
+        }
+        if (end < -length or end > length) {
+            self.runtimeError("End {d} is out of bounds ({d} to {d}).", .{ end, -length, length });
+            return res;
+        }
+        res.start = @intCast(usize, if (start < 0) start + length else start);
+        res.end = @intCast(usize, if (end < 0) end + length else end);
+        if (res.start > res.end) {
+            self.runtimeError("Start {d} is after end {d}.", .{ start, end });
+            return res;
+        }
+        if (inclusive) res.end += 1;
+        res.valid = true;
+        return res;
+    }
+
     fn defineOnValue(self: *Vm, target: Value, key: Value, val: Value, constant: bool) bool {
         if (value.isObject(target)) {
             const obj = value.asObject(target);
@@ -634,11 +665,13 @@ pub const Vm = struct {
 
     fn getOnList(self: *Vm, list: *ObjList, key: Value, pop_count: usize) bool {
         if (value.isNumber(key)) {
-            const index = @floatToInt(isize, value.asNumber(key));
-            if (index < 0 or index >= list.items.items.len) {
-                self.runtimeError("Index {d} is out of bounds (0-{d}).", .{ index, list.items.items.len - 1 });
+            var index = @floatToInt(isize, value.asNumber(key));
+            const len = @intCast(isize, list.items.items.len);
+            if (index < -len or index >= len) {
+                self.runtimeError("Index {d} is out of bounds ({d} to {d}).", .{ index, -len, len - 1 });
                 return false;
             }
+            if (index < 0) index += len;
             self.stack_top -= pop_count;
             self.push(list.items.items[@intCast(usize, index)]);
             return true;
@@ -647,28 +680,15 @@ pub const Vm = struct {
             const range = value.asRange(key);
             if (value.isNumber(range.start) and range.step == 1) {
                 const start = @floatToInt(isize, value.asNumber(range.start));
-                var end = @floatToInt(isize, value.asNumber(range.end));
-                if (range.inclusive) end += 1;
+                const end = @floatToInt(isize, value.asNumber(range.end));
+                const len = @intCast(isize, list.items.items.len);
 
-                if (start < 0 or start > list.items.items.len) {
-                    self.runtimeError("Start {d} is out of bounds (0-{d}).", .{ start, list.items.items.len });
-                    return false;
-                }
-                if (end < 0 or end > list.items.items.len) {
-                    self.runtimeError("End {d} is out of bounds (0-{d}).", .{ end, list.items.items.len });
-                    return false;
-                }
-                if (end < start) {
-                    self.runtimeError("End {d} is before start {d}.", .{ end, start });
-                    return false;
-                }
-
-                const ustart = @intCast(usize, start);
-                const uend = @intCast(usize, end);
+                const norm = self.normalizeRange(start, end, range.inclusive, len);
+                if (!norm.valid) return false;
 
                 const new_list = ObjList.init(self);
                 self.push(value.list(new_list));
-                new_list.items.appendSlice(list.items.items[ustart..uend]) catch {
+                new_list.items.appendSlice(list.items.items[norm.start..norm.end]) catch {
                     std.debug.print("Could not allocate memory for list.", .{});
                     std.process.exit(1);
                 };
@@ -724,37 +744,14 @@ pub const Vm = struct {
             const range = value.asRange(key);
             if (value.isNumber(range.start) and range.step == 1) {
                 const start = @floatToInt(isize, value.asNumber(range.start));
-                var end = @floatToInt(isize, value.asNumber(range.end));
-                if (range.inclusive) end += 1;
+                const end = @floatToInt(isize, value.asNumber(range.end));
 
-                var byte_start: usize = 0;
-                var byte_end = string.chars.len;
-                var length: usize = 0;
-                var i: usize = 0;
-                while (i < string.chars.len) : (length += 1) {
-                    if (length == start) byte_start = i;
-                    if (length == end) byte_end = i;
-                    i += unicode.utf8ByteSequenceLength(string.chars[i]) catch {
-                        std.debug.print("Invalid character encoding.", .{});
-                        std.process.exit(1);
-                    };
-                }
+                const norm = self.normalizeRange(start, end, range.inclusive, string.length);
+                if (!norm.valid) return false;
 
-                if (start < 0 or start > length) {
-                    self.runtimeError("Start {d} is out of bounds (0-{d}).", .{ start, length });
-                    return false;
-                }
-                if (end < 0 or end > length) {
-                    self.runtimeError("End {d} is out of bounds (0-{d}).", .{ end, length });
-                    return false;
-                }
-                if (end < start) {
-                    self.runtimeError("End {d} is before start {d}.", .{ end, start });
-                    return false;
-                }
-
+                const br = string.byteRange(norm.start, norm.end);
                 self.stack_top -= pop_count;
-                self.push(value.string(ObjString.copy(self, string.chars[byte_start..byte_end])));
+                self.push(value.string(ObjString.copy(self, string.chars[br.start..br.end])));
                 return true;
             }
             self.runtimeError("Only numeric ranges with a step of 1 can be used to index a string.", .{});

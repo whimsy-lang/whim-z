@@ -205,9 +205,7 @@ extension: *.whim
 
 ### Language Features
 
-* get with range step != 1 on string and list?
 * negative indices
-  * get - string range, list number, list range
   * set - string number, string range, list number, list range
 
 ### Standard Library
@@ -219,7 +217,7 @@ extension: *.whim
   * x class
     * _ to_string()
   * _ debug
-  * _ error
+  * _ error()
   * x function
     * _ to_string()
   * _ gc

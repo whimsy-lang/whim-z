@@ -1,16 +1,20 @@
 # simple test file
 
-s :: 'hello world!'
-std.print(s, ', ', s:length())
-std.print(s[0])
-std.print(s[1])
-std.print(s[9])
-std.print(s[10])
-std.print(s[11])
+l :: ('zero', 'one', 'two', 'three', 'four')
+std.print(l, ', length: ', l:length())
+std.print(l[0..0])
+std.print(l[0..1])
+std.print(l[0..4])
+std.print(l[0..=4])
+std.print(l[4..5])
+std.print(l[5..5])
 std.print()
-std.print(s[-1])
-std.print(s[-2])
-std.print(s[-12])
+std.print(l[-5.. -5])
+std.print(l[-5.. -4])
+std.print(l[-5.. -1])
+std.print(l[-5..= -1])
+std.print(l[-1..5])
+std.print(l[5..5])
 
 # zig build -Drelease-fast run -- test/test.whim
 
