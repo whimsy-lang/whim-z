@@ -11,6 +11,8 @@ const Vm = @import("vm.zig").Vm;
 pub fn register(vm: *Vm) void {
     // std
     const std_class = defineClass(vm, "std");
+    defineNative(vm, std_class, "assert", n_std_assert);
+    defineNative(vm, std_class, "error", n_std_error);
     defineNative(vm, std_class, "print", n_std_print);
     defineNative(vm, std_class, "time", n_std_time);
 
@@ -80,6 +82,26 @@ fn defineNative(vm: *Vm, class: *ObjClass, name: []const u8, native_fn: NativeFn
     _ = class.fields.add(value.asString(vm.peek(1)), vm.peek(0), true);
     _ = vm.pop();
     _ = vm.pop();
+}
+
+fn n_std_assert(vm: *Vm, values: []Value) Value {
+    if (values.len == 0) {
+        return vm.nativeError("std.assert takes a condition and an optional message", .{});
+    }
+    if (value.isFalsey(values[0])) {
+        if (values.len == 2 and value.isObjType(values[1], .string)) {
+            return vm.nativeError("std.assert: {s}", .{value.asString(values[1]).chars});
+        }
+        return vm.nativeError("std.assert", .{});
+    }
+    return value.nil();
+}
+
+fn n_std_error(vm: *Vm, values: []Value) Value {
+    if (values.len == 1 and value.isObjType(values[0], .string)) {
+        return vm.nativeError("std.error: {s}", .{value.asString(values[0]).chars});
+    }
+    return vm.nativeError("std.error", .{});
 }
 
 fn n_std_print(vm: *Vm, values: []Value) Value {

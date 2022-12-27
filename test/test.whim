@@ -1,20 +1,6 @@
 # simple test file
 
-l :: ('zero', 'one', 'two', 'three', 'four')
-std.print(l, ', length: ', l:length())
-std.print(l[0..0])
-std.print(l[0..1])
-std.print(l[0..4])
-std.print(l[0..=4])
-std.print(l[4..5])
-std.print(l[5..5])
-std.print()
-std.print(l[-5.. -5])
-std.print(l[-5.. -4])
-std.print(l[-5.. -1])
-std.print(l[-5..= -1])
-std.print(l[-1..5])
-std.print(l[5..5])
+std.assert(2 != 3, 'math!')
 
 # zig build -Drelease-fast run -- test/test.whim
 

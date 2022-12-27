@@ -211,13 +211,13 @@ extension: *.whim
 ### Standard Library
 
 * x std
-  * _ assert()
+  * x assert()
   * x bool
     * _ to_string()
   * x class
     * _ to_string()
   * _ debug
-  * _ error()
+  * x error()
   * x function
     * _ to_string()
   * _ gc
