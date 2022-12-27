@@ -1,10 +1,11 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
+const version = @import("vm.zig").version;
 const Vm = @import("vm.zig").Vm;
 
 pub fn main() !void {
-    std.debug.print("Whimsy v0.1\n", .{});
+    std.debug.print("{s}\n", .{version});
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     var allocator = gpa.allocator();

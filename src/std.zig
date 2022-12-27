@@ -6,6 +6,7 @@ const ObjNative = @import("object.zig").ObjNative;
 const ObjString = @import("object.zig").ObjString;
 const value = @import("value.zig");
 const Value = value.Value;
+const version = @import("vm.zig").version;
 const Vm = @import("vm.zig").Vm;
 
 pub fn register(vm: *Vm) void {
@@ -15,6 +16,7 @@ pub fn register(vm: *Vm) void {
     defineNative(vm, std_class, "error", n_std_error);
     defineNative(vm, std_class, "print", n_std_print);
     defineNative(vm, std_class, "time", n_std_time);
+    defineProperty(vm, std_class, "version", value.string(ObjString.copy(vm, version)));
 
     // std.bool
     vm.bool_class = defineInnerClass(vm, std_class, "bool");
@@ -80,6 +82,14 @@ fn defineNative(vm: *Vm, class: *ObjClass, name: []const u8, native_fn: NativeFn
     vm.push(value.string(ObjString.copy(vm, name)));
     vm.push(value.native(ObjNative.init(vm, native_fn)));
     _ = class.fields.add(value.asString(vm.peek(1)), vm.peek(0), true);
+    _ = vm.pop();
+    _ = vm.pop();
+}
+
+fn defineProperty(vm: *Vm, class: *ObjClass, name: []const u8, val: Value) void {
+    vm.push(val);
+    vm.push(value.string(ObjString.copy(vm, name)));
+    _ = class.fields.add(value.asString(vm.peek(0)), vm.peek(1), true);
     _ = vm.pop();
     _ = vm.pop();
 }

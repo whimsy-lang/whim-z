@@ -295,4 +295,4 @@ extension: *.whim
     * _ to_string()
     * _ to_upper()
   * x time()
-  * _ version
+  * x version

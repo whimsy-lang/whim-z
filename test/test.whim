@@ -1,6 +1,6 @@
 # simple test file
 
-std.assert(2 != 3, 'math!')
+std.print(std.version)
 
 # zig build -Drelease-fast run -- test/test.whim
 
