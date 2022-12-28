@@ -203,11 +203,6 @@ extension: *.whim
 * closures only for functions that need it?
 * generational gc
 
-### Language Features
-
-* negative indices
-  * set - string number, string range
-
 ### Standard Library
 
 * x std

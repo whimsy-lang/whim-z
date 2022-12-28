@@ -768,7 +768,6 @@ pub const Vm = struct {
             switch (value.asObject(target).type) {
                 .list => return self.setOnList(value.asList(target), key, val),
                 .map => return self.setOnMap(value.asMap(target), key, val),
-                .string => return self.setOnString(value.asString(target), key, val),
                 else => {},
             }
         }
@@ -867,53 +866,6 @@ pub const Vm = struct {
         vc.value = val;
 
         return true;
-    }
-
-    fn setOnString(self: *Vm, string: *ObjString, key: Value, val: Value) bool {
-        if (!value.isObjType(val, .string)) {
-            self.runtimeError("Value must be a string.", .{});
-            return false;
-        }
-
-        if (value.isNumber(key)) {
-            const index = @floatToInt(isize, value.asNumber(key));
-
-            var byte_idx: usize = 0;
-            var length: usize = 0;
-            var i: usize = 0;
-            while (i < string.chars.len) : (length += 1) {
-                if (length == index) byte_idx = i;
-                i += unicode.utf8ByteSequenceLength(string.chars[i]) catch {
-                    std.debug.print("Invalid character encoding.", .{});
-                    std.process.exit(1);
-                };
-            }
-
-            if (index < 0 or index >= length) {
-                self.runtimeError("Index {d} is out of bounds (0-{d}).", .{ index, length - 1 });
-                return false;
-            }
-
-            const ch_len = unicode.utf8ByteSequenceLength(string.chars[byte_idx]) catch {
-                std.debug.print("Invalid character encoding.", .{});
-                std.process.exit(1);
-            };
-
-            const strings = [_][]const u8{ string.chars[0..byte_idx], value.asString(val).chars, string.chars[byte_idx + ch_len ..] };
-
-            const heap_chars = std.mem.concat(self.allocator, u8, &strings) catch {
-                std.debug.print("Could not allocate memory for string.", .{});
-                std.process.exit(1);
-            };
-
-            const new_str = ObjString.take(self, heap_chars);
-            string.chars = new_str.chars;
-            string.hash = new_str.hash;
-            return true;
-        }
-
-        self.runtimeError("String index must be a number.", .{});
-        return false;
     }
 
     fn run(self: *Vm) InterpretResult {
