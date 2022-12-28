@@ -1,0 +1,43 @@
+# Whimsy Language Test Suite 0.1
+
+a :: std.assert
+
+# comparison
+a(0 == 0)
+a(nil == nil)
+a(true == true)
+a('str' == 'str')
+a(1 != 2)
+a(true != false)
+a(-1 < 2)
+a(!(2 < 2))
+a(6 <= 7)
+a(7 <= 7)
+a(!(8 <= 7))
+a(2 > 1)
+a(!(2 > 2))
+a(9 >= 8)
+a(9 >= 9)
+
+# standard operators
+a(1 + 2 == 3)
+a(3 - 2 == 1)
+a(4 * 5 == 20)
+a(12 / 3 == 4)
+a(12 % 7 == 5)
+# order of operations
+a(1 + 2 * 3 == 7)
+a((1 + 2) * 3 == 9)
+# concatenation
+a('str' == 'st' + 'r')
+
+# strings
+s :: 'hello world'
+a(s[0] == 'h')
+a(s[-1] == 'd')
+a(s[0..2] == 'he')
+a(s[0..=2] == 'hel')
+a(s[0 ..= -1] == s)
+
+
+std.print('success')

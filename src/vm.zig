@@ -29,7 +29,7 @@ const Value = value.Value;
 const ValueContainer = value.ValueContainer;
 const vle = @import("vle.zig");
 
-pub const version = "Whimsy v0.1";
+pub const version = "Whimsy 0.1";
 
 pub const InterpretResult = enum {
     ok,
