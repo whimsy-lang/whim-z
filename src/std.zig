@@ -40,11 +40,16 @@ pub fn register(vm: *Vm) void {
     defineNative(vm, vm.map_class.?, "length", n_std_map_length);
     defineNative(vm, vm.map_class.?, "remove", n_std_map_remove);
 
+    const math_class = defineInnerClass(vm, std_class, "math");
+    defineProperty(vm, math_class, "pi", value.number(3.141592653589793238462643383279502884));
+
     // std.nil
     vm.nil_class = defineInnerClass(vm, std_class, "nil");
 
     // std.number
     vm.number_class = defineInnerClass(vm, std_class, "number");
+    defineProperty(vm, vm.number_class.?, "max", value.number(std.math.floatMax(f64)));
+    defineProperty(vm, vm.number_class.?, "min", value.number(-std.math.floatMax(f64)));
 
     // std.range
     vm.range_class = defineInnerClass(vm, std_class, "range");

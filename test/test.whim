@@ -1,12 +1,8 @@
 # simple test file
 
-b :: class /class
-c :: class is b /class
-i :: c.super()
-
-std.print(i is c, ' ', i is b, ' ', i is std.class, ' ', i.type)
-std.print(c:to_string(), ' ', b:to_string())
-std.print(class /class:to_string())
+std.print(std.math.pi)
+std.print(std.number.max)
+std.print(std.number.min)
 
 # zig build -Drelease-fast run -- test/test.whim
 

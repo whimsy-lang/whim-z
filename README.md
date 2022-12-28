@@ -215,8 +215,7 @@ extension: *.whim
   * x error()
   * x function
     * _ to_string()
-  * _ gc
-    * _ collect()
+  * _ gc_collect()
   * _ io
   * x list
     * x add()
@@ -245,7 +244,7 @@ extension: *.whim
   * _ math
     * _ max()
     * _ min()
-    * _ pi
+    * x pi
   * x nil
     * _ to_string()
   * x number
@@ -257,8 +256,8 @@ extension: *.whim
     * _ cos()
     * _ floor()
     * _ log()
-    * _ max
-    * _ min
+    * x max
+    * x min
     * _ pow()
     * _ sin()
     * _ sqrt()
