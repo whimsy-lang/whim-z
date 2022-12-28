@@ -10,7 +10,7 @@ const Value = value.Value;
 const Vm = @import("vm.zig").Vm;
 
 pub const GcAllocater = struct {
-    const heap_grow_factor = 2;
+    pub const heap_grow_factor = 2;
 
     vm: *Vm,
     bytes_allocated: usize,
@@ -30,6 +30,13 @@ pub const GcAllocater = struct {
         self.gray_stack.deinit();
     }
 
+    pub fn traceReferences(self: *GcAllocater) void {
+        while (self.gray_stack.items.len > 0) {
+            const val = self.gray_stack.pop();
+            val.blacken(self.vm);
+        }
+    }
+
     pub fn allocator(self: *GcAllocater) Allocator {
         return .{
             .ptr = self,
@@ -45,7 +52,7 @@ pub const GcAllocater = struct {
         const self = @ptrCast(*GcAllocater, @alignCast(@alignOf(GcAllocater), ctx));
 
         if ((self.bytes_allocated + len > self.next_gc) or debug.stress_gc) {
-            collectGarbage(self.vm);
+            self.vm.collectGarbage();
         }
         const result = self.vm.parent_allocator.rawAlloc(len, log2_ptr_align, ret_addr);
         if (result == null) {
@@ -66,7 +73,7 @@ pub const GcAllocater = struct {
 
         if (new_len > buf.len) {
             if ((self.bytes_allocated + (new_len - buf.len) > self.next_gc) or debug.stress_gc) {
-                collectGarbage(self.vm);
+                self.vm.collectGarbage();
             }
         }
 
@@ -94,151 +101,6 @@ pub const GcAllocater = struct {
         self.bytes_allocated -= buf.len;
         if (debug.log_gc) {
             std.debug.print("  {d} -> {d}\n", .{ before, self.bytes_allocated });
-        }
-    }
-
-    fn markRoots(vm: *Vm) void {
-        var slot: [*]Value = &vm.stack;
-        while (@ptrToInt(slot) < @ptrToInt(vm.stack_top)) : (slot += 1) {
-            value.mark(slot[0], vm);
-        }
-
-        var i: usize = 0;
-        while (i < vm.frame_count) : (i += 1) {
-            vm.frames[i].closure.obj.mark(vm);
-        }
-
-        var upvalue = vm.open_upvalues;
-        while (upvalue) |up| {
-            up.obj.mark(vm);
-            upvalue = up.next;
-        }
-
-        vm.globals.mark(vm);
-
-        Compiler.markRoots(vm);
-
-        if (vm.empty_string) |s| s.obj.mark(vm);
-        if (vm.init_string) |s| s.obj.mark(vm);
-        if (vm.type_string) |s| s.obj.mark(vm);
-        if (vm.super_string) |s| s.obj.mark(vm);
-
-        if (vm.greater_string) |s| s.obj.mark(vm);
-        if (vm.greater_equal_string) |s| s.obj.mark(vm);
-        if (vm.less_string) |s| s.obj.mark(vm);
-        if (vm.less_equal_string) |s| s.obj.mark(vm);
-        if (vm.add_string) |s| s.obj.mark(vm);
-        if (vm.subtract_string) |s| s.obj.mark(vm);
-        if (vm.multiply_string) |s| s.obj.mark(vm);
-        if (vm.divide_string) |s| s.obj.mark(vm);
-        if (vm.remainder_string) |s| s.obj.mark(vm);
-
-        if (vm.bool_class) |c| c.obj.mark(vm);
-        if (vm.class_class) |c| c.obj.mark(vm);
-        if (vm.function_class) |c| c.obj.mark(vm);
-        if (vm.list_class) |c| c.obj.mark(vm);
-        if (vm.map_class) |c| c.obj.mark(vm);
-        if (vm.nil_class) |c| c.obj.mark(vm);
-        if (vm.number_class) |c| c.obj.mark(vm);
-        if (vm.range_class) |c| c.obj.mark(vm);
-        if (vm.set_class) |c| c.obj.mark(vm);
-        if (vm.string_class) |c| c.obj.mark(vm);
-    }
-
-    fn traceReferences(vm: *Vm) void {
-        while (vm.gc.gray_stack.items.len > 0) {
-            const val = vm.gc.gray_stack.pop();
-            val.blacken(vm);
-        }
-    }
-
-    fn sweep(vm: *Vm) void {
-        var i: usize = 0;
-        while (i < vm.objects.items.len) {
-            if (vm.objects.items[i].is_marked) {
-                vm.objects.items[i].is_marked = false;
-                i += 1;
-            } else {
-                const unreached = vm.objects.swapRemove(i);
-                freeObject(vm, unreached);
-            }
-        }
-    }
-
-    fn collectGarbage(vm: *Vm) void {
-        const before = vm.gc.bytes_allocated;
-        if (debug.log_gc) {
-            std.debug.print("-- gc begin\n", .{});
-        }
-
-        markRoots(vm);
-        traceReferences(vm);
-        vm.strings.removeWhite();
-        sweep(vm);
-
-        vm.gc.next_gc = vm.gc.bytes_allocated * heap_grow_factor;
-
-        if (debug.log_gc) {
-            std.debug.print("-- gc end | collected {d} bytes (from {d} to {d}) next at {d}\n", .{ before - vm.gc.bytes_allocated, before, vm.gc.bytes_allocated, vm.gc.next_gc });
-        }
-    }
-
-    pub fn freeObjects(vm: *Vm) void {
-        for (vm.objects.items) |object| {
-            freeObject(vm, object);
-        }
-    }
-
-    fn freeObject(vm: *Vm, object: *Object) void {
-        if (debug.log_gc) {
-            std.debug.print("free {any}: ", .{object.type});
-            object.print();
-            std.debug.print("\n", .{});
-        }
-        switch (object.type) {
-            .class => {
-                const class = object.asClass();
-                class.deinit();
-                vm.allocator.destroy(class);
-            },
-            .closure => {
-                const closure = object.asClosure();
-                vm.allocator.free(closure.upvalues);
-                vm.allocator.destroy(closure);
-            },
-            .function => {
-                const function = object.asFunction();
-                function.deinit();
-                vm.allocator.destroy(function);
-            },
-            .instance => {
-                const instance = object.asInstance();
-                instance.deinit();
-                vm.allocator.destroy(instance);
-            },
-            .list => {
-                const list = object.asList();
-                list.deinit();
-                vm.allocator.destroy(list);
-            },
-            .map => {
-                const map = object.asMap();
-                map.deinit();
-                vm.allocator.destroy(map);
-            },
-            .native => vm.allocator.destroy(object.asNative()),
-            .range => vm.allocator.destroy(object.asRange()),
-            .set => {
-                const set = object.asSet();
-                set.deinit();
-                vm.allocator.destroy(set);
-            },
-            .string => {
-                const string = object.asString();
-                string.deinit(vm.allocator);
-                vm.allocator.destroy(string);
-            },
-            .upvalue => vm.allocator.destroy(object.asUpvalue()),
         }
     }
 };

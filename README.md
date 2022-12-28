@@ -215,7 +215,7 @@ extension: *.whim
   * x error()
   * x function
     * _ to_string()
-  * _ gc_collect()
+  * x gc_collect()
   * _ io
   * x list
     * x add()

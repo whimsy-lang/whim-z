@@ -207,7 +207,7 @@ pub const Vm = struct {
         self.set_class = null;
         self.string_class = null;
 
-        GcAllocator.freeObjects(self);
+        self.freeObjects();
         self.gc.deinit();
     }
 
@@ -216,6 +216,144 @@ pub const Vm = struct {
             std.debug.print("Could not allocate memory to track object.", .{});
             std.process.exit(1);
         };
+    }
+
+    pub fn collectGarbage(self: *Vm) void {
+        const before = self.gc.bytes_allocated;
+        if (debug.log_gc) {
+            std.debug.print("-- gc begin\n", .{});
+        }
+
+        self.markRoots();
+        self.gc.traceReferences();
+        self.strings.removeWhite();
+        self.sweep();
+
+        self.gc.next_gc = self.gc.bytes_allocated * GcAllocator.heap_grow_factor;
+
+        if (debug.log_gc) {
+            std.debug.print("-- gc end | collected {d} bytes (from {d} to {d}) next at {d}\n", .{ before - self.gc.bytes_allocated, before, self.gc.bytes_allocated, self.gc.next_gc });
+        }
+    }
+
+    fn markRoots(self: *Vm) void {
+        var slot: [*]Value = &self.stack;
+        while (@ptrToInt(slot) < @ptrToInt(self.stack_top)) : (slot += 1) {
+            value.mark(slot[0], self);
+        }
+
+        var i: usize = 0;
+        while (i < self.frame_count) : (i += 1) {
+            self.frames[i].closure.obj.mark(self);
+        }
+
+        var upvalue = self.open_upvalues;
+        while (upvalue) |up| {
+            up.obj.mark(self);
+            upvalue = up.next;
+        }
+
+        self.globals.mark(self);
+
+        Compiler.markRoots(self);
+
+        if (self.empty_string) |s| s.obj.mark(self);
+        if (self.init_string) |s| s.obj.mark(self);
+        if (self.type_string) |s| s.obj.mark(self);
+        if (self.super_string) |s| s.obj.mark(self);
+
+        if (self.greater_string) |s| s.obj.mark(self);
+        if (self.greater_equal_string) |s| s.obj.mark(self);
+        if (self.less_string) |s| s.obj.mark(self);
+        if (self.less_equal_string) |s| s.obj.mark(self);
+        if (self.add_string) |s| s.obj.mark(self);
+        if (self.subtract_string) |s| s.obj.mark(self);
+        if (self.multiply_string) |s| s.obj.mark(self);
+        if (self.divide_string) |s| s.obj.mark(self);
+        if (self.remainder_string) |s| s.obj.mark(self);
+
+        if (self.bool_class) |c| c.obj.mark(self);
+        if (self.class_class) |c| c.obj.mark(self);
+        if (self.function_class) |c| c.obj.mark(self);
+        if (self.list_class) |c| c.obj.mark(self);
+        if (self.map_class) |c| c.obj.mark(self);
+        if (self.nil_class) |c| c.obj.mark(self);
+        if (self.number_class) |c| c.obj.mark(self);
+        if (self.range_class) |c| c.obj.mark(self);
+        if (self.set_class) |c| c.obj.mark(self);
+        if (self.string_class) |c| c.obj.mark(self);
+    }
+
+    fn sweep(self: *Vm) void {
+        var i: usize = 0;
+        while (i < self.objects.items.len) {
+            if (self.objects.items[i].is_marked) {
+                self.objects.items[i].is_marked = false;
+                i += 1;
+            } else {
+                const unreached = self.objects.swapRemove(i);
+                self.freeObject(unreached);
+            }
+        }
+    }
+
+    fn freeObjects(self: *Vm) void {
+        for (self.objects.items) |object| {
+            self.freeObject(object);
+        }
+    }
+
+    fn freeObject(self: *Vm, object: *Object) void {
+        if (debug.log_gc) {
+            std.debug.print("free {any}: ", .{object.type});
+            object.print();
+            std.debug.print("\n", .{});
+        }
+        switch (object.type) {
+            .class => {
+                const class = object.asClass();
+                class.deinit();
+                self.allocator.destroy(class);
+            },
+            .closure => {
+                const closure = object.asClosure();
+                self.allocator.free(closure.upvalues);
+                self.allocator.destroy(closure);
+            },
+            .function => {
+                const function = object.asFunction();
+                function.deinit();
+                self.allocator.destroy(function);
+            },
+            .instance => {
+                const instance = object.asInstance();
+                instance.deinit();
+                self.allocator.destroy(instance);
+            },
+            .list => {
+                const list = object.asList();
+                list.deinit();
+                self.allocator.destroy(list);
+            },
+            .map => {
+                const map = object.asMap();
+                map.deinit();
+                self.allocator.destroy(map);
+            },
+            .native => self.allocator.destroy(object.asNative()),
+            .range => self.allocator.destroy(object.asRange()),
+            .set => {
+                const set = object.asSet();
+                set.deinit();
+                self.allocator.destroy(set);
+            },
+            .string => {
+                const string = object.asString();
+                string.deinit(self.allocator);
+                self.allocator.destroy(string);
+            },
+            .upvalue => self.allocator.destroy(object.asUpvalue()),
+        }
     }
 
     fn resetStack(self: *Vm) void {

@@ -14,6 +14,7 @@ pub fn register(vm: *Vm) void {
     const std_class = defineClass(vm, "std");
     defineNative(vm, std_class, "assert", n_std_assert);
     defineNative(vm, std_class, "error", n_std_error);
+    defineNative(vm, std_class, "gc_collect", n_std_gc_collect);
     defineNative(vm, std_class, "print", n_std_print);
     defineNative(vm, std_class, "time", n_std_time);
     defineProperty(vm, std_class, "version", value.string(ObjString.copy(vm, version)));
@@ -122,6 +123,14 @@ fn n_std_error(vm: *Vm, values: []Value) Value {
     return vm.nativeError("std.error", .{});
 }
 
+fn n_std_gc_collect(vm: *Vm, values: []Value) Value {
+    if (values.len != 0) {
+        return vm.nativeError("std.gc_collect takes 0 arguments", .{});
+    }
+    vm.collectGarbage();
+    return value.nil();
+}
+
 fn n_std_print(vm: *Vm, values: []Value) Value {
     _ = vm;
     for (values) |val| {
@@ -190,10 +199,10 @@ fn n_std_list_remove(vm: *Vm, values: []Value) Value {
 }
 
 fn n_std_map_length(vm: *Vm, values: []Value) Value {
-    var length: usize = 0;
     if (values.len != 1 or !value.isObjType(values[0], .map)) {
         return vm.nativeError("std.map.length takes a map", .{});
     }
+    var length: usize = 0;
     for (value.asMap(values[0]).items.entries) |entry| {
         if (!value.isEmpty(entry.key)) {
             length += 1;
@@ -236,10 +245,10 @@ fn n_std_set_add(vm: *Vm, values: []Value) Value {
 }
 
 fn n_std_set_length(vm: *Vm, values: []Value) Value {
-    var length: usize = 0;
     if (values.len != 1 or !value.isObjType(values[0], .set)) {
         return vm.nativeError("std.set.length takes a set", .{});
     }
+    var length: usize = 0;
     for (value.asSet(values[0]).items.entries) |entry| {
         if (!value.isEmpty(entry.key)) {
             length += 1;
