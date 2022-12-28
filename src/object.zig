@@ -123,9 +123,7 @@ pub const Object = struct {
             .native => std.debug.print("<native fn>", .{}),
             .range => {
                 const r = self.asRange();
-                value.print(r.start);
-                std.debug.print("{s}", .{if (r.inclusive) "..=" else ".."});
-                value.print(r.end);
+                std.debug.print("{d}{s}{d}", .{ r.start, if (r.inclusive) "..=" else "..", r.end });
                 if (r.step != 1) std.debug.print(" by {d}", .{r.step});
             },
             .set => {
@@ -159,9 +157,9 @@ pub const Object = struct {
 
         self.is_marked = true;
 
-        // don't bother queueing up strings or native functions since they
-        // do not have references to check
-        if (self.is(.string) or self.is(.native)) return;
+        // don't bother queueing up strings, ranges, or native functions
+        // since they do not have references to check
+        if (self.is(.string) or self.is(.range) or self.is(.native)) return;
 
         vm.gc.gray_stack.append(self) catch {
             std.debug.print("Could not allocate memory for garbage collection.", .{});
@@ -206,11 +204,6 @@ pub const Object = struct {
             },
             .list => markArray(&self.asList().items, vm),
             .map => self.asMap().items.mark(vm),
-            .range => {
-                const r = self.asRange();
-                value.mark(r.start, vm);
-                value.mark(r.end, vm);
-            },
             .set => self.asSet().items.mark(vm),
             .upvalue => value.mark(self.asUpvalue().closed, vm),
             else => unreachable,
@@ -449,12 +442,12 @@ pub const ObjNative = struct {
 
 pub const ObjRange = struct {
     obj: Object,
-    start: Value,
-    end: Value,
+    start: f64,
+    end: f64,
     step: f64,
     inclusive: bool,
 
-    pub fn init(vm: *Vm, start_val: Value, end_val: Value, step_val: f64, inclusive_val: bool) *ObjRange {
+    pub fn init(vm: *Vm, start_val: f64, end_val: f64, step_val: f64, inclusive_val: bool) *ObjRange {
         if (debug.log_gc) {
             std.debug.print("allocate for range\n", .{});
         }

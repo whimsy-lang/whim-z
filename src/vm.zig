@@ -677,9 +677,9 @@ pub const Vm = struct {
         }
         if (value.isObjType(key, .range)) {
             const range = value.asRange(key);
-            if (value.isNumber(range.start) and range.step == 1) {
-                const start = @floatToInt(isize, value.asNumber(range.start));
-                const end = @floatToInt(isize, value.asNumber(range.end));
+            if (range.step == 1) {
+                const start = @floatToInt(isize, range.start);
+                const end = @floatToInt(isize, range.end);
                 const len = @intCast(isize, list.items.items.len);
 
                 const norm = self.normalizeRange(start, end, range.inclusive, len);
@@ -696,7 +696,7 @@ pub const Vm = struct {
                 self.push(value.list(new_list));
                 return true;
             }
-            self.runtimeError("Only numeric ranges with a step of 1 can be used to index a list.", .{});
+            self.runtimeError("Only ranges with a step of 1 can be used to index a list.", .{});
             return false;
         }
         self.runtimeError("Only numbers and ranges can be used to index a list.", .{});
@@ -741,9 +741,9 @@ pub const Vm = struct {
         }
         if (value.isObjType(key, .range)) {
             const range = value.asRange(key);
-            if (value.isNumber(range.start) and range.step == 1) {
-                const start = @floatToInt(isize, value.asNumber(range.start));
-                const end = @floatToInt(isize, value.asNumber(range.end));
+            if (range.step == 1) {
+                const start = @floatToInt(isize, range.start);
+                const end = @floatToInt(isize, range.end);
 
                 const norm = self.normalizeRange(start, end, range.inclusive, string.length);
                 if (!norm.valid) return false;
@@ -753,7 +753,7 @@ pub const Vm = struct {
                 self.push(value.string(ObjString.copy(self, string.chars[br.start..br.end])));
                 return true;
             }
-            self.runtimeError("Only numeric ranges with a step of 1 can be used to index a string.", .{});
+            self.runtimeError("Only ranges with a step of 1 can be used to index a string.", .{});
             return false;
         }
         self.runtimeError("Only numbers and ranges can be used to index a string.", .{});
@@ -827,9 +827,9 @@ pub const Vm = struct {
         }
         if (value.isObjType(key, .range)) {
             const range = value.asRange(key);
-            if (value.isNumber(range.start) and range.step == 1) {
-                const start = @floatToInt(isize, value.asNumber(range.start));
-                const end = @floatToInt(isize, value.asNumber(range.end));
+            if (range.step == 1) {
+                const start = @floatToInt(isize, range.start);
+                const end = @floatToInt(isize, range.end);
                 const len = @intCast(isize, list.items.items.len);
 
                 const norm = self.normalizeRange(start, end, range.inclusive, len);
@@ -842,7 +842,7 @@ pub const Vm = struct {
                 };
                 return true;
             }
-            self.runtimeError("Only numeric ranges with a step of 1 can be used to index a list.", .{});
+            self.runtimeError("Only ranges with a step of 1 can be used to index a list.", .{});
             return false;
         }
 
@@ -1252,35 +1252,12 @@ pub const Vm = struct {
                             },
                             .range => {
                                 const range = obj.asRange();
-                                if (value.isNumber(range.start)) {
-                                    const val = value.asNumber(range.start) + index * range.step;
-                                    const end = value.asNumber(range.end);
-                                    if ((range.step > 0 and val < end) or (range.step < 0 and val > end) or (range.inclusive and val == end)) {
-                                        self.push(value.number(val));
-                                    } else {
-                                        frame.ip += offset;
-                                    }
+                                const val = range.start + index * range.step;
+                                const end = range.end;
+                                if ((range.step > 0 and val < end) or (range.step < 0 and val > end) or (range.inclusive and val == end)) {
+                                    self.push(value.number(val));
                                 } else {
-                                    const start = unicode.utf8Decode(value.asString(range.start).chars) catch {
-                                        std.debug.print("Invalid character encoding.", .{});
-                                        std.process.exit(1);
-                                    };
-                                    const end = unicode.utf8Decode(value.asString(range.end).chars) catch {
-                                        std.debug.print("Invalid character encoding.", .{});
-                                        std.process.exit(1);
-                                    };
-
-                                    const val = @intCast(u21, start + @floatToInt(isize, index * range.step));
-                                    if ((range.step > 0 and val < end) or (range.step < 0 and val > end) or (range.inclusive and val == end)) {
-                                        var buf: [4]u8 = undefined;
-                                        const len = unicode.utf8Encode(val, &buf) catch {
-                                            std.debug.print("Unable to encode character.", .{});
-                                            std.process.exit(1);
-                                        };
-                                        self.push(value.string(ObjString.copy(self, buf[0..len])));
-                                    } else {
-                                        frame.ip += offset;
-                                    }
+                                    frame.ip += offset;
                                 }
                             },
                             .string => {
@@ -1348,14 +1325,12 @@ pub const Vm = struct {
                 .range, .range_inclusive => {
                     const end = self.peek(0);
                     const start = self.peek(1);
-                    if ((value.isNumber(start) and value.isNumber(end)) or
-                        (value.isObjType(start, .string) and value.isObjType(end, .string) and value.asString(start).length == 1 and value.asString(end).length == 1))
-                    {
-                        const range = ObjRange.init(self, start, end, 1, op == .range_inclusive);
+                    if (value.isNumber(start) and value.isNumber(end)) {
+                        const range = ObjRange.init(self, value.asNumber(start), value.asNumber(end), 1, op == .range_inclusive);
                         self.stack_top -= 2;
                         self.push(value.range(range));
                     } else {
-                        self.runtimeError("Start and end must both be numbers or strings of length 1.", .{});
+                        self.runtimeError("Start and end must both be numbers.", .{});
                         return .runtime_error;
                     }
                 },
@@ -1363,18 +1338,16 @@ pub const Vm = struct {
                     const step = self.peek(0);
                     const end = self.peek(1);
                     const start = self.peek(2);
-                    if (((value.isNumber(start) and value.isNumber(end)) or
-                        (value.isObjType(start, .string) and value.isObjType(end, .string) and value.asString(start).length == 1 and value.asString(end).length == 1)) and value.isNumber(step))
-                    {
+                    if (value.isNumber(start) and value.isNumber(end) and value.isNumber(step)) {
                         if (value.asNumber(step) == 0) {
                             self.runtimeError("Step cannot be 0.", .{});
                             return .runtime_error;
                         }
-                        const range = ObjRange.init(self, start, end, value.asNumber(step), op == .range_inclusive_step);
+                        const range = ObjRange.init(self, value.asNumber(start), value.asNumber(end), value.asNumber(step), op == .range_inclusive_step);
                         self.stack_top -= 3;
                         self.push(value.range(range));
                     } else {
-                        self.runtimeError("Start and end must both be numbers or strings of length 1, and step must be a number.", .{});
+                        self.runtimeError("Start, end, and step must all be numbers.", .{});
                         return .runtime_error;
                     }
                 },

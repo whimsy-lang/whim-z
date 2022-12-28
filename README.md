@@ -221,6 +221,7 @@ extension: *.whim
     * x add()
     * _ all()
     * _ any()
+    * _ filter()
     * _ first()
     * _ index_of()
     * _ last()
@@ -234,7 +235,6 @@ extension: *.whim
     * _ reverse()
     * _ sort()
     * _ to_string()
-    * _ where()
   * x map
     * _ keys()
     * x length()
@@ -262,6 +262,7 @@ extension: *.whim
     * _ sin()
     * _ sqrt()
     * _ tan()
+    * _ to_char()
     * _ to_degrees()
     * _ to_radians()
     * _ to_string()
@@ -276,6 +277,7 @@ extension: *.whim
     * _ to_string()
     * _ values()
   * x string
+    * _ char_to_number()
     * _ format()
     * _ index_of()
     * _ join()
