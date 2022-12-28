@@ -186,7 +186,6 @@ fn n_std_list_remove(vm: *Vm, values: []Value) Value {
     if (!value.isObjType(values[0], .list) or !value.isNumber(values[1])) {
         return vm.nativeError("std.list.remove arguments must be a list and number", .{});
     }
-    // TODO - remove on range
     return value.asList(values[0]).items.orderedRemove(@floatToInt(usize, value.asNumber(values[1])));
 }
 
