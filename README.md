@@ -206,7 +206,7 @@ extension: *.whim
 ### Language Features
 
 * negative indices
-  * set - string number, string range, list number, list range
+  * set - string number, string range
 
 ### Standard Library
 

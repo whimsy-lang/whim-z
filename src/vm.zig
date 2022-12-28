@@ -819,16 +819,38 @@ pub const Vm = struct {
 
     fn setOnList(self: *Vm, list: *ObjList, key: Value, val: Value) bool {
         if (value.isNumber(key)) {
-            const index = @floatToInt(isize, value.asNumber(key));
-            if (index < 0 or index >= list.items.items.len) {
-                self.runtimeError("Index {d} is out of bounds (0-{d}).", .{ index, list.items.items.len - 1 });
+            var index = @floatToInt(isize, value.asNumber(key));
+            const len = @intCast(isize, list.items.items.len);
+            if (index < -len or index >= len) {
+                self.runtimeError("Index {d} is out of bounds ({d} to {d}).", .{ index, -len, len - 1 });
                 return false;
             }
+            if (index < 0) index += len;
             list.items.items[@intCast(usize, index)] = val;
             return true;
         }
+        if (value.isObjType(key, .range)) {
+            const range = value.asRange(key);
+            if (value.isNumber(range.start) and range.step == 1) {
+                const start = @floatToInt(isize, value.asNumber(range.start));
+                const end = @floatToInt(isize, value.asNumber(range.end));
+                const len = @intCast(isize, list.items.items.len);
 
-        self.runtimeError("List index must be a number.", .{});
+                const norm = self.normalizeRange(start, end, range.inclusive, len);
+                if (!norm.valid) return false;
+
+                const new_items = if (value.isObjType(val, .list)) value.asList(val).items.items else &[_]Value{val};
+                list.items.replaceRange(norm.start, norm.end - norm.start, new_items) catch {
+                    std.debug.print("Could not allocate memory for list.", .{});
+                    std.process.exit(1);
+                };
+                return true;
+            }
+            self.runtimeError("Only numeric ranges with a step of 1 can be used to index a list.", .{});
+            return false;
+        }
+
+        self.runtimeError("Only numbers and ranges can be used to index a list.", .{});
         return false;
     }
 

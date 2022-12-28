@@ -1,6 +1,8 @@
 # simple test file
 
-std.print(std.version)
+l :: ('zero', 'one', 'two', 'three', 'four')
+l[0..= -2] = 'hi'
+std.print(l)
 
 # zig build -Drelease-fast run -- test/test.whim
 
