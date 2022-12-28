@@ -246,7 +246,7 @@ extension: *.whim
     * _ min()
     * x pi
   * x nil
-    * _ to_string()
+    * x to_string()
   * x number
     * _ abs()
     * _ acos()

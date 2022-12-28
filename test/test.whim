@@ -3,6 +3,9 @@
 std.print(std.math.pi)
 std.print(std.number.max)
 std.print(std.number.min)
+std.print(nil:to_string())
+n :: nil
+std.print(n:to_string())
 
 # zig build -Drelease-fast run -- test/test.whim
 

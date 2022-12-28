@@ -45,6 +45,7 @@ pub fn register(vm: *Vm) void {
 
     // std.nil
     vm.nil_class = defineInnerClass(vm, std_class, "nil");
+    defineNative(vm, vm.nil_class.?, "to_string", n_std_nil_to_string);
 
     // std.number
     vm.number_class = defineInnerClass(vm, std_class, "number");
@@ -213,6 +214,11 @@ fn n_std_map_remove(vm: *Vm, values: []Value) Value {
         _ = map.items.delete(val);
     }
     return values[0];
+}
+
+fn n_std_nil_to_string(vm: *Vm, values: []Value) Value {
+    _ = values;
+    return value.string(ObjString.copy(vm, "nil"));
 }
 
 fn n_std_set_add(vm: *Vm, values: []Value) Value {
