@@ -496,11 +496,6 @@ pub const Vm = struct {
             class = value.asInstance(a).type;
         } else if (value.isObjType(a, .class)) {
             class = value.asClass(a);
-            // myClass is std.class
-            if (target == self.class_class) {
-                self.push(value.boolean(true));
-                return true;
-            }
         } else if (value.hasStdClass(a)) {
             class = value.stdClass(a, self);
         } else {
@@ -607,7 +602,9 @@ pub const Vm = struct {
     }
 
     fn getOnValue(self: *Vm, target: Value, key: Value, pop_count: usize) bool {
-        if (value.isObject(target)) {
+        const is_type = value.isObjType(key, .string) and value.asString(key) == self.type_string;
+
+        if (!is_type and value.isObject(target)) {
             const obj = value.asObject(target);
             switch (obj.type) {
                 .list => return self.getOnList(obj.asList(), key, pop_count),
@@ -641,7 +638,7 @@ pub const Vm = struct {
             class = if (value.isObjType(target, .class)) value.asClass(target) else std_class;
 
             // type
-            if (key_str == self.type_string) {
+            if (is_type) {
                 self.stack_top -= pop_count;
                 self.push(value.class(std_class));
                 return true;
@@ -1204,7 +1201,6 @@ pub const Vm = struct {
                     if (value.isObjType(self.peek(0), .class)) {
                         super = value.asClass(self.peek(0));
                         if (super == self.bool_class or
-                            super == self.class_class or
                             super == self.function_class or
                             super == self.list_class or
                             super == self.map_class or
@@ -1222,7 +1218,7 @@ pub const Vm = struct {
                         return .runtime_error;
                     }
 
-                    const class = ObjClass.init(self, frame.readString(), super);
+                    const class = ObjClass.init(self, frame.readString(), super, false);
                     _ = self.pop();
                     self.push(value.class(class));
                 },

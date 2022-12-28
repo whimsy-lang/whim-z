@@ -20,9 +20,11 @@ pub fn register(vm: *Vm) void {
 
     // std.bool
     vm.bool_class = defineInnerClass(vm, std_class, "bool");
+    defineNative(vm, vm.bool_class.?, "to_string", n_std_bool_to_string);
 
     // std.class
     vm.class_class = defineInnerClass(vm, std_class, "class");
+    defineNative(vm, vm.class_class.?, "to_string", n_std_class_to_string);
 
     // std.function
     vm.function_class = defineInnerClass(vm, std_class, "function");
@@ -60,7 +62,7 @@ pub fn register(vm: *Vm) void {
 
 fn defineClass(vm: *Vm, name: []const u8) *ObjClass {
     vm.push(value.string(ObjString.copy(vm, name)));
-    const class = ObjClass.init(vm, value.asString(vm.peek(0)), null);
+    const class = ObjClass.init(vm, value.asString(vm.peek(0)), null, true);
     vm.push(value.class(class));
     _ = vm.globals.add(value.asString(vm.peek(1)), value.class(class), true);
     _ = vm.pop();
@@ -70,7 +72,7 @@ fn defineClass(vm: *Vm, name: []const u8) *ObjClass {
 
 fn defineInnerClass(vm: *Vm, outer: *ObjClass, name: []const u8) *ObjClass {
     vm.push(value.string(ObjString.copy(vm, name)));
-    const inner = ObjClass.init(vm, value.asString(vm.peek(0)), null);
+    const inner = ObjClass.init(vm, value.asString(vm.peek(0)), null, true);
     vm.push(value.class(inner));
     _ = outer.fields.add(value.asString(vm.peek(1)), value.class(inner), true);
     _ = vm.pop();
@@ -129,6 +131,25 @@ fn n_std_time(vm: *Vm, values: []Value) Value {
     }
     const time = @intToFloat(f64, std.time.nanoTimestamp()) / std.time.ns_per_s;
     return value.number(time);
+}
+
+fn n_std_bool_to_string(vm: *Vm, values: []Value) Value {
+    if (values.len != 1 or !value.isBool(values[0])) {
+        return vm.nativeError("std.bool.to_string takes a boolean", .{});
+    }
+    return value.string(ObjString.copy(vm, if (value.asBool(values[0])) "true" else "false"));
+}
+
+fn n_std_class_to_string(vm: *Vm, values: []Value) Value {
+    if (values.len != 1 or !value.isObjType(values[0], .class)) {
+        return vm.nativeError("std.class.to_string takes a class", .{});
+    }
+    const name = if (value.asClass(values[0]).name) |n| n.chars else "anonymous";
+    const chars = std.fmt.allocPrint(vm.allocator, "class {s}", .{name}) catch {
+        std.debug.print("Could not allocate memory for string.", .{});
+        std.process.exit(1);
+    };
+    return value.string(ObjString.take(vm, chars));
 }
 
 fn n_std_list_add(vm: *Vm, values: []Value) Value {

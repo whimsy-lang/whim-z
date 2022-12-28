@@ -208,9 +208,9 @@ extension: *.whim
 * x std
   * x assert()
   * x bool
-    * _ to_string()
+    * x to_string()
   * x class
-    * _ to_string()
+    * x to_string()
   * _ debug
   * x error()
   * x function

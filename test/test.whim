@@ -1,8 +1,12 @@
 # simple test file
 
-l :: ('zero', 'one', 'two', 'three', 'four')
-l[0..= -2] = 'hi'
-std.print(l)
+b :: class /class
+c :: class is b /class
+i :: c.super()
+
+std.print(i is c, ' ', i is b, ' ', i is std.class, ' ', i.type)
+std.print(c:to_string(), ' ', b:to_string())
+std.print(class /class:to_string())
 
 # zig build -Drelease-fast run -- test/test.whim
 

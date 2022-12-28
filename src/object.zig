@@ -224,7 +224,7 @@ pub const ObjClass = struct {
     super: ?*ObjClass,
     fields: StringMap,
 
-    pub fn init(vm: *Vm, class_name: *ObjString, super_class: ?*ObjClass) *ObjClass {
+    pub fn init(vm: *Vm, class_name: *ObjString, super_class: ?*ObjClass, base: bool) *ObjClass {
         if (debug.log_gc) {
             std.debug.print("allocate for class\n", .{});
         }
@@ -239,9 +239,10 @@ pub const ObjClass = struct {
         class.obj = .{ .type = .class };
 
         class.name = if (class_name != vm.empty_string) class_name else null;
-        class.super = super_class;
+        class.super = if (!base and super_class == null) vm.class_class.? else super_class;
+
         class.fields = StringMap.init(vm.allocator);
-        _ = class.fields.add(vm.super_string.?, if (super_class) |s| value.class(s) else value.nil(), true);
+        _ = class.fields.add(vm.super_string.?, if (class.super) |s| value.class(s) else value.nil(), true);
         _ = class.fields.add(vm.type_string.?, value.nil(), true);
 
         _ = vm.pop();
