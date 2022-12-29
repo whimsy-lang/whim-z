@@ -1,0 +1,11 @@
+# Whimsy portion of the standard library
+
+std.list.filter :: fn(list, filter)
+    res :: ()
+    for i in list
+        if filter(i)
+            res:add(i)
+        /if
+    /for
+    return res
+/fn

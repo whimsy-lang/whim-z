@@ -96,17 +96,15 @@ pub const OpCode = enum(u8) {
 
 pub const Chunk = struct {
     code: std.ArrayList(u8),
-    // variable-length encoding of the difference from the previous line number
+    // variable-length encoding of the line number
     lines: std.ArrayList(u8),
     constants: std.ArrayList(Value),
-    current_line: u29,
 
     pub fn init(allocator: Allocator) Chunk {
         return .{
             .code = std.ArrayList(u8).init(allocator),
             .lines = std.ArrayList(u8).init(allocator),
             .constants = std.ArrayList(Value).init(allocator),
-            .current_line = 0,
         };
     }
 
@@ -121,11 +119,10 @@ pub const Chunk = struct {
             std.debug.print("Could not add byte to chunk.", .{});
             std.process.exit(1);
         };
-        vle.add(&self.lines, line - self.current_line) catch {
+        vle.add(&self.lines, line) catch {
             std.debug.print("Could not add line to chunk.", .{});
             std.process.exit(1);
         };
-        self.current_line = line;
     }
 
     pub fn writeVle(self: *Chunk, val: u29, line: u29) void {
@@ -135,16 +132,15 @@ pub const Chunk = struct {
             std.process.exit(1);
         };
         while (i < self.code.items.len) : (i += 1) {
-            vle.add(&self.lines, line - self.current_line) catch {
+            vle.add(&self.lines, line) catch {
                 std.debug.print("Could not add line to chunk.", .{});
                 std.process.exit(1);
             };
-            self.current_line = line;
         }
     }
 
     pub fn getLine(self: *Chunk, index: usize) u29 {
-        return vle.sumTo(self.lines.items, index);
+        return vle.at(self.lines.items, index);
     }
 
     pub fn getAddConstant(self: *Chunk, vm: *Vm, val: Value) usize {

@@ -9,6 +9,8 @@ const Value = value.Value;
 const version = @import("vm.zig").version;
 const Vm = @import("vm.zig").Vm;
 
+pub const lib = @embedFile("std.whim");
+
 pub fn register(vm: *Vm) void {
     // std
     const std_class = defineClass(vm, "std");

@@ -1,9 +1,7 @@
 # simple test file
 
-std.print(1000:log(10))
-std.print(2:pow(5))
-std.print(std.math.pi:to_degrees())
-std.print(180:to_radians())
+l :: ('one', 'two', 'three', 'four', 'five')
+std.print(l:filter(fn(i) return i:length() == 3 /fn))
 
 # zig build -Drelease-fast run -- test/test.whim
 

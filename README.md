@@ -221,7 +221,7 @@ extension: *.whim
     * x add()
     * _ all()
     * _ any()
-    * _ filter()
+    * x filter()
     * _ first()
     * _ index_of()
     * _ last()

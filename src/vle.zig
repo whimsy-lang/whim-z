@@ -27,13 +27,11 @@ pub fn getIncrement(array: *[*]u8) u29 {
     return get(arr);
 }
 
-pub fn sumTo(arr: []const u8, index: usize) u29 {
-    var sum: u29 = 0;
+pub fn at(arr: []const u8, index: usize) u29 {
     var curIndex: usize = 0;
     var i: usize = 0;
     while (i < arr.len) {
-        sum += get(arr[i..].ptr);
-        if (curIndex == index) return sum;
+        if (curIndex == index) return get(arr[i..].ptr);
         i += valueLength(arr[i..].ptr);
         curIndex += 1;
     }

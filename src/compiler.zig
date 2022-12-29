@@ -8,6 +8,7 @@ const Token = @import("lexer.zig").Token;
 const TokenType = @import("lexer.zig").TokenType;
 const ObjFunction = @import("object.zig").ObjFunction;
 const ObjString = @import("object.zig").ObjString;
+const whimsy_std = @import("std.zig");
 const value = @import("value.zig");
 const Value = value.Value;
 const Vm = @import("vm.zig").Vm;
@@ -1398,9 +1399,15 @@ pub const Compiler = struct {
         }
     }
 
-    pub fn compile(vm: *Vm, source: []const u8) ?*ObjFunction {
+    fn compileItem(vm: *Vm, source: []const u8) void {
         vm.lexer = Lexer.init(source);
+        advance(vm);
+        while (!match(vm, .eof)) {
+            statement(vm);
+        }
+    }
 
+    pub fn compile(vm: *Vm, source: []const u8) ?*ObjFunction {
         vm.parser.had_error = false;
         vm.parser.panic_mode = false;
 
@@ -1408,11 +1415,8 @@ pub const Compiler = struct {
         compiler.init(vm, .script);
         defer compiler.deinit();
 
-        advance(vm);
-
-        while (!match(vm, .eof)) {
-            statement(vm);
-        }
+        compileItem(vm, whimsy_std.lib);
+        compileItem(vm, source);
 
         const script_func = endCompiler(vm);
         return if (vm.parser.had_error) null else script_func;
