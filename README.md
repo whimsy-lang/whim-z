@@ -219,8 +219,8 @@ extension: *.whim
   * _ io
   * x list
     * x add()
-    * _ all()
-    * _ any()
+    * x all()
+    * x any()
     * x filter()
     * _ first()
     * _ index_of()

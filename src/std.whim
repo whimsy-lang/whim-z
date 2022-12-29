@@ -1,5 +1,24 @@
 # Whimsy portion of the standard library
 
+# std.list
+std.list.all :: fn(list, filter)
+    for i in list
+        if !filter(i)
+            return false
+        /if
+    /for
+    return true
+/fn
+
+std.list.any :: fn(list, filter)
+    for i in list
+        if filter(i)
+            return true
+        /if
+    /for
+    return false
+/fn
+
 std.list.filter :: fn(list, filter)
     res :: ()
     for i in list
