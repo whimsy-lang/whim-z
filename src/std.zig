@@ -52,6 +52,16 @@ pub fn register(vm: *Vm) void {
 
     // std.number
     vm.number_class = defineInnerClass(vm, std_class, "number");
+    defineNative(vm, vm.number_class.?, "abs", n_std_number_abs);
+    defineNative(vm, vm.number_class.?, "acos", n_std_number_acos);
+    defineNative(vm, vm.number_class.?, "asin", n_std_number_asin);
+    defineNative(vm, vm.number_class.?, "atan", n_std_number_atan);
+    defineNative(vm, vm.number_class.?, "ceiling", n_std_number_ceiling);
+    defineNative(vm, vm.number_class.?, "cos", n_std_number_cos);
+    defineNative(vm, vm.number_class.?, "floor", n_std_number_floor);
+    defineNative(vm, vm.number_class.?, "sin", n_std_number_sin);
+    defineNative(vm, vm.number_class.?, "sqrt", n_std_number_sqrt);
+    defineNative(vm, vm.number_class.?, "tan", n_std_number_tan);
     defineProperty(vm, vm.number_class.?, "max", value.number(std.math.floatMax(f64)));
     defineProperty(vm, vm.number_class.?, "min", value.number(-std.math.floatMax(f64)));
 
@@ -161,6 +171,77 @@ fn n_std_math_min(vm: *Vm, values: []Value) Value {
         if (num < min) min = num;
     }
     return value.number(min);
+}
+
+fn n_std_number_abs(vm: *Vm, values: []Value) Value {
+    if (values.len != 1 or !value.isNumber(values[0])) {
+        return vm.nativeError("std.number.abs takes a number", .{});
+    }
+    const num = value.asNumber(values[0]);
+    return value.number(if (num < 0) -num else num);
+}
+
+fn n_std_number_acos(vm: *Vm, values: []Value) Value {
+    if (values.len != 1 or !value.isNumber(values[0])) {
+        return vm.nativeError("std.number.acos takes a number", .{});
+    }
+    return value.number(std.math.acos(value.asNumber(values[0])));
+}
+
+fn n_std_number_asin(vm: *Vm, values: []Value) Value {
+    if (values.len != 1 or !value.isNumber(values[0])) {
+        return vm.nativeError("std.number.asin takes a number", .{});
+    }
+    return value.number(std.math.asin(value.asNumber(values[0])));
+}
+
+fn n_std_number_atan(vm: *Vm, values: []Value) Value {
+    if (values.len != 1 or !value.isNumber(values[0])) {
+        return vm.nativeError("std.number.atan takes a number", .{});
+    }
+    return value.number(std.math.atan(value.asNumber(values[0])));
+}
+
+fn n_std_number_ceiling(vm: *Vm, values: []Value) Value {
+    if (values.len != 1 or !value.isNumber(values[0])) {
+        return vm.nativeError("std.number.ceiling takes a number", .{});
+    }
+    return value.number(std.math.ceil(value.asNumber(values[0])));
+}
+
+fn n_std_number_cos(vm: *Vm, values: []Value) Value {
+    if (values.len != 1 or !value.isNumber(values[0])) {
+        return vm.nativeError("std.number.cos takes a number", .{});
+    }
+    return value.number(std.math.cos(value.asNumber(values[0])));
+}
+
+fn n_std_number_floor(vm: *Vm, values: []Value) Value {
+    if (values.len != 1 or !value.isNumber(values[0])) {
+        return vm.nativeError("std.number.floor takes a number", .{});
+    }
+    return value.number(std.math.floor(value.asNumber(values[0])));
+}
+
+fn n_std_number_sin(vm: *Vm, values: []Value) Value {
+    if (values.len != 1 or !value.isNumber(values[0])) {
+        return vm.nativeError("std.number.sin takes a number", .{});
+    }
+    return value.number(std.math.sin(value.asNumber(values[0])));
+}
+
+fn n_std_number_sqrt(vm: *Vm, values: []Value) Value {
+    if (values.len != 1 or !value.isNumber(values[0])) {
+        return vm.nativeError("std.number.sqrt takes a number", .{});
+    }
+    return value.number(std.math.sqrt(value.asNumber(values[0])));
+}
+
+fn n_std_number_tan(vm: *Vm, values: []Value) Value {
+    if (values.len != 1 or !value.isNumber(values[0])) {
+        return vm.nativeError("std.number.tan takes a number", .{});
+    }
+    return value.number(std.math.tan(value.asNumber(values[0])));
 }
 
 fn n_std_print(vm: *Vm, values: []Value) Value {
