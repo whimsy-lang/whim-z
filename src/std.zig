@@ -59,6 +59,8 @@ pub fn register(vm: *Vm) void {
     defineNative(vm, vm.number_class.?, "ceiling", n_std_number_ceiling);
     defineNative(vm, vm.number_class.?, "cos", n_std_number_cos);
     defineNative(vm, vm.number_class.?, "floor", n_std_number_floor);
+    defineNative(vm, vm.number_class.?, "log", n_std_number_log);
+    defineNative(vm, vm.number_class.?, "pow", n_std_number_pow);
     defineNative(vm, vm.number_class.?, "sin", n_std_number_sin);
     defineNative(vm, vm.number_class.?, "sqrt", n_std_number_sqrt);
     defineNative(vm, vm.number_class.?, "tan", n_std_number_tan);
@@ -221,6 +223,20 @@ fn n_std_number_floor(vm: *Vm, values: []Value) Value {
         return vm.nativeError("std.number.floor takes a number", .{});
     }
     return value.number(std.math.floor(value.asNumber(values[0])));
+}
+
+fn n_std_number_log(vm: *Vm, values: []Value) Value {
+    if (values.len != 2 or !value.isNumber(values[0]) or !value.isNumber(values[1])) {
+        return vm.nativeError("std.number.log takes two numbers (value, base)", .{});
+    }
+    return value.number(std.math.log(f64, value.asNumber(values[1]), value.asNumber(values[0])));
+}
+
+fn n_std_number_pow(vm: *Vm, values: []Value) Value {
+    if (values.len != 2 or !value.isNumber(values[0]) or !value.isNumber(values[1])) {
+        return vm.nativeError("std.number.pow takes two numbers (value, power)", .{});
+    }
+    return value.number(std.math.pow(f64, value.asNumber(values[0]), value.asNumber(values[1])));
 }
 
 fn n_std_number_sin(vm: *Vm, values: []Value) Value {

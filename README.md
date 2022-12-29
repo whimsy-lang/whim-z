@@ -255,10 +255,10 @@ extension: *.whim
     * x ceiling()
     * x cos()
     * x floor()
-    * _ log()
+    * x log()
     * x max
     * x min
-    * _ pow()
+    * x pow()
     * x sin()
     * x sqrt()
     * x tan()
