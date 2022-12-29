@@ -233,6 +233,7 @@ extension: *.whim
     * x reduce()
     * x remove()
     * x reverse()
+    * _ to_set()
     * _ to_string()
   * x map
     * x keys()
@@ -268,6 +269,7 @@ extension: *.whim
   * _ os
   * x print()
   * x range
+    * _ to_list()
     * _ to_string()
   * x set
     * x add()
@@ -277,6 +279,7 @@ extension: *.whim
     * _ values()
   * x string
     * _ char_to_number()
+    * _ chars()
     * _ format()
     * _ index_of()
     * _ join()
