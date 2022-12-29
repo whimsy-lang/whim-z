@@ -230,10 +230,9 @@ extension: *.whim
     * x length()
     * x map()
     * x pop()
-    * _ reduce()
+    * x reduce()
     * x remove()
     * x reverse()
-    * _ sort()
     * _ to_string()
   * x map
     * _ keys()

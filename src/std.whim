@@ -59,3 +59,11 @@ std.list.map :: fn(list, func)
     /for
     return res
 /fn
+
+std.list.reduce :: fn(list, func, start)
+    res := start
+    for i in list
+        res = func(res, i)
+    /for
+    return res
+/fn
