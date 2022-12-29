@@ -2,6 +2,7 @@ const std = @import("std");
 
 const NativeFn = @import("object.zig").NativeFn;
 const ObjClass = @import("object.zig").ObjClass;
+const ObjList = @import("object.zig").ObjList;
 const ObjNative = @import("object.zig").ObjNative;
 const ObjString = @import("object.zig").ObjString;
 const value = @import("value.zig");
@@ -45,8 +46,10 @@ pub fn register(vm: *Vm) void {
 
     // std.map
     vm.map_class = defineInnerClass(vm, std_class, "map");
+    defineNative(vm, vm.map_class.?, "keys", n_std_map_keys);
     defineNative(vm, vm.map_class.?, "length", n_std_map_length);
     defineNative(vm, vm.map_class.?, "remove", n_std_map_remove);
+    defineNative(vm, vm.map_class.?, "values", n_std_map_values);
 
     const math_class = defineInnerClass(vm, std_class, "math");
     defineNative(vm, math_class, "max", n_std_math_max);
@@ -332,11 +335,8 @@ fn n_std_function_to_string(vm: *Vm, values: []Value) Value {
 }
 
 fn n_std_list_add(vm: *Vm, values: []Value) Value {
-    if (values.len < 2) {
+    if (values.len < 2 or !value.isObjType(values[0], .list)) {
         return vm.nativeError("std.list.add takes a list and at least one item to add", .{});
-    }
-    if (!value.isObjType(values[0], .list)) {
-        return vm.nativeError("std.list.add's first argument must be a list", .{});
     }
     value.asList(values[0]).items.appendSlice(values[1..]) catch {
         std.debug.print("Could not allocate memory for list.", .{});
@@ -390,6 +390,25 @@ fn n_std_list_reverse(vm: *Vm, values: []Value) Value {
     return values[0];
 }
 
+fn n_std_map_keys(vm: *Vm, values: []Value) Value {
+    if (values.len != 1 or !value.isObjType(values[0], .map)) {
+        return vm.nativeError("std.map.keys takes a map", .{});
+    }
+    const list = ObjList.init(vm);
+    vm.push(value.list(list));
+
+    for (value.asMap(values[0]).items.entries) |entry| {
+        if (!value.isEmpty(entry.key)) {
+            list.items.append(entry.key) catch {
+                std.debug.print("Could not allocate memory for list.", .{});
+                std.process.exit(1);
+            };
+        }
+    }
+
+    return vm.pop();
+}
+
 fn n_std_map_length(vm: *Vm, values: []Value) Value {
     if (values.len != 1 or !value.isObjType(values[0], .map)) {
         return vm.nativeError("std.map.length takes a map", .{});
@@ -404,11 +423,8 @@ fn n_std_map_length(vm: *Vm, values: []Value) Value {
 }
 
 fn n_std_map_remove(vm: *Vm, values: []Value) Value {
-    if (values.len < 2) {
+    if (values.len < 2 or !value.isObjType(values[0], .map)) {
         return vm.nativeError("std.map.remove takes a map and at least one key to remove", .{});
-    }
-    if (!value.isObjType(values[0], .map)) {
-        return vm.nativeError("std.map.remove's first argument must be a map", .{});
     }
     const map = value.asMap(values[0]);
     for (values[1..]) |val| {
@@ -417,17 +433,33 @@ fn n_std_map_remove(vm: *Vm, values: []Value) Value {
     return values[0];
 }
 
+fn n_std_map_values(vm: *Vm, values: []Value) Value {
+    if (values.len != 1 or !value.isObjType(values[0], .map)) {
+        return vm.nativeError("std.map.values takes a map", .{});
+    }
+    const list = ObjList.init(vm);
+    vm.push(value.list(list));
+
+    for (value.asMap(values[0]).items.entries) |entry| {
+        if (!value.isEmpty(entry.key)) {
+            list.items.append(entry.value.value) catch {
+                std.debug.print("Could not allocate memory for list.", .{});
+                std.process.exit(1);
+            };
+        }
+    }
+
+    return vm.pop();
+}
+
 fn n_std_nil_to_string(vm: *Vm, values: []Value) Value {
     _ = values;
     return value.string(ObjString.copy(vm, "nil"));
 }
 
 fn n_std_set_add(vm: *Vm, values: []Value) Value {
-    if (values.len < 2) {
+    if (values.len < 2 or !value.isObjType(values[0], .set)) {
         return vm.nativeError("std.set.add takes a set and at least one item to add", .{});
-    }
-    if (!value.isObjType(values[0], .set)) {
-        return vm.nativeError("std.set.add's first argument must be a set", .{});
     }
     const set = value.asSet(values[0]);
     for (values[1..]) |val| {
@@ -450,11 +482,8 @@ fn n_std_set_length(vm: *Vm, values: []Value) Value {
 }
 
 fn n_std_set_remove(vm: *Vm, values: []Value) Value {
-    if (values.len < 2) {
+    if (values.len < 2 or !value.isObjType(values[0], .set)) {
         return vm.nativeError("std.set.remove takes a set and at least one item to remove", .{});
-    }
-    if (!value.isObjType(values[0], .set)) {
-        return vm.nativeError("std.set.remove's first argument must be a set", .{});
     }
     const set = value.asSet(values[0]);
     for (values[1..]) |val| {

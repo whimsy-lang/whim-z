@@ -196,6 +196,8 @@ extension: *.whim
 * character (byte?) number instead of line number
 * error handling
 * import system
+* debugging
+* io
 * strings - flexible array members
 * string hash set (instead of table with nil values) for interning
 * separate sized jumps
@@ -212,12 +214,10 @@ extension: *.whim
     * x to_string()
   * x class
     * x to_string()
-  * _ debug
   * x error()
   * x function
     * x to_string()
   * x gc_collect()
-  * _ io
   * x list
     * x add()
     * x all()
@@ -235,11 +235,11 @@ extension: *.whim
     * x reverse()
     * _ to_string()
   * x map
-    * _ keys()
+    * x keys()
     * x length()
     * x remove()
     * _ to_string()
-    * _ values()
+    * x values()
   * _ math
     * x max()
     * x min()

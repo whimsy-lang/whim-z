@@ -1,4 +1,10 @@
 # simple test file
 
-l :: (1, 2, 3, 4, 5)
-std.print(l:reduce(fn(acc, v) return acc + v /fn, 0))
+m :: ['one' :: 1, 'two' :: 2, 'three' :: 3]
+std.print(m)
+std.print(m:keys())
+std.print(m:values())
+m:remove('two')
+std.print(m)
+std.print(m:keys())
+std.print(m:values())
