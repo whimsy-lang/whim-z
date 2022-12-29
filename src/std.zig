@@ -42,6 +42,8 @@ pub fn register(vm: *Vm) void {
     defineNative(vm, vm.map_class.?, "remove", n_std_map_remove);
 
     const math_class = defineInnerClass(vm, std_class, "math");
+    defineNative(vm, math_class, "max", n_std_math_max);
+    defineNative(vm, math_class, "min", n_std_math_min);
     defineProperty(vm, math_class, "pi", value.number(3.141592653589793238462643383279502884));
 
     // std.nil
@@ -129,6 +131,36 @@ fn n_std_gc_collect(vm: *Vm, values: []Value) Value {
     }
     vm.collectGarbage();
     return value.nil();
+}
+
+fn n_std_math_max(vm: *Vm, values: []Value) Value {
+    if (values.len == 0) {
+        return vm.nativeError("std.math.max takes numbers as arguments", .{});
+    }
+    var max = -std.math.floatMax(f64);
+    for (values) |val| {
+        if (!value.isNumber(val)) {
+            return vm.nativeError("std.math.max takes numbers as arguments", .{});
+        }
+        const num = value.asNumber(val);
+        if (num > max) max = num;
+    }
+    return value.number(max);
+}
+
+fn n_std_math_min(vm: *Vm, values: []Value) Value {
+    if (values.len == 0) {
+        return vm.nativeError("std.math.min takes numbers as arguments", .{});
+    }
+    var min = std.math.floatMax(f64);
+    for (values) |val| {
+        if (!value.isNumber(val)) {
+            return vm.nativeError("std.math.min takes numbers as arguments", .{});
+        }
+        const num = value.asNumber(val);
+        if (num < min) min = num;
+    }
+    return value.number(min);
 }
 
 fn n_std_print(vm: *Vm, values: []Value) Value {

@@ -242,8 +242,8 @@ extension: *.whim
     * _ to_string()
     * _ values()
   * _ math
-    * _ max()
-    * _ min()
+    * x max()
+    * x min()
     * x pi
   * x nil
     * x to_string()

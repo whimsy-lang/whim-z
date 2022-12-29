@@ -1,11 +1,7 @@
 # simple test file
 
-std.print(std.math.pi)
-std.print(std.number.max)
-std.print(std.number.min)
-std.print(nil:to_string())
-n :: nil
-std.print(n:to_string())
+std.print(std.math.min(0, 3, -5, 7))
+std.print(std.math.max(512, 0, -75, 1027, 18))
 
 # zig build -Drelease-fast run -- test/test.whim
 
