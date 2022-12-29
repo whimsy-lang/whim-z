@@ -2,5 +2,8 @@
 
 l :: ('one', 'two', 'three', 'four', 'five')
 std.print(l:filter(fn(i) return i:length() == 3 /fn))
+std.print(l:first(fn(i) return i:length() == 5 /fn))
+std.print(l:last(fn(i) return i:length() == 3 /fn))
 std.print(('aaa', 'bbb', 'ccc'):all(fn(i) return i:length() == 3 /fn))
-std.print(('aa', 'bb'):any(fn(i) return i:length() == 3 /fn))
+std.print(('aa', 'bbb'):any(fn(i) return i:length() == 3 /fn))
+std.print(l:map(fn(i) return i + ' ' + i /fn))

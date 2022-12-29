@@ -1,30 +1,58 @@
 # Whimsy portion of the standard library
 
 # std.list
-std.list.all :: fn(list, filter)
+std.list.all :: fn(list, func)
     for i in list
-        if !filter(i)
+        if !func(i)
             return false
         /if
     /for
     return true
 /fn
 
-std.list.any :: fn(list, filter)
+std.list.any :: fn(list, func)
     for i in list
-        if filter(i)
+        if func(i)
             return true
         /if
     /for
     return false
 /fn
 
-std.list.filter :: fn(list, filter)
+std.list.filter :: fn(list, func)
     res :: ()
     for i in list
-        if filter(i)
+        if func(i)
             res:add(i)
         /if
+    /for
+    return res
+/fn
+
+std.list.first :: fn(list, func)
+    for i in list
+        if func(i)
+            return i
+        /if
+    /for
+    return nil
+/fn
+
+std.list.last :: fn(list, func)
+    i := list:length() - 1
+    loop break i < 0
+        if func(list[i])
+            return list[i]
+        /if
+        i -= 1
+    /loop
+    return nil
+/fn
+
+std.list.map :: fn(list, func)
+    res :: ()
+    for i in list
+        res:add(func(i))
     /for
     return res
 /fn
