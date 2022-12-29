@@ -229,11 +229,10 @@ extension: *.whim
     * x last_index_of()
     * x length()
     * x map()
-    * _ pop()
-    * _ push()
+    * x pop()
     * _ reduce()
     * x remove()
-    * _ reverse()
+    * x reverse()
     * _ sort()
     * _ to_string()
   * x map

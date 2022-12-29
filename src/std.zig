@@ -39,7 +39,9 @@ pub fn register(vm: *Vm) void {
     defineNative(vm, vm.list_class.?, "index_of", n_std_list_index_of);
     defineNative(vm, vm.list_class.?, "last_index_of", n_std_list_last_index_of);
     defineNative(vm, vm.list_class.?, "length", n_std_list_length);
+    defineNative(vm, vm.list_class.?, "pop", n_std_list_pop);
     defineNative(vm, vm.list_class.?, "remove", n_std_list_remove);
+    defineNative(vm, vm.list_class.?, "reverse", n_std_list_reverse);
 
     // std.map
     vm.map_class = defineInnerClass(vm, std_class, "map");
@@ -347,24 +349,16 @@ fn n_std_list_index_of(vm: *Vm, values: []Value) Value {
     if (values.len != 2 or !value.isObjType(values[0], .list)) {
         return vm.nativeError("std.list.index_of takes a list and the value to find", .{});
     }
-    for (value.asList(values[0]).items.items) |v, i| {
-        if (v == values[1]) return value.number(@intToFloat(f64, i));
-    }
-    return value.number(-1);
+    const index = std.mem.indexOfScalar(Value, value.asList(values[0]).items.items, values[1]);
+    return value.number(if (index) |i| @intToFloat(f64, i) else -1);
 }
 
 fn n_std_list_last_index_of(vm: *Vm, values: []Value) Value {
     if (values.len != 2 or !value.isObjType(values[0], .list)) {
         return vm.nativeError("std.list.last_index_of takes a list and the value to find", .{});
     }
-    const list = value.asList(values[0]);
-    var i = @intCast(isize, list.items.items.len) - 1;
-    while (i >= 0) : (i -= 1) {
-        if (list.items.items[@intCast(usize, i)] == values[1]) {
-            return value.number(@intToFloat(f64, i));
-        }
-    }
-    return value.number(-1);
+    const index = std.mem.lastIndexOfScalar(Value, value.asList(values[0]).items.items, values[1]);
+    return value.number(if (index) |i| @intToFloat(f64, i) else -1);
 }
 
 fn n_std_list_length(vm: *Vm, values: []Value) Value {
@@ -374,11 +368,26 @@ fn n_std_list_length(vm: *Vm, values: []Value) Value {
     return value.number(@intToFloat(f64, value.asList(values[0]).items.items.len));
 }
 
+fn n_std_list_pop(vm: *Vm, values: []Value) Value {
+    if (values.len != 1 or !value.isObjType(values[0], .list)) {
+        return vm.nativeError("std.list.pop takes a list", .{});
+    }
+    return value.asList(values[0]).items.pop();
+}
+
 fn n_std_list_remove(vm: *Vm, values: []Value) Value {
     if (values.len != 2 or !value.isObjType(values[0], .list) or !value.isNumber(values[1])) {
         return vm.nativeError("std.list.remove takes a list and the index to remove", .{});
     }
     return value.asList(values[0]).items.orderedRemove(@floatToInt(usize, value.asNumber(values[1])));
+}
+
+fn n_std_list_reverse(vm: *Vm, values: []Value) Value {
+    if (values.len != 1 or !value.isObjType(values[0], .list)) {
+        return vm.nativeError("std.list.reverse takes a list", .{});
+    }
+    std.mem.reverse(Value, value.asList(values[0]).items.items);
+    return values[0];
 }
 
 fn n_std_map_length(vm: *Vm, values: []Value) Value {
