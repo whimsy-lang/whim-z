@@ -263,8 +263,8 @@ extension: *.whim
     * x sqrt()
     * x tan()
     * _ to_char()
-    * _ to_degrees()
-    * _ to_radians()
+    * x to_degrees()
+    * x to_radians()
     * _ to_string()
   * _ os
   * x print()

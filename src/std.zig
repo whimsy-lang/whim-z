@@ -64,6 +64,8 @@ pub fn register(vm: *Vm) void {
     defineNative(vm, vm.number_class.?, "sin", n_std_number_sin);
     defineNative(vm, vm.number_class.?, "sqrt", n_std_number_sqrt);
     defineNative(vm, vm.number_class.?, "tan", n_std_number_tan);
+    defineNative(vm, vm.number_class.?, "to_degrees", n_std_number_to_degrees);
+    defineNative(vm, vm.number_class.?, "to_radians", n_std_number_to_radians);
     defineProperty(vm, vm.number_class.?, "max", value.number(std.math.floatMax(f64)));
     defineProperty(vm, vm.number_class.?, "min", value.number(-std.math.floatMax(f64)));
 
@@ -258,6 +260,20 @@ fn n_std_number_tan(vm: *Vm, values: []Value) Value {
         return vm.nativeError("std.number.tan takes a number", .{});
     }
     return value.number(std.math.tan(value.asNumber(values[0])));
+}
+
+fn n_std_number_to_degrees(vm: *Vm, values: []Value) Value {
+    if (values.len != 1 or !value.isNumber(values[0])) {
+        return vm.nativeError("std.number.to_degrees takes a number", .{});
+    }
+    return value.number(std.math.radiansToDegrees(f64, value.asNumber(values[0])));
+}
+
+fn n_std_number_to_radians(vm: *Vm, values: []Value) Value {
+    if (values.len != 1 or !value.isNumber(values[0])) {
+        return vm.nativeError("std.number.to_radians takes a number", .{});
+    }
+    return value.number(std.math.degreesToRadians(f64, value.asNumber(values[0])));
 }
 
 fn n_std_print(vm: *Vm, values: []Value) Value {

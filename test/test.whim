@@ -2,6 +2,8 @@
 
 std.print(1000:log(10))
 std.print(2:pow(5))
+std.print(std.math.pi:to_degrees())
+std.print(180:to_radians())
 
 # zig build -Drelease-fast run -- test/test.whim
 
