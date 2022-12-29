@@ -1,4 +1,7 @@
-# Whimsy portion of the standard library
+# Whimsy portion of the standard library.
+#
+# Most items are implemented in std.zig, but those
+# that take functions as parameters are here.
 
 # std.list
 std.list.all :: fn(list, func)

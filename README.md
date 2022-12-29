@@ -184,9 +184,9 @@ a
 
 # Operators: + - * / % ! == != and or :: := = += -= *= /= %= is
 
-# no implicit string conversion
-val := 3 + someStr:num()
-message :: "Value is " + val:str()
+# no implicit conversions
+val := 3 + someStr:to_number()
+message :: "Value is " + val:to_string()
 ```
 
 extension: *.whim  
@@ -195,6 +195,7 @@ extension: *.whim
 
 * character (byte?) number instead of line number
 * error handling
+* import system
 * strings - flexible array members
 * string hash set (instead of table with nil values) for interning
 * separate sized jumps
