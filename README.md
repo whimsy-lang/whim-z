@@ -215,7 +215,7 @@ extension: *.whim
   * _ debug
   * x error()
   * x function
-    * _ to_string()
+    * x to_string()
   * x gc_collect()
   * _ io
   * x list
@@ -224,9 +224,9 @@ extension: *.whim
     * x any()
     * x filter()
     * x first()
-    * _ index_of()
+    * x index_of()
     * x last()
-    * _ last_index_of()
+    * x last_index_of()
     * x length()
     * x map()
     * _ pop()

@@ -31,10 +31,13 @@ pub fn register(vm: *Vm) void {
 
     // std.function
     vm.function_class = defineInnerClass(vm, std_class, "function");
+    defineNative(vm, vm.function_class.?, "to_string", n_std_function_to_string);
 
     // std.list
     vm.list_class = defineInnerClass(vm, std_class, "list");
     defineNative(vm, vm.list_class.?, "add", n_std_list_add);
+    defineNative(vm, vm.list_class.?, "index_of", n_std_list_index_of);
+    defineNative(vm, vm.list_class.?, "last_index_of", n_std_list_last_index_of);
     defineNative(vm, vm.list_class.?, "length", n_std_list_length);
     defineNative(vm, vm.list_class.?, "remove", n_std_list_remove);
 
@@ -314,6 +317,18 @@ fn n_std_class_to_string(vm: *Vm, values: []Value) Value {
     return value.string(ObjString.take(vm, chars));
 }
 
+fn n_std_function_to_string(vm: *Vm, values: []Value) Value {
+    if (values.len != 1 or !value.isObjType(values[0], .closure)) {
+        return vm.nativeError("std.function.to_string takes a function", .{});
+    }
+    const name = if (value.asClosure(values[0]).function.name) |n| n.chars else "anon fn";
+    const chars = std.fmt.allocPrint(vm.allocator, "{s}()", .{name}) catch {
+        std.debug.print("Could not allocate memory for string.", .{});
+        std.process.exit(1);
+    };
+    return value.string(ObjString.take(vm, chars));
+}
+
 fn n_std_list_add(vm: *Vm, values: []Value) Value {
     if (values.len < 2) {
         return vm.nativeError("std.list.add takes a list and at least one item to add", .{});
@@ -328,6 +343,30 @@ fn n_std_list_add(vm: *Vm, values: []Value) Value {
     return values[0];
 }
 
+fn n_std_list_index_of(vm: *Vm, values: []Value) Value {
+    if (values.len != 2 or !value.isObjType(values[0], .list)) {
+        return vm.nativeError("std.list.index_of takes a list and the value to find", .{});
+    }
+    for (value.asList(values[0]).items.items) |v, i| {
+        if (v == values[1]) return value.number(@intToFloat(f64, i));
+    }
+    return value.number(-1);
+}
+
+fn n_std_list_last_index_of(vm: *Vm, values: []Value) Value {
+    if (values.len != 2 or !value.isObjType(values[0], .list)) {
+        return vm.nativeError("std.list.last_index_of takes a list and the value to find", .{});
+    }
+    const list = value.asList(values[0]);
+    var i = @intCast(isize, list.items.items.len) - 1;
+    while (i >= 0) : (i -= 1) {
+        if (list.items.items[@intCast(usize, i)] == values[1]) {
+            return value.number(@intToFloat(f64, i));
+        }
+    }
+    return value.number(-1);
+}
+
 fn n_std_list_length(vm: *Vm, values: []Value) Value {
     if (values.len != 1 or !value.isObjType(values[0], .list)) {
         return vm.nativeError("std.list.length takes a list", .{});
@@ -336,11 +375,8 @@ fn n_std_list_length(vm: *Vm, values: []Value) Value {
 }
 
 fn n_std_list_remove(vm: *Vm, values: []Value) Value {
-    if (values.len != 2) {
+    if (values.len != 2 or !value.isObjType(values[0], .list) or !value.isNumber(values[1])) {
         return vm.nativeError("std.list.remove takes a list and the index to remove", .{});
-    }
-    if (!value.isObjType(values[0], .list) or !value.isNumber(values[1])) {
-        return vm.nativeError("std.list.remove arguments must be a list and number", .{});
     }
     return value.asList(values[0]).items.orderedRemove(@floatToInt(usize, value.asNumber(values[1])));
 }
