@@ -633,10 +633,12 @@ fn n_std_string_chars(vm: *Vm, values: []Value) Value {
             std.debug.print("Invalid character encoding.", .{});
             std.process.exit(1);
         };
-        list.items.append(value.string(ObjString.copy(vm, str.chars[i .. i + len]))) catch {
+        vm.push(value.string(ObjString.copy(vm, str.chars[i .. i + len])));
+        list.items.append(vm.peek(0)) catch {
             std.debug.print("Could not allocate memory for list.", .{});
             std.process.exit(1);
         };
+        _ = vm.pop();
         i += len;
     }
 
