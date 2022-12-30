@@ -211,12 +211,12 @@ extension: *.whim
 * x std
   * x assert()
   * x bool
-    * x to_string()
+    * _ to_string()
   * x class
-    * x to_string()
+    * _ to_string()
   * x error()
   * x function
-    * x to_string()
+    * _ to_string()
   * x gc_collect()
   * x list
     * x add()
@@ -247,7 +247,7 @@ extension: *.whim
     * x min()
     * x pi
   * x nil
-    * x to_string()
+    * _ to_string()
   * x number
     * x abs()
     * x acos()

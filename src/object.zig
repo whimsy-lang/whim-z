@@ -146,6 +146,35 @@ pub const Object = struct {
         }
     }
 
+    pub fn toString(self: *Object, vm: *Vm) *ObjString {
+        _ = self;
+        return ObjString.copy(vm, "obj");
+    }
+
+    // fn n_std_class_to_string(vm: *Vm, values: []Value) Value {
+    //     if (values.len != 1 or !value.isObjType(values[0], .class)) {
+    //         return vm.nativeError("std.class.to_string takes a class", .{});
+    //     }
+    //     const name = if (value.asClass(values[0]).name) |n| n.chars else "anonymous";
+    //     const chars = std.fmt.allocPrint(vm.allocator, "class {s}", .{name}) catch {
+    //         std.debug.print("Could not allocate memory for string.", .{});
+    //         std.process.exit(1);
+    //     };
+    //     return value.string(ObjString.take(vm, chars));
+    // }
+
+    // fn n_std_function_to_string(vm: *Vm, values: []Value) Value {
+    //     if (values.len != 1 or !value.isObjType(values[0], .closure)) {
+    //         return vm.nativeError("std.function.to_string takes a function", .{});
+    //     }
+    //     const name = if (value.asClosure(values[0]).function.name) |n| n.chars else "anon fn";
+    //     const chars = std.fmt.allocPrint(vm.allocator, "{s}()", .{name}) catch {
+    //         std.debug.print("Could not allocate memory for string.", .{});
+    //         std.process.exit(1);
+    //     };
+    //     return value.string(ObjString.take(vm, chars));
+    // }
+
     pub fn mark(self: *Object, vm: *Vm) void {
         if (self.is_marked) return;
 

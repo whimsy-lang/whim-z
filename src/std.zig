@@ -26,15 +26,15 @@ pub fn register(vm: *Vm) void {
 
     // std.bool
     vm.bool_class = defineInnerClass(vm, std_class, "bool");
-    defineNative(vm, vm.bool_class.?, "to_string", n_std_bool_to_string);
+    defineNative(vm, vm.bool_class.?, "to_string", n_std_to_string);
 
     // std.class
     vm.class_class = defineInnerClass(vm, std_class, "class");
-    defineNative(vm, vm.class_class.?, "to_string", n_std_class_to_string);
+    defineNative(vm, vm.class_class.?, "to_string", n_std_to_string);
 
     // std.function
     vm.function_class = defineInnerClass(vm, std_class, "function");
-    defineNative(vm, vm.function_class.?, "to_string", n_std_function_to_string);
+    defineNative(vm, vm.function_class.?, "to_string", n_std_to_string);
 
     // std.list
     vm.list_class = defineInnerClass(vm, std_class, "list");
@@ -47,12 +47,14 @@ pub fn register(vm: *Vm) void {
     defineNative(vm, vm.list_class.?, "remove", n_std_list_remove);
     defineNative(vm, vm.list_class.?, "reverse", n_std_list_reverse);
     defineNative(vm, vm.list_class.?, "to_set", n_std_list_to_set);
+    defineNative(vm, vm.list_class.?, "to_string", n_std_to_string);
 
     // std.map
     vm.map_class = defineInnerClass(vm, std_class, "map");
     defineNative(vm, vm.map_class.?, "keys", n_std_map_keys);
     defineNative(vm, vm.map_class.?, "length", n_std_map_length);
     defineNative(vm, vm.map_class.?, "remove", n_std_map_remove);
+    defineNative(vm, vm.map_class.?, "to_string", n_std_to_string);
     defineNative(vm, vm.map_class.?, "values", n_std_map_values);
 
     // std.math
@@ -63,7 +65,7 @@ pub fn register(vm: *Vm) void {
 
     // std.nil
     vm.nil_class = defineInnerClass(vm, std_class, "nil");
-    defineNative(vm, vm.nil_class.?, "to_string", n_std_nil_to_string);
+    defineNative(vm, vm.nil_class.?, "to_string", n_std_to_string);
 
     // std.number
     vm.number_class = defineInnerClass(vm, std_class, "number");
@@ -84,9 +86,11 @@ pub fn register(vm: *Vm) void {
     defineNative(vm, vm.number_class.?, "to_char", n_std_number_to_char);
     defineNative(vm, vm.number_class.?, "to_degrees", n_std_number_to_degrees);
     defineNative(vm, vm.number_class.?, "to_radians", n_std_number_to_radians);
+    defineNative(vm, vm.number_class.?, "to_string", n_std_to_string);
 
     // std.range
     vm.range_class = defineInnerClass(vm, std_class, "range");
+    defineNative(vm, vm.range_class.?, "to_string", n_std_to_string);
     defineNative(vm, vm.range_class.?, "values", n_std_range_values);
 
     // std.set
@@ -94,6 +98,7 @@ pub fn register(vm: *Vm) void {
     defineNative(vm, vm.set_class.?, "add", n_std_set_add);
     defineNative(vm, vm.set_class.?, "length", n_std_set_length);
     defineNative(vm, vm.set_class.?, "remove", n_std_set_remove);
+    defineNative(vm, vm.set_class.?, "to_string", n_std_to_string);
     defineNative(vm, vm.set_class.?, "values", n_std_set_values);
 
     // std.string
@@ -105,6 +110,7 @@ pub fn register(vm: *Vm) void {
     defineNative(vm, vm.string_class.?, "length", n_std_string_length);
     defineNative(vm, vm.string_class.?, "repeat", n_std_string_repeat);
     defineNative(vm, vm.string_class.?, "split", n_std_string_split);
+    defineNative(vm, vm.string_class.?, "to_string", n_std_to_string);
 }
 
 fn defineClass(vm: *Vm, name: []const u8) *ObjClass {
@@ -156,42 +162,11 @@ fn n_std_assert(vm: *Vm, values: []Value) Value {
     return value.nil();
 }
 
-fn n_std_bool_to_string(vm: *Vm, values: []Value) Value {
-    if (values.len != 1 or !value.isBool(values[0])) {
-        return vm.nativeError("std.bool.to_string takes a boolean", .{});
-    }
-    return value.string(ObjString.copy(vm, if (value.asBool(values[0])) "true" else "false"));
-}
-
-fn n_std_class_to_string(vm: *Vm, values: []Value) Value {
-    if (values.len != 1 or !value.isObjType(values[0], .class)) {
-        return vm.nativeError("std.class.to_string takes a class", .{});
-    }
-    const name = if (value.asClass(values[0]).name) |n| n.chars else "anonymous";
-    const chars = std.fmt.allocPrint(vm.allocator, "class {s}", .{name}) catch {
-        std.debug.print("Could not allocate memory for string.", .{});
-        std.process.exit(1);
-    };
-    return value.string(ObjString.take(vm, chars));
-}
-
 fn n_std_error(vm: *Vm, values: []Value) Value {
     if (values.len == 1 and value.isObjType(values[0], .string)) {
         return vm.nativeError("std.error: {s}", .{value.asString(values[0]).chars});
     }
     return vm.nativeError("std.error", .{});
-}
-
-fn n_std_function_to_string(vm: *Vm, values: []Value) Value {
-    if (values.len != 1 or !value.isObjType(values[0], .closure)) {
-        return vm.nativeError("std.function.to_string takes a function", .{});
-    }
-    const name = if (value.asClosure(values[0]).function.name) |n| n.chars else "anon fn";
-    const chars = std.fmt.allocPrint(vm.allocator, "{s}()", .{name}) catch {
-        std.debug.print("Could not allocate memory for string.", .{});
-        std.process.exit(1);
-    };
-    return value.string(ObjString.take(vm, chars));
 }
 
 fn n_std_gc_collect(vm: *Vm, values: []Value) Value {
@@ -401,11 +376,6 @@ fn n_std_math_min(vm: *Vm, values: []Value) Value {
     return value.number(min);
 }
 
-fn n_std_nil_to_string(vm: *Vm, values: []Value) Value {
-    _ = values;
-    return value.string(ObjString.copy(vm, "nil"));
-}
-
 fn n_std_number_abs(vm: *Vm, values: []Value) Value {
     if (values.len != 1 or !value.isNumber(values[0])) {
         return vm.nativeError("std.number.abs takes a number", .{});
@@ -518,13 +488,8 @@ fn n_std_number_to_radians(vm: *Vm, values: []Value) Value {
 }
 
 fn n_std_print(vm: *Vm, values: []Value) Value {
-    _ = vm;
     for (values) |val| {
-
-        // TODO
-        
-        // value.print(val);
-        _ = val;
+        std.debug.print("{s}", .{value.toString(val, vm).chars});
     }
     std.debug.print("\n", .{});
     return value.nil();
@@ -729,4 +694,11 @@ fn n_std_time(vm: *Vm, values: []Value) Value {
     }
     const time = @intToFloat(f64, std.time.nanoTimestamp()) / std.time.ns_per_s;
     return value.number(time);
+}
+
+fn n_std_to_string(vm: *Vm, values: []Value) Value {
+    if (values.len != 1) {
+        return vm.nativeError("to_string takes one argument", .{});
+    }
+    return value.string(value.toString(values[0], vm));
 }

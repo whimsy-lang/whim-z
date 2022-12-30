@@ -227,6 +227,23 @@ pub fn debugPrint(val: Value) void {
     }
 }
 
+pub fn toString(val: Value, vm: *Vm) *ObjString {
+    _ = val;
+    return ObjString.copy(vm, "val");
+}
+
+// fn n_std_bool_to_string(vm: *Vm, values: []Value) Value {
+//     if (values.len != 1 or !value.isBool(values[0])) {
+//         return vm.nativeError("std.bool.to_string takes a boolean", .{});
+//     }
+//     return value.string(ObjString.copy(vm, if (value.asBool(values[0])) "true" else "false"));
+// }
+
+// fn n_std_nil_to_string(vm: *Vm, values: []Value) Value {
+//     _ = values;
+//     return value.string(ObjString.copy(vm, "nil"));
+// }
+
 pub fn mark(val: Value, vm: *Vm) void {
     if (isObject(val)) asObject(val).mark(vm);
 }
