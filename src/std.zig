@@ -93,6 +93,7 @@ pub fn register(vm: *Vm) void {
     defineNative(vm, vm.set_class.?, "add", n_std_set_add);
     defineNative(vm, vm.set_class.?, "length", n_std_set_length);
     defineNative(vm, vm.set_class.?, "remove", n_std_set_remove);
+    defineNative(vm, vm.set_class.?, "values", n_std_set_values);
 
     // std.string
     vm.string_class = defineInnerClass(vm, std_class, "string");
@@ -542,6 +543,25 @@ fn n_std_set_remove(vm: *Vm, values: []Value) Value {
         _ = set.items.delete(val);
     }
     return values[0];
+}
+
+fn n_std_set_values(vm: *Vm, values: []Value) Value {
+    if (values.len != 1 or !value.isObjType(values[0], .set)) {
+        return vm.nativeError("std.set.values takes a set", .{});
+    }
+    const list = ObjList.init(vm);
+    vm.push(value.list(list));
+
+    for (value.asSet(values[0]).items.entries) |entry| {
+        if (!value.isEmpty(entry.key)) {
+            list.items.append(entry.key) catch {
+                std.debug.print("Could not allocate memory for list.", .{});
+                std.process.exit(1);
+            };
+        }
+    }
+
+    return vm.pop();
 }
 
 fn n_std_string_length(vm: *Vm, values: []Value) Value {

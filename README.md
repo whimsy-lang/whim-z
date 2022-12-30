@@ -275,7 +275,7 @@ extension: *.whim
     * x length()
     * x remove()
     * _ to_string()
-    * _ values()
+    * x values()
   * x string
     * _ char_to_number()
     * _ chars()
