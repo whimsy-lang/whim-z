@@ -570,6 +570,20 @@ pub const ObjString = struct {
         return br;
     }
 
+    // get utf8 character index from byte index
+    pub fn utf8Index(self: *ObjString, b_index: usize) ?usize {
+        var index: usize = 0;
+        var i: usize = 0;
+        while (i < self.chars.len) : (index += 1) {
+            if (i == b_index) return index;
+            i += unicode.utf8ByteSequenceLength(self.chars[i]) catch {
+                std.debug.print("Invalid character encoding.", .{});
+                std.process.exit(1);
+            };
+        }
+        return null;
+    }
+
     pub fn take(vm: *Vm, chars: []const u8) *ObjString {
         const hash = value.calcHash(chars);
         const interned = vm.strings.findString(chars, hash);
