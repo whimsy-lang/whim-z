@@ -1,12 +1,5 @@
 # simple test file
 
-s :: '★ hello world ★'
-std.print(s)
-std.print(s:chars())
-std.print('':chars())
-std.print('0 ', s:index_of('★'))
-std.print('4 ', s:index_of('l'))
-std.print('2 ', s:index_of('he'))
-std.print('-1 ', s:index_of('m'))
-std.print('14 ', s:last_index_of('★'))
-std.print('-1 ', s:last_index_of('m'))
+std.print(():join(', '))
+std.print(('one',):join(', '))
+std.print(('one', 'two', 'three'):join(', '))

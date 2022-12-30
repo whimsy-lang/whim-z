@@ -40,6 +40,7 @@ pub fn register(vm: *Vm) void {
     vm.list_class = defineInnerClass(vm, std_class, "list");
     defineNative(vm, vm.list_class.?, "add", n_std_list_add);
     defineNative(vm, vm.list_class.?, "index_of", n_std_list_index_of);
+    defineNative(vm, vm.list_class.?, "join", n_std_list_join);
     defineNative(vm, vm.list_class.?, "last_index_of", n_std_list_last_index_of);
     defineNative(vm, vm.list_class.?, "length", n_std_list_length);
     defineNative(vm, vm.list_class.?, "pop", n_std_list_pop);
@@ -217,6 +218,36 @@ fn n_std_list_index_of(vm: *Vm, values: []Value) Value {
     }
     const index = std.mem.indexOfScalar(Value, value.asList(values[0]).items.items, values[1]);
     return value.number(if (index) |i| @intToFloat(f64, i) else -1);
+}
+
+fn n_std_list_join(vm: *Vm, values: []Value) Value {
+    if (values.len != 2 or !value.isObjType(values[0], .list) or !value.isObjType(values[1], .string)) {
+        return vm.nativeError("std.list.join takes a list and a string", .{});
+    }
+    const list = value.asList(values[0]);
+    const sep = value.asString(values[1]);
+
+    const slices = vm.allocator.alloc([]const u8, list.items.items.len) catch {
+        std.debug.print("Could not allocate memory for slices.", .{});
+        std.process.exit(1);
+    };
+    defer vm.allocator.free(slices);
+
+    var i: usize = 0;
+    while (i < list.items.items.len) : (i += 1) {
+        const item = list.items.items[i];
+        if (!value.isObjType(item, .string)) {
+            return vm.nativeError("std.list.join can only join strings", .{});
+        }
+        slices[i] = value.asString(item).chars;
+    }
+
+    const heap_chars = std.mem.join(vm.allocator, sep.chars, slices) catch {
+        std.debug.print("Could not allocate memory for string.", .{});
+        std.process.exit(1);
+    };
+
+    return value.string(ObjString.take(vm, heap_chars));
 }
 
 fn n_std_list_last_index_of(vm: *Vm, values: []Value) Value {
