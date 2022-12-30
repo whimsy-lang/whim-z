@@ -1391,8 +1391,11 @@ pub const Vm = struct {
                             .range => {
                                 const range = obj.asRange();
                                 const val = range.start + index * range.step;
-                                const end = range.end;
-                                if ((range.step > 0 and val < end) or (range.step < 0 and val > end) or (range.inclusive and val == end)) {
+                                const positive = range.step > 0;
+                                if ((positive and val < range.end) or
+                                    (!positive and val > range.end) or
+                                    (range.inclusive and val == range.end))
+                                {
                                     self.push(value.number(val));
                                 } else {
                                     frame.ip += offset;

@@ -266,11 +266,10 @@ extension: *.whim
     * x to_degrees()
     * x to_radians()
     * _ to_string()
-  * _ os
   * x print()
   * x range
-    * _ to_list()
     * _ to_string()
+    * x values()
   * x set
     * x add()
     * x length()

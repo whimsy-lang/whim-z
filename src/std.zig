@@ -54,6 +54,7 @@ pub fn register(vm: *Vm) void {
     defineNative(vm, vm.map_class.?, "remove", n_std_map_remove);
     defineNative(vm, vm.map_class.?, "values", n_std_map_values);
 
+    // std.math
     const math_class = defineInnerClass(vm, std_class, "math");
     defineNative(vm, math_class, "max", n_std_math_max);
     defineNative(vm, math_class, "min", n_std_math_min);
@@ -85,6 +86,7 @@ pub fn register(vm: *Vm) void {
 
     // std.range
     vm.range_class = defineInnerClass(vm, std_class, "range");
+    defineNative(vm, vm.range_class.?, "values", n_std_range_values);
 
     // std.set
     vm.set_class = defineInnerClass(vm, std_class, "set");
@@ -477,6 +479,34 @@ fn n_std_print(vm: *Vm, values: []Value) Value {
     }
     std.debug.print("\n", .{});
     return value.nil();
+}
+
+fn n_std_range_values(vm: *Vm, values: []Value) Value {
+    if (values.len != 1 or !value.isObjType(values[0], .range)) {
+        return vm.nativeError("std.range.values takes a range", .{});
+    }
+    const range = value.asRange(values[0]);
+    const positive = range.step > 0;
+    const list = ObjList.init(vm);
+    vm.push(value.list(list));
+
+    var index: f64 = 0;
+    while (true) : (index += 1) {
+        const val = range.start + index * range.step;
+        if ((positive and val < range.end) or
+            (!positive and val > range.end) or
+            (range.inclusive and val == range.end))
+        {
+            list.items.append(value.number(val)) catch {
+                std.debug.print("Could not allocate memory for list.", .{});
+                std.process.exit(1);
+            };
+        } else {
+            break;
+        }
+    }
+
+    return vm.pop();
 }
 
 fn n_std_set_add(vm: *Vm, values: []Value) Value {
