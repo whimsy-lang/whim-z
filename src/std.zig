@@ -97,7 +97,9 @@ pub fn register(vm: *Vm) void {
 
     // std.string
     vm.string_class = defineInnerClass(vm, std_class, "string");
+    defineNative(vm, vm.string_class.?, "char_to_number", n_std_string_char_to_number);
     defineNative(vm, vm.string_class.?, "length", n_std_string_length);
+    defineNative(vm, vm.string_class.?, "repeat", n_std_string_repeat);
 }
 
 fn defineClass(vm: *Vm, name: []const u8) *ObjClass {
@@ -564,11 +566,39 @@ fn n_std_set_values(vm: *Vm, values: []Value) Value {
     return vm.pop();
 }
 
+fn n_std_string_char_to_number(vm: *Vm, values: []Value) Value {
+    if (values.len != 1 or !value.isObjType(values[0], .string) or value.asString(values[0]).length != 1) {
+        return vm.nativeError("std.string.char_to_number takes a string with length 1", .{});
+    }
+    const val = unicode.utf8Decode(value.asString(values[0]).chars) catch {
+        std.debug.print("Invalid character encoding.", .{});
+        std.process.exit(1);
+    };
+    return value.number(@intToFloat(f64, val));
+}
+
 fn n_std_string_length(vm: *Vm, values: []Value) Value {
     if (values.len != 1 or !value.isObjType(values[0], .string)) {
         return vm.nativeError("std.string.length takes a string", .{});
     }
     return value.number(@intToFloat(f64, value.asString(values[0]).length));
+}
+
+fn n_std_string_repeat(vm: *Vm, values: []Value) Value {
+    if (values.len != 2 or !value.isObjType(values[0], .string) or !value.isNumber(values[1])) {
+        return vm.nativeError("std.string.repeat takes a string and number", .{});
+    }
+    const str = value.asString(values[0]);
+    const count = @floatToInt(usize, value.asNumber(values[1]));
+    const heap_chars = vm.allocator.alloc(u8, str.chars.len * count) catch {
+        std.debug.print("Could not allocate memory for string.", .{});
+        std.process.exit(1);
+    };
+    var i: usize = 0;
+    while (i < count) : (i += 1) {
+        std.mem.copy(u8, heap_chars[i * str.chars.len ..], str.chars);
+    }
+    return value.string(ObjString.take(vm, heap_chars));
 }
 
 fn n_std_time(vm: *Vm, values: []Value) Value {

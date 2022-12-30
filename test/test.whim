@@ -1,8 +1,6 @@
 # simple test file
 
-s :: ['one', 'two', 'three']
-std.print(s)
-std.print(s:values())
-s:remove('one')
-std.print(s)
-std.print(s:values())
+std.print('32 ', ' ':char_to_number())
+std.print('9733 ', '★':char_to_number())
+std.print('abc':repeat(0))
+std.print('abc':repeat(3))
