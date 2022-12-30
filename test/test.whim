@@ -1,6 +1,6 @@
 # simple test file
 
-l :: ('one', 'two', 'three', 'four', 'five')
-std.print(l)
-std.print(l:reverse())
-std.print(l)
+s :: '★ hello world ★'
+std.print(s)
+std.print(s:chars())
+std.print('':chars())

@@ -98,6 +98,7 @@ pub fn register(vm: *Vm) void {
     // std.string
     vm.string_class = defineInnerClass(vm, std_class, "string");
     defineNative(vm, vm.string_class.?, "char_to_number", n_std_string_char_to_number);
+    defineNative(vm, vm.string_class.?, "chars", n_std_string_chars);
     defineNative(vm, vm.string_class.?, "length", n_std_string_length);
     defineNative(vm, vm.string_class.?, "repeat", n_std_string_repeat);
 }
@@ -582,6 +583,30 @@ fn n_std_string_char_to_number(vm: *Vm, values: []Value) Value {
         std.process.exit(1);
     };
     return value.number(@intToFloat(f64, val));
+}
+
+fn n_std_string_chars(vm: *Vm, values: []Value) Value {
+    if (values.len != 1 or !value.isObjType(values[0], .string)) {
+        return vm.nativeError("std.string.chars takes a string", .{});
+    }
+    const str = value.asString(values[0]);
+    const list = ObjList.init(vm);
+    vm.push(value.list(list));
+
+    var i: usize = 0;
+    while (i < str.chars.len) {
+        const len = unicode.utf8ByteSequenceLength(str.chars[i]) catch {
+            std.debug.print("Invalid character encoding.", .{});
+            std.process.exit(1);
+        };
+        list.items.append(value.string(ObjString.copy(vm, str.chars[i .. i + len]))) catch {
+            std.debug.print("Could not allocate memory for list.", .{});
+            std.process.exit(1);
+        };
+        i += len;
+    }
+
+    return vm.pop();
 }
 
 fn n_std_string_length(vm: *Vm, values: []Value) Value {
