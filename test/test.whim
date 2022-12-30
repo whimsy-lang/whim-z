@@ -1,6 +1,6 @@
 # simple test file
 
-std.print('32 ', ' ':char_to_number())
-std.print('9733 ', '★':char_to_number())
-std.print('abc':repeat(0))
-std.print('abc':repeat(3))
+l :: ('one', 'two', 'three', 'four', 'five')
+std.print(l)
+std.print(l:reverse())
+std.print(l)

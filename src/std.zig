@@ -249,8 +249,15 @@ fn n_std_list_reverse(vm: *Vm, values: []Value) Value {
     if (values.len != 1 or !value.isObjType(values[0], .list)) {
         return vm.nativeError("std.list.reverse takes a list", .{});
     }
-    std.mem.reverse(Value, value.asList(values[0]).items.items);
-    return values[0];
+    const list = value.asList(values[0]);
+    const new_list = ObjList.init(vm);
+    vm.push(value.list(new_list));
+    new_list.items.appendSlice(list.items.items) catch {
+        std.debug.print("Could not allocate memory for list.", .{});
+        std.process.exit(1);
+    };
+    std.mem.reverse(Value, new_list.items.items);
+    return vm.pop();
 }
 
 fn n_std_list_to_set(vm: *Vm, values: []Value) Value {
