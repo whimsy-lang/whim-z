@@ -1,5 +1,6 @@
 # simple test file
 
-std.print(():join(', '))
-std.print(('one',):join(', '))
-std.print(('one', 'two', 'three'):join(', '))
+std.print('first,second,,third,fourth':split(','))
+std.print('':split('hi'))
+std.print('hello world':split(','))
+std.print('first, second, third, fourth, fifth':split('ir'))

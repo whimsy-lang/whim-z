@@ -104,6 +104,7 @@ pub fn register(vm: *Vm) void {
     defineNative(vm, vm.string_class.?, "last_index_of", n_std_string_last_index_of);
     defineNative(vm, vm.string_class.?, "length", n_std_string_length);
     defineNative(vm, vm.string_class.?, "repeat", n_std_string_repeat);
+    defineNative(vm, vm.string_class.?, "split", n_std_string_split);
 }
 
 fn defineClass(vm: *Vm, name: []const u8) *ObjClass {
@@ -692,6 +693,28 @@ fn n_std_string_repeat(vm: *Vm, values: []Value) Value {
         std.mem.copy(u8, heap_chars[i * str.chars.len ..], str.chars);
     }
     return value.string(ObjString.take(vm, heap_chars));
+}
+
+fn n_std_string_split(vm: *Vm, values: []Value) Value {
+    if (values.len != 2 or !value.isObjType(values[0], .string) or !value.isObjType(values[1], .string)) {
+        return vm.nativeError("std.string.split takes two strings", .{});
+    }
+    const str = value.asString(values[0]);
+    const delim = value.asString(values[1]);
+    const list = ObjList.init(vm);
+    vm.push(value.list(list));
+
+    var iter = std.mem.split(u8, str.chars, delim.chars);
+    while (iter.next()) |item| {
+        vm.push(value.string(ObjString.copy(vm, item)));
+        list.items.append(vm.peek(0)) catch {
+            std.debug.print("Could not allocate memory for list.", .{});
+            std.process.exit(1);
+        };
+        _ = vm.pop();
+    }
+
+    return vm.pop();
 }
 
 fn n_std_time(vm: *Vm, values: []Value) Value {
