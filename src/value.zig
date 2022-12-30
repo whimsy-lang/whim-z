@@ -213,7 +213,7 @@ pub fn stdClass(val: Value, vm: *Vm) *ObjClass {
     unreachable;
 }
 
-pub fn print(val: Value) void {
+pub fn debugPrint(val: Value) void {
     if (isBool(val)) {
         std.debug.print("{s}", .{if (asBool(val)) "true" else "false"});
     } else if (isNil(val)) {
@@ -221,7 +221,7 @@ pub fn print(val: Value) void {
     } else if (isNumber(val)) {
         std.debug.print("{d}", .{asNumber(val)});
     } else if (isObject(val)) {
-        asObject(val).print();
+        asObject(val).debugPrint();
     } else {
         std.debug.print("empty", .{});
     }

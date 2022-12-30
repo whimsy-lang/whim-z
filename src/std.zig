@@ -520,7 +520,11 @@ fn n_std_number_to_radians(vm: *Vm, values: []Value) Value {
 fn n_std_print(vm: *Vm, values: []Value) Value {
     _ = vm;
     for (values) |val| {
-        value.print(val);
+
+        // TODO
+        
+        // value.print(val);
+        _ = val;
     }
     std.debug.print("\n", .{});
     return value.nil();

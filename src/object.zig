@@ -76,7 +76,7 @@ pub const Object = struct {
         return @fieldParentPtr(ObjUpvalue, "obj", self);
     }
 
-    pub fn print(self: *Object) void {
+    pub fn debugPrint(self: *Object) void {
         switch (self.type) {
             .class => if (self.asClass().name) |name| {
                 std.debug.print("class {s}", .{name.chars});
@@ -99,7 +99,7 @@ pub const Object = struct {
                     } else {
                         std.debug.print(", ", .{});
                     }
-                    value.print(item);
+                    value.debugPrint(item);
                 }
                 std.debug.print(")", .{});
             },
@@ -113,9 +113,9 @@ pub const Object = struct {
                         } else {
                             std.debug.print(", ", .{});
                         }
-                        value.print(entry.key);
+                        value.debugPrint(entry.key);
                         std.debug.print(" {s} ", .{if (entry.value.constant) "::" else ":="});
-                        value.print(entry.value.value);
+                        value.debugPrint(entry.value.value);
                     }
                 }
                 std.debug.print("]", .{});
@@ -136,7 +136,7 @@ pub const Object = struct {
                         } else {
                             std.debug.print(", ", .{});
                         }
-                        value.print(entry.key);
+                        value.debugPrint(entry.key);
                     }
                 }
                 std.debug.print("]", .{});
@@ -151,7 +151,7 @@ pub const Object = struct {
 
         if (debug.log_gc) {
             std.debug.print("mark {any}: ", .{self.type});
-            self.print();
+            self.debugPrint();
             std.debug.print("\n", .{});
         }
 
@@ -174,7 +174,7 @@ pub const Object = struct {
     pub fn blacken(self: *Object, vm: *Vm) void {
         if (debug.log_gc) {
             std.debug.print("blacken {any}: ", .{self.type});
-            self.print();
+            self.debugPrint();
             std.debug.print("\n", .{});
         }
 
