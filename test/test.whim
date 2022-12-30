@@ -1,10 +1,4 @@
 # simple test file
 
-m :: ['one' :: 1, 'two' :: 2, 'three' :: 3]
-std.print(m)
-std.print(m:keys())
-std.print(m:values())
-m:remove('two')
-std.print(m)
-std.print(m:keys())
-std.print(m:values())
+std.print('C ', 67:to_char())
+std.print('Ⓐ ', 9398:to_char())

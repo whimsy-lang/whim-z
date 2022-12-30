@@ -2,7 +2,7 @@
 
 Simple embeddable programming language.
 
-[Zig](https://ziglang.org/) implementation, last compiled with 0.11.0-dev.514+4be1bb4aa.
+[Zig](https://ziglang.org/) implementation, last compiled with 0.11.0-dev.987+a1d82352d.
 
 Whimsy is based on [Crafting Interpreters](http://craftinginterpreters.com/) by Robert Nystrom.
 
@@ -233,7 +233,7 @@ extension: *.whim
     * x reduce()
     * x remove()
     * x reverse()
-    * _ to_set()
+    * x to_set()
     * _ to_string()
   * x map
     * x keys()
@@ -262,7 +262,7 @@ extension: *.whim
     * x sin()
     * x sqrt()
     * x tan()
-    * _ to_char()
+    * x to_char()
     * x to_degrees()
     * x to_radians()
     * _ to_string()
