@@ -193,6 +193,8 @@ extension: *.whim
 
 ## TODO
 
+* in-memory strings as []u21 to simplify all the things
+  * trim functions take an optional second parameter of chars to trim
 * character (byte?) number instead of line number
 * error handling
 * import system
@@ -293,8 +295,8 @@ extension: *.whim
     * _ to_number()
     * to_string()
     * to_upper()
-    * _ trim()
-    * _ trim_end()
-    * _ trim_start()
+    * trim()
+    * trim_end()
+    * trim_start()
   * time()
   * version

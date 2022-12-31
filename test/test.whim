@@ -1,7 +1,8 @@
 # simple test file
 
-s :: 'Hello World!'
-std.print(s)
-std.print(s:to_lower())
-std.print(s:to_upper())
-std.print(s)
+s :: '      Hello World!  \r\n\n'
+std.print('"', s, '"')
+std.print('"', s:trim(), '"')
+std.print('"', s:trim_start(), '"')
+std.print('"', s:trim_end(), '"')
+std.print('"', s, '"')

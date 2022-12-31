@@ -113,6 +113,9 @@ pub fn register(vm: *Vm) void {
     defineNative(vm, vm.string_class.?, "to_lower", n_std_string_to_lower);
     defineNative(vm, vm.string_class.?, "to_string", n_std_to_string);
     defineNative(vm, vm.string_class.?, "to_upper", n_std_string_to_upper);
+    defineNative(vm, vm.string_class.?, "trim", n_std_string_trim);
+    defineNative(vm, vm.string_class.?, "trim_end", n_std_string_trim_end);
+    defineNative(vm, vm.string_class.?, "trim_start", n_std_string_trim_start);
 }
 
 fn defineClass(vm: *Vm, name: []const u8) *ObjClass {
@@ -710,6 +713,33 @@ fn n_std_string_to_upper(vm: *Vm, values: []Value) Value {
         std.process.exit(1);
     };
     return value.string(ObjString.take(vm, heap_chars));
+}
+
+fn n_std_string_trim(vm: *Vm, values: []Value) Value {
+    if (values.len != 1 or !value.isObjType(values[0], .string)) {
+        return vm.nativeError("std.string.trim takes a string", .{});
+    }
+    const ws = " \r\n";
+    const trimmed = std.mem.trim(u8, value.asString(values[0]).chars, ws);
+    return value.string(ObjString.copy(vm, trimmed));
+}
+
+fn n_std_string_trim_end(vm: *Vm, values: []Value) Value {
+    if (values.len != 1 or !value.isObjType(values[0], .string)) {
+        return vm.nativeError("std.string.trim_end takes a string", .{});
+    }
+    const ws = " \r\n";
+    const trimmed = std.mem.trimRight(u8, value.asString(values[0]).chars, ws);
+    return value.string(ObjString.copy(vm, trimmed));
+}
+
+fn n_std_string_trim_start(vm: *Vm, values: []Value) Value {
+    if (values.len != 1 or !value.isObjType(values[0], .string)) {
+        return vm.nativeError("std.string.trim_start takes a string", .{});
+    }
+    const ws = " \r\n";
+    const trimmed = std.mem.trimLeft(u8, value.asString(values[0]).chars, ws);
+    return value.string(ObjString.copy(vm, trimmed));
 }
 
 fn n_std_time(vm: *Vm, values: []Value) Value {
