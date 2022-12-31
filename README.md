@@ -282,7 +282,7 @@ extension: *.whim
   * string
     * char_to_number()
     * chars()
-    * ends_with()
+    * _ ends_with()
     * _ format()
     * index_of()
     * last_index_of()
