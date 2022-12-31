@@ -241,7 +241,7 @@ extension: *.whim
     * x keys()
     * x length()
     * x remove()
-    * _ to_string()
+    * x to_string()
     * x values()
   * _ math
     * x max()
@@ -276,7 +276,7 @@ extension: *.whim
     * x add()
     * x length()
     * x remove()
-    * _ to_string()
+    * x to_string()
     * x values()
   * x string
     * x char_to_number()

@@ -202,7 +202,49 @@ pub const Object = struct {
                 };
                 return ObjString.take(vm, chars.items);
             },
-            .map => return ObjString.copy(vm, "todo map"),
+            .map => {
+                var chars = std.ArrayList(u8).init(vm.allocator);
+                chars.append('[') catch {
+                    std.debug.print("Could not allocate memory for string.", .{});
+                    std.process.exit(1);
+                };
+                var first = true;
+                for (self.asMap().items.entries) |entry| {
+                    if (!value.isEmpty(entry.key)) {
+                        if (first) {
+                            first = false;
+                        } else {
+                            chars.appendSlice(", ") catch {
+                                std.debug.print("Could not allocate memory for string.", .{});
+                                std.process.exit(1);
+                            };
+                        }
+                        const key_str = value.toString(entry.key, vm);
+                        vm.push(value.string(key_str));
+                        chars.appendSlice(key_str.chars) catch {
+                            std.debug.print("Could not allocate memory for string.", .{});
+                            std.process.exit(1);
+                        };
+                        _ = vm.pop();
+                        chars.appendSlice(if (entry.value.constant) " :: " else " := ") catch {
+                            std.debug.print("Could not allocate memory for string.", .{});
+                            std.process.exit(1);
+                        };
+                        const val_str = value.toString(entry.value.value, vm);
+                        vm.push(value.string(val_str));
+                        chars.appendSlice(val_str.chars) catch {
+                            std.debug.print("Could not allocate memory for string.", .{});
+                            std.process.exit(1);
+                        };
+                        _ = vm.pop();
+                    }
+                }
+                chars.append(']') catch {
+                    std.debug.print("Could not allocate memory for string.", .{});
+                    std.process.exit(1);
+                };
+                return ObjString.take(vm, chars.items);
+            },
             .native => return ObjString.copy(vm, "native fn()"),
             .range => {
                 const range = self.asRange();
@@ -216,7 +258,38 @@ pub const Object = struct {
                 };
                 return ObjString.take(vm, chars);
             },
-            .set => return ObjString.copy(vm, "todo set"),
+            .set => {
+                var chars = std.ArrayList(u8).init(vm.allocator);
+                chars.append('[') catch {
+                    std.debug.print("Could not allocate memory for string.", .{});
+                    std.process.exit(1);
+                };
+                var first = true;
+                for (self.asSet().items.entries) |entry| {
+                    if (!value.isEmpty(entry.key)) {
+                        if (first) {
+                            first = false;
+                        } else {
+                            chars.appendSlice(", ") catch {
+                                std.debug.print("Could not allocate memory for string.", .{});
+                                std.process.exit(1);
+                            };
+                        }
+                        const str = value.toString(entry.key, vm);
+                        vm.push(value.string(str));
+                        chars.appendSlice(str.chars) catch {
+                            std.debug.print("Could not allocate memory for string.", .{});
+                            std.process.exit(1);
+                        };
+                        _ = vm.pop();
+                    }
+                }
+                chars.append(']') catch {
+                    std.debug.print("Could not allocate memory for string.", .{});
+                    std.process.exit(1);
+                };
+                return ObjString.take(vm, chars.items);
+            },
             .string => return self.asString(),
             .upvalue => return ObjString.copy(vm, "upvalue"),
         }
