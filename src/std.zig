@@ -110,7 +110,9 @@ pub fn register(vm: *Vm) void {
     defineNative(vm, vm.string_class.?, "length", n_std_string_length);
     defineNative(vm, vm.string_class.?, "repeat", n_std_string_repeat);
     defineNative(vm, vm.string_class.?, "split", n_std_string_split);
+    defineNative(vm, vm.string_class.?, "to_lower", n_std_string_to_lower);
     defineNative(vm, vm.string_class.?, "to_string", n_std_to_string);
+    defineNative(vm, vm.string_class.?, "to_upper", n_std_string_to_upper);
 }
 
 fn defineClass(vm: *Vm, name: []const u8) *ObjClass {
@@ -686,6 +688,28 @@ fn n_std_string_split(vm: *Vm, values: []Value) Value {
     }
 
     return vm.pop();
+}
+
+fn n_std_string_to_lower(vm: *Vm, values: []Value) Value {
+    if (values.len != 1 or !value.isObjType(values[0], .string)) {
+        return vm.nativeError("std.string.to_lower takes a string", .{});
+    }
+    const heap_chars = std.ascii.allocLowerString(vm.allocator, value.asString(values[0]).chars) catch {
+        std.debug.print("Could not allocate memory for string.", .{});
+        std.process.exit(1);
+    };
+    return value.string(ObjString.take(vm, heap_chars));
+}
+
+fn n_std_string_to_upper(vm: *Vm, values: []Value) Value {
+    if (values.len != 1 or !value.isObjType(values[0], .string)) {
+        return vm.nativeError("std.string.to_upper takes a string", .{});
+    }
+    const heap_chars = std.ascii.allocUpperString(vm.allocator, value.asString(values[0]).chars) catch {
+        std.debug.print("Could not allocate memory for string.", .{});
+        std.process.exit(1);
+    };
+    return value.string(ObjString.take(vm, heap_chars));
 }
 
 fn n_std_time(vm: *Vm, values: []Value) Value {

@@ -1,12 +1,7 @@
 # simple test file
 
-cl1 :: class/class
-cl2 :: class/class
-cl3 :: class/class
-
-std.print([])
-std.print(['one' :: 1])
-std.print(['first' :: 1, 'second' := 2, 'third' := fn()/fn,
-    'classes' :: [1 := cl1, 2 :: cl2, 3 :: cl3],
-    'strings' := ['d' :: 'da', 'e' := 'ea', 'f' :: 'fa']
-])
+s :: 'Hello World!'
+std.print(s)
+std.print(s:to_lower())
+std.print(s:to_upper())
+std.print(s)
