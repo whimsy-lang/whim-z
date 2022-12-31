@@ -7,7 +7,7 @@ const vle = @import("vle.zig");
 
 pub const print_code = true;
 pub const trace_execution = false;
-pub const stress_gc = false;
+pub const stress_gc = true;
 pub const log_gc = false;
 
 pub fn disassembleChunk(chunk: *Chunk, name: []const u8) void {

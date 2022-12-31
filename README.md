@@ -198,6 +198,7 @@ extension: *.whim
 * import system
 * debugging
 * io
+* custom to_string that works with std.print
 * strings - flexible array members
 * string hash set (instead of table with nil values) for interning
 * separate sized jumps
@@ -211,12 +212,12 @@ extension: *.whim
 * x std
   * x assert()
   * x bool
-    * _ to_string()
+    * x to_string()
   * x class
-    * _ to_string()
+    * x to_string()
   * x error()
   * x function
-    * _ to_string()
+    * x to_string()
   * x gc_collect()
   * x list
     * x add()
@@ -235,7 +236,7 @@ extension: *.whim
     * x remove()
     * x reverse()
     * x to_set()
-    * _ to_string()
+    * x to_string()
   * x map
     * x keys()
     * x length()
@@ -247,7 +248,7 @@ extension: *.whim
     * x min()
     * x pi
   * x nil
-    * _ to_string()
+    * x to_string()
   * x number
     * x abs()
     * x acos()
@@ -266,10 +267,10 @@ extension: *.whim
     * x to_char()
     * x to_degrees()
     * x to_radians()
-    * _ to_string()
+    * x to_string()
   * x print()
   * x range
-    * _ to_string()
+    * x to_string()
     * x values()
   * x set
     * x add()
@@ -290,7 +291,7 @@ extension: *.whim
     * _ to_bool()
     * _ to_lower()
     * _ to_number()
-    * _ to_string()
+    * x to_string()
     * _ to_upper()
     * _ trim()
     * _ trim_end()

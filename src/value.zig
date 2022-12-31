@@ -228,21 +228,18 @@ pub fn debugPrint(val: Value) void {
 }
 
 pub fn toString(val: Value, vm: *Vm) *ObjString {
-    _ = val;
-    return ObjString.copy(vm, "val");
+    if (isBool(val)) return ObjString.copy(vm, if (asBool(val)) "true" else "false");
+    if (isNil(val)) return ObjString.copy(vm, "nil");
+    if (isNumber(val)) {
+        const chars = std.fmt.allocPrint(vm.allocator, "{d}", .{asNumber(val)}) catch {
+            std.debug.print("Could not allocate memory for string.", .{});
+            std.process.exit(1);
+        };
+        return ObjString.take(vm, chars);
+    }
+    if (isObject(val)) return asObject(val).toString(vm);
+    return ObjString.copy(vm, "empty");
 }
-
-// fn n_std_bool_to_string(vm: *Vm, values: []Value) Value {
-//     if (values.len != 1 or !value.isBool(values[0])) {
-//         return vm.nativeError("std.bool.to_string takes a boolean", .{});
-//     }
-//     return value.string(ObjString.copy(vm, if (value.asBool(values[0])) "true" else "false"));
-// }
-
-// fn n_std_nil_to_string(vm: *Vm, values: []Value) Value {
-//     _ = values;
-//     return value.string(ObjString.copy(vm, "nil"));
-// }
 
 pub fn mark(val: Value, vm: *Vm) void {
     if (isObject(val)) asObject(val).mark(vm);

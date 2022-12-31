@@ -1,6 +1,9 @@
 # simple test file
 
-std.print('first,second,,third,fourth':split(','))
-std.print('':split('hi'))
-std.print('hello world':split(','))
-std.print('first, second, third, fourth, fifth':split('ir'))
+cl1 :: class/class
+cl2 :: class/class
+cl3 :: class/class
+
+std.print(())
+std.print(('one',))
+std.print(('first', 'second', 'third', (cl1, cl2, cl3), ('d', 'e', 'f')))

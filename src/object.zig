@@ -147,33 +147,91 @@ pub const Object = struct {
     }
 
     pub fn toString(self: *Object, vm: *Vm) *ObjString {
-        _ = self;
-        return ObjString.copy(vm, "obj");
+        switch (self.type) {
+            .class => {
+                const class = self.asClass();
+                if (class.name) |n| {
+                    const chars = std.fmt.allocPrint(vm.allocator, "class {s}", .{n.chars}) catch {
+                        std.debug.print("Could not allocate memory for string.", .{});
+                        std.process.exit(1);
+                    };
+                    return ObjString.take(vm, chars);
+                }
+                return ObjString.copy(vm, "anon class");
+            },
+            .closure => return functionToString(self.asClosure().function, vm),
+            .function => return functionToString(self.asFunction(), vm),
+            .instance => {
+                const instance = self.asInstance();
+                if (instance.type.name) |n| {
+                    const chars = std.fmt.allocPrint(vm.allocator, "instance of {s}", .{n.chars}) catch {
+                        std.debug.print("Could not allocate memory for string.", .{});
+                        std.process.exit(1);
+                    };
+                    return ObjString.take(vm, chars);
+                }
+                return ObjString.copy(vm, "instance of anon class");
+            },
+            .list => {
+                var chars = std.ArrayList(u8).init(vm.allocator);
+                chars.append('(') catch {
+                    std.debug.print("Could not allocate memory for string.", .{});
+                    std.process.exit(1);
+                };
+                var first = true;
+                for (self.asList().items.items) |item| {
+                    if (first) {
+                        first = false;
+                    } else {
+                        chars.appendSlice(", ") catch {
+                            std.debug.print("Could not allocate memory for string.", .{});
+                            std.process.exit(1);
+                        };
+                    }
+                    const str = value.toString(item, vm);
+                    vm.push(value.string(str));
+                    chars.appendSlice(str.chars) catch {
+                        std.debug.print("Could not allocate memory for string.", .{});
+                        std.process.exit(1);
+                    };
+                    _ = vm.pop();
+                }
+                chars.append(')') catch {
+                    std.debug.print("Could not allocate memory for string.", .{});
+                    std.process.exit(1);
+                };
+                return ObjString.take(vm, chars.items);
+            },
+            .map => return ObjString.copy(vm, "todo map"),
+            .native => return ObjString.copy(vm, "native fn()"),
+            .range => {
+                const range = self.asRange();
+                const op = if (range.inclusive) (if (range.end < 0) "..= " else "..=") else (if (range.end < 0) ".. " else "..");
+                const chars = (if (range.step == 1)
+                    std.fmt.allocPrint(vm.allocator, "{d}{s}{d}", .{ range.start, op, range.end })
+                else
+                    std.fmt.allocPrint(vm.allocator, "{d}{s}{d} by {d}", .{ range.start, op, range.end, range.step })) catch {
+                    std.debug.print("Could not allocate memory for string.", .{});
+                    std.process.exit(1);
+                };
+                return ObjString.take(vm, chars);
+            },
+            .set => return ObjString.copy(vm, "todo set"),
+            .string => return self.asString(),
+            .upvalue => return ObjString.copy(vm, "upvalue"),
+        }
     }
 
-    // fn n_std_class_to_string(vm: *Vm, values: []Value) Value {
-    //     if (values.len != 1 or !value.isObjType(values[0], .class)) {
-    //         return vm.nativeError("std.class.to_string takes a class", .{});
-    //     }
-    //     const name = if (value.asClass(values[0]).name) |n| n.chars else "anonymous";
-    //     const chars = std.fmt.allocPrint(vm.allocator, "class {s}", .{name}) catch {
-    //         std.debug.print("Could not allocate memory for string.", .{});
-    //         std.process.exit(1);
-    //     };
-    //     return value.string(ObjString.take(vm, chars));
-    // }
-
-    // fn n_std_function_to_string(vm: *Vm, values: []Value) Value {
-    //     if (values.len != 1 or !value.isObjType(values[0], .closure)) {
-    //         return vm.nativeError("std.function.to_string takes a function", .{});
-    //     }
-    //     const name = if (value.asClosure(values[0]).function.name) |n| n.chars else "anon fn";
-    //     const chars = std.fmt.allocPrint(vm.allocator, "{s}()", .{name}) catch {
-    //         std.debug.print("Could not allocate memory for string.", .{});
-    //         std.process.exit(1);
-    //     };
-    //     return value.string(ObjString.take(vm, chars));
-    // }
+    fn functionToString(func: *ObjFunction, vm: *Vm) *ObjString {
+        if (func.name) |n| {
+            const chars = std.fmt.allocPrint(vm.allocator, "{s}()", .{n.chars}) catch {
+                std.debug.print("Could not allocate memory for string.", .{});
+                std.process.exit(1);
+            };
+            return ObjString.take(vm, chars);
+        }
+        return ObjString.copy(vm, "anon fn()");
+    }
 
     pub fn mark(self: *Object, vm: *Vm) void {
         if (self.is_marked) return;

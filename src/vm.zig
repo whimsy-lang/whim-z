@@ -549,10 +549,9 @@ pub const Vm = struct {
             }
 
             var current: ?*ObjClass = instance.type;
-            var method: Value = undefined;
             while (current) |cur| {
-                if (cur.fields.get(name, &method)) {
-                    return self.call(value.asClosure(method), arg_count, true);
+                if (cur.fields.get(name, &val)) {
+                    return self.callValue(val, arg_count);
                 }
                 current = cur.super;
             }
