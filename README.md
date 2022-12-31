@@ -209,92 +209,92 @@ extension: *.whim
 
 ### Standard Library
 
-* x std
-  * x assert()
-  * x bool
-    * x to_string()
-  * x class
-    * x to_string()
-  * x error()
-  * x function
-    * x to_string()
-  * x gc_collect()
-  * x list
-    * x add()
-    * x all()
-    * x any()
-    * x filter()
-    * x first()
-    * x index_of()
-    * x join()
-    * x last()
-    * x last_index_of()
-    * x length()
-    * x map()
-    * x pop()
-    * x reduce()
-    * x remove()
-    * x reverse()
-    * x to_set()
-    * x to_string()
-  * x map
-    * x keys()
-    * x length()
-    * x remove()
-    * x to_string()
-    * x values()
-  * _ math
-    * x max()
-    * x min()
-    * x pi
-  * x nil
-    * x to_string()
-  * x number
-    * x abs()
-    * x acos()
-    * x asin()
-    * x atan()
-    * x ceiling()
-    * x cos()
-    * x floor()
-    * x log()
-    * x max
-    * x min
-    * x pow()
-    * x sin()
-    * x sqrt()
-    * x tan()
-    * x to_char()
-    * x to_degrees()
-    * x to_radians()
-    * x to_string()
-  * x print()
-  * x range
-    * x to_string()
-    * x values()
-  * x set
-    * x add()
-    * x length()
-    * x remove()
-    * x to_string()
-    * x values()
-  * x string
-    * x char_to_number()
-    * x chars()
+* std
+  * assert()
+  * bool
+    * to_string()
+  * class
+    * to_string()
+  * error()
+  * function
+    * to_string()
+  * gc_collect()
+  * list
+    * add()
+    * all()
+    * any()
+    * filter()
+    * first()
+    * index_of()
+    * join()
+    * last()
+    * last_index_of()
+    * length()
+    * map()
+    * pop()
+    * reduce()
+    * remove()
+    * reverse()
+    * to_set()
+    * to_string()
+  * map
+    * keys()
+    * length()
+    * remove()
+    * to_string()
+    * values()
+  * math
+    * max()
+    * min()
+    * pi
+  * nil
+    * to_string()
+  * number
+    * abs()
+    * acos()
+    * asin()
+    * atan()
+    * ceiling()
+    * cos()
+    * floor()
+    * log()
+    * max
+    * min
+    * pow()
+    * sin()
+    * sqrt()
+    * tan()
+    * to_char()
+    * to_degrees()
+    * to_radians()
+    * to_string()
+  * print()
+  * range
+    * to_string()
+    * values()
+  * set
+    * add()
+    * length()
+    * remove()
+    * to_string()
+    * values()
+  * string
+    * char_to_number()
+    * chars()
     * _ format()
-    * x index_of()
-    * x last_index_of()
-    * x length()
-    * x repeat()
+    * index_of()
+    * last_index_of()
+    * length()
+    * repeat()
     * _ reverse()
-    * x split()
+    * split()
     * _ to_bool()
     * _ to_lower()
     * _ to_number()
-    * x to_string()
+    * to_string()
     * _ to_upper()
     * _ trim()
     * _ trim_end()
     * _ trim_start()
-  * x time()
-  * x version
+  * time()
+  * version
