@@ -1,27 +1,7 @@
 # simple test file
 
-s :: '      Hello World!  \r\n\n'
-std.print('"', s, '"')
-std.print('"', s:trim(), '"')
-std.print('"', s:trim_start(), '"')
-std.print('"', s:trim_end(), '"')
-std.print('"', s, '"')
-
+std.print('abc':starts_with('a'))
+std.print('abc':starts_with('c'))
 std.print()
-
-s2 :: 'abab hi baba'
-std.print('"', s2, '"')
-std.print('"', s2:trim('a', 'b'), '"')
-std.print('"', s2:trim('ab'), '"')
-std.print('"', s2:trim('ba'), '"')
-std.print()
-std.print('"', s2:trim_start('a', 'b'), '"')
-std.print('"', s2:trim_end('a', 'b'), '"')
-std.print()
-std.print('"', s2, '"')
-
-std.print()
-std.print('"', '':trim(), '"')
-std.print('"', '':trim('a'), '"')
-std.print('"', '':trim('a', 'b'), '"')
-std.print('"', 'abab':trim('a', 'b'), '"')
+std.print('abc':ends_with('c'))
+std.print('abc':ends_with('a'))

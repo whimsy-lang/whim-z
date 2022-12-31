@@ -105,11 +105,13 @@ pub fn register(vm: *Vm) void {
     vm.string_class = defineInnerClass(vm, std_class, "string");
     defineNative(vm, vm.string_class.?, "char_to_number", n_std_string_char_to_number);
     defineNative(vm, vm.string_class.?, "chars", n_std_string_chars);
+    defineNative(vm, vm.string_class.?, "ends_with", n_std_string_ends_with);
     defineNative(vm, vm.string_class.?, "index_of", n_std_string_index_of);
     defineNative(vm, vm.string_class.?, "last_index_of", n_std_string_last_index_of);
     defineNative(vm, vm.string_class.?, "length", n_std_string_length);
     defineNative(vm, vm.string_class.?, "repeat", n_std_string_repeat);
     defineNative(vm, vm.string_class.?, "split", n_std_string_split);
+    defineNative(vm, vm.string_class.?, "starts_with", n_std_string_starts_with);
     defineNative(vm, vm.string_class.?, "to_lower", n_std_string_to_lower);
     defineNative(vm, vm.string_class.?, "to_string", n_std_to_string);
     defineNative(vm, vm.string_class.?, "to_upper", n_std_string_to_upper);
@@ -619,6 +621,14 @@ fn n_std_string_chars(vm: *Vm, values: []Value) Value {
     return vm.pop();
 }
 
+fn n_std_string_ends_with(vm: *Vm, values: []Value) Value {
+    if (values.len != 2 or !value.isObjType(values[0], .string) or !value.isObjType(values[1], .string)) {
+        return vm.nativeError("std.string.ends_with takes two strings", .{});
+    }
+    const res = std.mem.endsWith(u8, value.asString(values[0]).chars, value.asString(values[1]).chars);
+    return value.boolean(res);
+}
+
 fn n_std_string_index_of(vm: *Vm, values: []Value) Value {
     if (values.len != 2 or !value.isObjType(values[0], .string) or !value.isObjType(values[1], .string)) {
         return vm.nativeError("std.string.index_of takes two strings", .{});
@@ -691,6 +701,14 @@ fn n_std_string_split(vm: *Vm, values: []Value) Value {
     }
 
     return vm.pop();
+}
+
+fn n_std_string_starts_with(vm: *Vm, values: []Value) Value {
+    if (values.len != 2 or !value.isObjType(values[0], .string) or !value.isObjType(values[1], .string)) {
+        return vm.nativeError("std.string.starts_with takes two strings", .{});
+    }
+    const res = std.mem.startsWith(u8, value.asString(values[0]).chars, value.asString(values[1]).chars);
+    return value.boolean(res);
 }
 
 fn n_std_string_to_lower(vm: *Vm, values: []Value) Value {

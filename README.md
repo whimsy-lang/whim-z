@@ -282,7 +282,7 @@ extension: *.whim
   * string
     * char_to_number()
     * chars()
-    * _ ends_with()
+    * ends_with()
     * _ format()
     * index_of()
     * last_index_of()
@@ -290,7 +290,7 @@ extension: *.whim
     * repeat()
     * _ reverse()
     * split()
-    * _ starts_with()
+    * starts_with()
     * _ to_bool()
     * to_lower()
     * _ to_number()
