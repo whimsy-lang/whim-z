@@ -193,14 +193,13 @@ extension: *.whim
 
 ## TODO
 
-* in-memory strings as []u21 to simplify all the things
-  * trim functions take an optional second parameter of chars to trim
 * character (byte?) number instead of line number
 * error handling
 * import system
 * debugging
 * io
 * custom to_string that works with std.print
+* update all string indexing to use grapheme clusters
 * strings - flexible array members
 * string hash set (instead of table with nil values) for interning
 * separate sized jumps

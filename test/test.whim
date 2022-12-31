@@ -6,3 +6,22 @@ std.print('"', s:trim(), '"')
 std.print('"', s:trim_start(), '"')
 std.print('"', s:trim_end(), '"')
 std.print('"', s, '"')
+
+std.print()
+
+s2 :: 'abab hi baba'
+std.print('"', s2, '"')
+std.print('"', s2:trim('a', 'b'), '"')
+std.print('"', s2:trim('ab'), '"')
+std.print('"', s2:trim('ba'), '"')
+std.print()
+std.print('"', s2:trim_start('a', 'b'), '"')
+std.print('"', s2:trim_end('a', 'b'), '"')
+std.print()
+std.print('"', s2, '"')
+
+std.print()
+std.print('"', '':trim(), '"')
+std.print('"', '':trim('a'), '"')
+std.print('"', '':trim('a', 'b'), '"')
+std.print('"', 'abab':trim('a', 'b'), '"')

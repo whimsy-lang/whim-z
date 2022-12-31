@@ -716,30 +716,112 @@ fn n_std_string_to_upper(vm: *Vm, values: []Value) Value {
 }
 
 fn n_std_string_trim(vm: *Vm, values: []Value) Value {
-    if (values.len != 1 or !value.isObjType(values[0], .string)) {
-        return vm.nativeError("std.string.trim takes a string", .{});
+    if (values.len == 0 or !value.isObjType(values[0], .string)) {
+        return vm.nativeError("std.string.trim takes a string and optional strings to trim", .{});
     }
-    const ws = " \r\n";
-    const trimmed = std.mem.trim(u8, value.asString(values[0]).chars, ws);
+    // trim whitespace
+    if (values.len == 1) {
+        const ws = " \t\r\n";
+        const trimmed = std.mem.trim(u8, value.asString(values[0]).chars, ws);
+        return value.string(ObjString.copy(vm, trimmed));
+    }
+    // custom trim
+    var trims = vm.allocator.alloc([]const u8, values.len - 1) catch {
+        std.debug.print("Could not allocate memory for trim.", .{});
+        std.process.exit(1);
+    };
+    defer vm.allocator.free(trims);
+    for (values[1..]) |val, i| {
+        if (!value.isObjType(val, .string)) {
+            return vm.nativeError("std.string.trim takes a string and optional strings to trim", .{});
+        }
+        trims[i] = value.asString(val).chars;
+    }
+    var trimmed = trim_start(value.asString(values[0]).chars, trims);
+    trimmed = trim_end(trimmed, trims);
     return value.string(ObjString.copy(vm, trimmed));
 }
 
 fn n_std_string_trim_end(vm: *Vm, values: []Value) Value {
-    if (values.len != 1 or !value.isObjType(values[0], .string)) {
-        return vm.nativeError("std.string.trim_end takes a string", .{});
+    if (values.len == 0 or !value.isObjType(values[0], .string)) {
+        return vm.nativeError("std.string.trim_end takes a string and optional strings to trim", .{});
     }
-    const ws = " \r\n";
-    const trimmed = std.mem.trimRight(u8, value.asString(values[0]).chars, ws);
+    // trim whitespace
+    if (values.len == 1) {
+        const ws = " \t\r\n";
+        const trimmed = std.mem.trimRight(u8, value.asString(values[0]).chars, ws);
+        return value.string(ObjString.copy(vm, trimmed));
+    }
+    // custom trim
+    var trims = vm.allocator.alloc([]const u8, values.len - 1) catch {
+        std.debug.print("Could not allocate memory for trim.", .{});
+        std.process.exit(1);
+    };
+    defer vm.allocator.free(trims);
+    for (values[1..]) |val, i| {
+        if (!value.isObjType(val, .string)) {
+            return vm.nativeError("std.string.trim_end takes a string and optional strings to trim", .{});
+        }
+        trims[i] = value.asString(val).chars;
+    }
+    const trimmed = trim_end(value.asString(values[0]).chars, trims);
     return value.string(ObjString.copy(vm, trimmed));
 }
 
 fn n_std_string_trim_start(vm: *Vm, values: []Value) Value {
-    if (values.len != 1 or !value.isObjType(values[0], .string)) {
-        return vm.nativeError("std.string.trim_start takes a string", .{});
+    if (values.len == 0 or !value.isObjType(values[0], .string)) {
+        return vm.nativeError("std.string.trim_start takes a string and optional strings to trim", .{});
     }
-    const ws = " \r\n";
-    const trimmed = std.mem.trimLeft(u8, value.asString(values[0]).chars, ws);
+    // trim whitespace
+    if (values.len == 1) {
+        const ws = " \t\r\n";
+        const trimmed = std.mem.trimLeft(u8, value.asString(values[0]).chars, ws);
+        return value.string(ObjString.copy(vm, trimmed));
+    }
+    // custom trim
+    var trims = vm.allocator.alloc([]const u8, values.len - 1) catch {
+        std.debug.print("Could not allocate memory for trim.", .{});
+        std.process.exit(1);
+    };
+    defer vm.allocator.free(trims);
+    for (values[1..]) |val, i| {
+        if (!value.isObjType(val, .string)) {
+            return vm.nativeError("std.string.trim_start takes a string and optional strings to trim", .{});
+        }
+        trims[i] = value.asString(val).chars;
+    }
+    const trimmed = trim_start(value.asString(values[0]).chars, trims);
     return value.string(ObjString.copy(vm, trimmed));
+}
+
+fn trim_start(str: []const u8, trims: []const []const u8) []const u8 {
+    var res = str;
+    var trimming = true;
+    while (trimming) {
+        trimming = false;
+        for (trims) |trim| {
+            while (std.mem.startsWith(u8, res, trim)) {
+                res = res[trim.len..];
+                trimming = true;
+            }
+        }
+    }
+    return res;
+}
+
+fn trim_end(str: []const u8, trims: []const []const u8) []const u8 {
+    var res = str;
+    var trimming = true;
+    while (trimming) {
+        trimming = false;
+        for (trims) |trim| {
+            while (std.mem.endsWith(u8, res, trim)) {
+                res = res[0 .. res.len - trim.len];
+                trimming = true;
+            }
+        }
+    }
+    return res;
 }
 
 fn n_std_time(vm: *Vm, values: []Value) Value {
