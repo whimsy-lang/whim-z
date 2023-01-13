@@ -1,6 +1,7 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
+const out = @import("out.zig");
 const Value = @import("value.zig").Value;
 const vle = @import("vle.zig");
 const Vm = @import("vm.zig").Vm;
@@ -116,25 +117,21 @@ pub const Chunk = struct {
 
     pub fn write(self: *Chunk, byte: u8, line: u29) void {
         self.code.append(byte) catch {
-            std.debug.print("Could not add byte to chunk.", .{});
-            std.process.exit(1);
+            out.printExit("Could not add byte to chunk.", .{}, 1);
         };
         vle.add(&self.lines, line) catch {
-            std.debug.print("Could not add line to chunk.", .{});
-            std.process.exit(1);
+            out.printExit("Could not add line to chunk.", .{}, 1);
         };
     }
 
     pub fn writeVle(self: *Chunk, val: u29, line: u29) void {
         var i = self.code.items.len;
         vle.add(&self.code, val) catch {
-            std.debug.print("Could not add value to chunk.", .{});
-            std.process.exit(1);
+            out.printExit("Could not add value to chunk.", .{}, 1);
         };
         while (i < self.code.items.len) : (i += 1) {
             vle.add(&self.lines, line) catch {
-                std.debug.print("Could not add line to chunk.", .{});
-                std.process.exit(1);
+                out.printExit("Could not add line to chunk.", .{}, 1);
             };
         }
     }
@@ -150,8 +147,7 @@ pub const Chunk = struct {
 
         vm.push(val);
         self.constants.append(val) catch {
-            std.debug.print("Could not add constant to chunk.", .{});
-            std.process.exit(1);
+            out.printExit("Could not add constant to chunk.", .{}, 1);
         };
         _ = vm.pop();
 

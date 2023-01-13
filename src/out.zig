@@ -16,8 +16,7 @@ pub fn init() void {
 
 pub fn print(comptime fmt: []const u8, args: anytype) void {
     stdout.print(fmt, args) catch {
-        std.debug.print("could not print to stdout", .{});
-        std.process.exit(1);
+        printExit("Could not print to stdout.", .{}, 1);
     };
 }
 
@@ -33,10 +32,14 @@ pub fn printlnColor(comptime fmt: []const u8, args: anytype, r: u8, g: u8, b: u8
     print(set_color_str ++ fmt ++ reset_str ++ "\n", .{ r, g, b } ++ args);
 }
 
+pub fn printExit(comptime fmt: []const u8, args: anytype, status: u8) void {
+    std.debug.print(fmt, args);
+    std.process.exit(status);
+}
+
 pub fn flush() void {
     buffered_writer.flush() catch {
-        std.debug.print("could not flush stdout", .{});
-        std.process.exit(1);
+        printExit("Could not flush stdout.", .{}, 1);
     };
 }
 
