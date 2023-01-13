@@ -8,6 +8,7 @@ const Token = @import("lexer.zig").Token;
 const TokenType = @import("lexer.zig").TokenType;
 const ObjFunction = @import("object.zig").ObjFunction;
 const ObjString = @import("object.zig").ObjString;
+const out = @import("out.zig");
 const whimsy_std = @import("std.zig");
 const value = @import("value.zig");
 const Value = value.Value;
@@ -112,15 +113,17 @@ pub const Compiler = struct {
         if (vm.parser.panic_mode) return;
         vm.parser.panic_mode = true;
 
-        std.debug.print("[line {d}] Error", .{token.line});
+        out.printColor("[line {d}]", .{token.line}, 0xff, 0, 0);
+        out.print(" Error", .{});
 
         if (token.type == .eof) {
-            std.debug.print(" at end", .{});
+            out.print(" at end", .{});
         } else if (token.type != .error_) {
-            std.debug.print(" at '{s}'", .{token.value});
+            out.print(" at ", .{});
+            out.printColor("'{s}'", .{token.value}, 0xff, 0x80, 0x40);
         }
 
-        std.debug.print(": {s}\n", .{message});
+        out.println(": {s}", .{message});
         vm.parser.had_error = true;
     }
 
@@ -371,8 +374,7 @@ pub const Compiler = struct {
             .depth = -1,
             .is_captured = false,
         }) catch {
-            std.debug.print("Could not add local.", .{});
-            std.process.exit(1);
+            out.printExit("Could not add local.", .{}, 1);
         };
     }
 
@@ -405,8 +407,7 @@ pub const Compiler = struct {
             .depth = comp.scope_depth,
             .is_captured = false,
         }) catch {
-            std.debug.print("Could not add local.", .{});
-            std.process.exit(1);
+            out.printExit("Could not add local.", .{}, 1);
         };
     }
 
@@ -441,8 +442,7 @@ pub const Compiler = struct {
             .is_local = is_local,
             .index = index,
         }) catch {
-            std.debug.print("Could not add upvalue.", .{});
-            std.process.exit(1);
+            out.printExit("Could not add upvalue.", .{}, 1);
         };
         self.function.?.upvalue_count += 1;
         return upvalue_count;
@@ -1241,8 +1241,7 @@ pub const Compiler = struct {
             .depth = vm.compiler.?.scope_depth,
             .iterator = true,
         }) catch {
-            std.debug.print("Could not add loop.", .{});
-            std.process.exit(1);
+            out.printExit("Could not add loop.", .{}, 1);
         };
         const loop = &vm.compiler.?.loops.items[vm.compiler.?.loops.items.len - 1];
 
@@ -1325,8 +1324,7 @@ pub const Compiler = struct {
             .depth = vm.compiler.?.scope_depth,
             .iterator = false,
         }) catch {
-            std.debug.print("Could not add loop.", .{});
-            std.process.exit(1);
+            out.printExit("Could not add loop.", .{}, 1);
         };
         const loop = &vm.compiler.?.loops.items[vm.compiler.?.loops.items.len - 1];
 

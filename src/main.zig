@@ -7,7 +7,6 @@ const Vm = @import("vm.zig").Vm;
 
 pub fn main() !void {
     out.init();
-
     out.println("{s}", .{version});
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -31,9 +30,11 @@ pub fn main() !void {
         try runFile(allocator, &vm, argList.items[1]);
     } else {
         out.println("Usage: whim [path]", .{});
+        out.flush();
         std.process.exit(64);
     }
 
+    out.flush();
     std.process.exit(0);
 }
 
@@ -62,6 +63,7 @@ fn runFile(allocator: Allocator, vm: *Vm, path: []const u8) !void {
     defer allocator.free(source);
 
     const result = vm.interpret(source);
+    out.flush();
 
     if (result == .compile_error) std.process.exit(65);
     if (result == .runtime_error) std.process.exit(70);
