@@ -2,6 +2,7 @@ const std = @import("std");
 
 const Chunk = @import("chunk.zig").Chunk;
 const OpCode = @import("chunk.zig").OpCode;
+const out = @import("out.zig");
 const value = @import("value.zig");
 const vle = @import("vle.zig");
 
@@ -11,20 +12,23 @@ pub const stress_gc = false;
 pub const log_gc = false;
 
 pub fn disassembleChunk(chunk: *Chunk, name: []const u8) void {
-    std.debug.print("== {s} ==\n", .{name});
+    out.printlnColor("== {s} ==", .{name}, 0, 0x80, 0xff);
 
     var offset: usize = 0;
     while (offset < chunk.code.items.len) {
         offset = disassembleInstruction(chunk, offset);
     }
+
+    out.flush();
 }
 
 pub fn disassembleInstruction(chunk: *Chunk, offset: usize) usize {
-    std.debug.print("{d:0>4} ", .{offset});
+    out.printColor("{d:0>4} ", .{offset}, 0x60, 0x60, 0x60);
+
     if (offset > 0 and chunk.getLine(offset) == chunk.getLine(offset - 1)) {
-        std.debug.print("   | ", .{});
+        out.printColor("   | ", .{}, 0x60, 0x60, 0x60);
     } else {
-        std.debug.print("{d:4} ", .{chunk.getLine(offset)});
+        out.print("{d:4} ", .{chunk.getLine(offset)});
     }
 
     const instruction = chunk.code.items[offset];
@@ -122,9 +126,9 @@ fn closureInstruction(name: []const u8, chunk: *Chunk, offset: usize) usize {
     var cur_offset = offset + 1;
     const constant = vle.get(chunk.code.items.ptr + cur_offset);
     cur_offset += vle.valueLength(chunk.code.items.ptr + cur_offset);
-    std.debug.print("{s: <20} {d:4} ", .{ name, constant });
+    out.print("{s: <20} {d:4} ", .{ name, constant });
     value.debugPrint(chunk.constants.items[constant]);
-    std.debug.print("\n", .{});
+    out.println("", .{});
 
     const function = value.asFunction(chunk.constants.items[constant]);
     var i: usize = 0;
@@ -133,7 +137,7 @@ fn closureInstruction(name: []const u8, chunk: *Chunk, offset: usize) usize {
         cur_offset += 1;
         const index = vle.get(chunk.code.items.ptr + cur_offset);
         cur_offset += vle.valueLength(chunk.code.items.ptr + cur_offset);
-        std.debug.print("{d:0>4}      > {s} {d}\n", .{ cur_offset - 2, if (is_local == 1) "local" else "upvalue", index });
+        out.println("{d:0>4}      > {s} {d}", .{ cur_offset - 2, if (is_local == 1) "local" else "upvalue", index });
     }
 
     return cur_offset;
@@ -141,9 +145,9 @@ fn closureInstruction(name: []const u8, chunk: *Chunk, offset: usize) usize {
 
 fn constantInstruction(name: []const u8, chunk: *Chunk, offset: usize) usize {
     const constant = vle.get(chunk.code.items.ptr + offset + 1);
-    std.debug.print("{s: <20} {d:4} '", .{ name, constant });
+    out.print("{s: <20} {d:4} '", .{ name, constant });
     value.debugPrint(chunk.constants.items[constant]);
-    std.debug.print("'\n", .{});
+    out.println("'", .{});
     return offset + vle.valueLength(chunk.code.items.ptr + offset + 1) + 1;
 }
 
@@ -153,26 +157,26 @@ fn invokeInstruction(name: []const u8, chunk: *Chunk, offset: usize) usize {
     cur_offset += vle.valueLength(chunk.code.items.ptr + cur_offset);
     const arg_count = vle.get(chunk.code.items.ptr + cur_offset);
     cur_offset += vle.valueLength(chunk.code.items.ptr + cur_offset);
-    std.debug.print("{s: <20} {d:4} '", .{ name, constant });
+    out.print("{s: <20} {d:4} '", .{ name, constant });
     value.debugPrint(chunk.constants.items[constant]);
-    std.debug.print("' ({d})\n", .{arg_count});
+    out.println("' ({d})", .{arg_count});
     return cur_offset;
 }
 
 fn jumpInstruction(name: []const u8, sign: isize, chunk: *Chunk, offset: usize) usize {
     var jump = @as(u16, chunk.code.items[offset + 1]) << 8;
     jump |= chunk.code.items[offset + 2];
-    std.debug.print("{s: <20} {d:4} -> {d}\n", .{ name, offset, @intCast(isize, offset) + 3 + sign * jump });
+    out.println("{s: <20} {d:4} -> {d}", .{ name, offset, @intCast(isize, offset) + 3 + sign * jump });
     return offset + 3;
 }
 
 fn numInstruction(name: []const u8, chunk: *Chunk, offset: usize) usize {
     const index = vle.get(chunk.code.items.ptr + offset + 1);
-    std.debug.print("{s: <20} {d:4}\n", .{ name, index });
+    out.println("{s: <20} {d:4}", .{ name, index });
     return offset + vle.valueLength(chunk.code.items.ptr + offset + 1) + 1;
 }
 
 fn simpleInstruction(name: []const u8, offset: usize) usize {
-    std.debug.print("{s}\n", .{name});
+    out.println("{s}", .{name});
     return offset + 1;
 }
