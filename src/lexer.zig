@@ -1,5 +1,6 @@
 const std = @import("std");
 const unicode = std.unicode;
+const out = @import("out.zig");
 
 pub const TokenType = enum {
     // symbols
@@ -99,8 +100,7 @@ pub const Lexer = struct {
         var i: usize = 0;
         while (i < count and !self.isAtEnd()) : (i += 1) {
             self.current += unicode.utf8ByteSequenceLength(self.source[self.current]) catch {
-                std.debug.print("Invalid character encoding.", .{});
-                std.process.exit(1);
+                out.printExit("Invalid character encoding.", .{}, 1);
             };
         }
         if (self.isAtEnd()) self.current = self.source.len;
@@ -116,18 +116,15 @@ pub const Lexer = struct {
         var ind = self.current;
         while (i < offset and ind < self.source.len) : (i += 1) {
             ind += unicode.utf8ByteSequenceLength(self.source[ind]) catch {
-                std.debug.print("Invalid character encoding.", .{});
-                std.process.exit(1);
+                out.printExit("Invalid character encoding.", .{}, 1);
             };
         }
         if (ind < self.source.len) {
             const len = unicode.utf8ByteSequenceLength(self.source[ind]) catch {
-                std.debug.print("Invalid character encoding.", .{});
-                std.process.exit(1);
+                out.printExit("Invalid character encoding.", .{}, 1);
             };
             return unicode.utf8Decode(self.source[ind .. ind + len]) catch {
-                std.debug.print("Invalid character encoding.", .{});
-                std.process.exit(1);
+                out.printExit("Invalid character encoding.", .{}, 1);
             };
         }
         return 0;
@@ -188,12 +185,10 @@ pub const Lexer = struct {
             var end_val: u21 = 0;
             if (end < self.source.len) {
                 const len = unicode.utf8ByteSequenceLength(self.source[end]) catch {
-                    std.debug.print("Invalid character encoding.", .{});
-                    std.process.exit(1);
+                    out.printExit("Invalid character encoding.", .{}, 1);
                 };
                 end_val = unicode.utf8Decode(self.source[end .. end + len]) catch {
-                    std.debug.print("Invalid character encoding.", .{});
-                    std.process.exit(1);
+                    out.printExit("Invalid character encoding.", .{}, 1);
                 };
             }
             if (!isAlphaOrDigit(end_val)) {

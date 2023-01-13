@@ -32,7 +32,7 @@ pub fn printlnColor(comptime fmt: []const u8, args: anytype, r: u8, g: u8, b: u8
     print(set_color_str ++ fmt ++ reset_str ++ "\n", .{ r, g, b } ++ args);
 }
 
-pub fn printExit(comptime fmt: []const u8, args: anytype, status: u8) void {
+pub fn printExit(comptime fmt: []const u8, args: anytype, status: u8) noreturn {
     std.debug.print(fmt, args);
     std.process.exit(status);
 }
