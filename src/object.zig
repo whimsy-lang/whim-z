@@ -5,6 +5,7 @@ const Allocator = std.mem.Allocator;
 const Chunk = @import("chunk.zig").Chunk;
 const debug = @import("debug.zig");
 const Map = @import("map.zig").Map;
+const out = @import("out.zig");
 const StringMap = @import("string_map.zig").StringMap;
 const value = @import("value.zig");
 const Value = value.Value;
@@ -79,70 +80,70 @@ pub const Object = struct {
     pub fn debugPrint(self: *Object) void {
         switch (self.type) {
             .class => if (self.asClass().name) |name| {
-                std.debug.print("class {s}", .{name.chars});
+                out.print("class {s}", .{name.chars});
             } else {
-                std.debug.print("anon class", .{});
+                out.print("anon class", .{});
             },
             .closure => self.asClosure().function.print(),
             .function => self.asFunction().print(),
             .instance => if (self.asInstance().type.name) |name| {
-                std.debug.print("{s} inst", .{name.chars});
+                out.print("{s} inst", .{name.chars});
             } else {
-                std.debug.print("anon inst", .{});
+                out.print("anon inst", .{});
             },
             .list => {
-                std.debug.print("(", .{});
+                out.print("(", .{});
                 var first = true;
                 for (self.asList().items.items) |item| {
                     if (first) {
                         first = false;
                     } else {
-                        std.debug.print(", ", .{});
+                        out.print(", ", .{});
                     }
                     value.debugPrint(item);
                 }
-                std.debug.print(")", .{});
+                out.print(")", .{});
             },
             .map => {
-                std.debug.print("[", .{});
+                out.print("[", .{});
                 var first = true;
                 for (self.asMap().items.entries) |entry| {
                     if (!value.isEmpty(entry.key)) {
                         if (first) {
                             first = false;
                         } else {
-                            std.debug.print(", ", .{});
+                            out.print(", ", .{});
                         }
                         value.debugPrint(entry.key);
-                        std.debug.print(" {s} ", .{if (entry.value.constant) "::" else ":="});
+                        out.print(" {s} ", .{if (entry.value.constant) "::" else ":="});
                         value.debugPrint(entry.value.value);
                     }
                 }
-                std.debug.print("]", .{});
+                out.print("]", .{});
             },
-            .native => std.debug.print("<native fn>", .{}),
+            .native => out.print("<native fn>", .{}),
             .range => {
                 const r = self.asRange();
-                std.debug.print("{d}{s}{d}", .{ r.start, if (r.inclusive) "..=" else "..", r.end });
-                if (r.step != 1) std.debug.print(" by {d}", .{r.step});
+                out.print("{d}{s}{d}", .{ r.start, if (r.inclusive) "..=" else "..", r.end });
+                if (r.step != 1) out.print(" by {d}", .{r.step});
             },
             .set => {
-                std.debug.print("[", .{});
+                out.print("[", .{});
                 var first = true;
                 for (self.asSet().items.entries) |entry| {
                     if (!value.isEmpty(entry.key)) {
                         if (first) {
                             first = false;
                         } else {
-                            std.debug.print(", ", .{});
+                            out.print(", ", .{});
                         }
                         value.debugPrint(entry.key);
                     }
                 }
-                std.debug.print("]", .{});
+                out.print("]", .{});
             },
-            .string => std.debug.print("{s}", .{self.asString().chars}),
-            .upvalue => std.debug.print("upvalue", .{}),
+            .string => out.print("{s}", .{self.asString().chars}),
+            .upvalue => out.print("upvalue", .{}),
         }
     }
 
@@ -152,8 +153,7 @@ pub const Object = struct {
                 const class = self.asClass();
                 if (class.name) |n| {
                     const chars = std.fmt.allocPrint(vm.allocator, "class {s}", .{n.chars}) catch {
-                        std.debug.print("Could not allocate memory for string.", .{});
-                        std.process.exit(1);
+                        out.printExit("Could not allocate memory for string.", .{}, 1);
                     };
                     return ObjString.take(vm, chars);
                 }
@@ -165,8 +165,7 @@ pub const Object = struct {
                 const instance = self.asInstance();
                 if (instance.type.name) |n| {
                     const chars = std.fmt.allocPrint(vm.allocator, "instance of {s}", .{n.chars}) catch {
-                        std.debug.print("Could not allocate memory for string.", .{});
-                        std.process.exit(1);
+                        out.printExit("Could not allocate memory for string.", .{}, 1);
                     };
                     return ObjString.take(vm, chars);
                 }
@@ -175,8 +174,7 @@ pub const Object = struct {
             .list => {
                 var chars = std.ArrayList(u8).init(vm.allocator);
                 chars.append('(') catch {
-                    std.debug.print("Could not allocate memory for string.", .{});
-                    std.process.exit(1);
+                    out.printExit("Could not allocate memory for string.", .{}, 1);
                 };
                 var first = true;
                 for (self.asList().items.items) |item| {
@@ -184,29 +182,25 @@ pub const Object = struct {
                         first = false;
                     } else {
                         chars.appendSlice(", ") catch {
-                            std.debug.print("Could not allocate memory for string.", .{});
-                            std.process.exit(1);
+                            out.printExit("Could not allocate memory for string.", .{}, 1);
                         };
                     }
                     const str = value.toString(item, vm);
                     vm.push(value.string(str));
                     chars.appendSlice(str.chars) catch {
-                        std.debug.print("Could not allocate memory for string.", .{});
-                        std.process.exit(1);
+                        out.printExit("Could not allocate memory for string.", .{}, 1);
                     };
                     _ = vm.pop();
                 }
                 chars.append(')') catch {
-                    std.debug.print("Could not allocate memory for string.", .{});
-                    std.process.exit(1);
+                    out.printExit("Could not allocate memory for string.", .{}, 1);
                 };
                 return ObjString.take(vm, chars.items);
             },
             .map => {
                 var chars = std.ArrayList(u8).init(vm.allocator);
                 chars.append('[') catch {
-                    std.debug.print("Could not allocate memory for string.", .{});
-                    std.process.exit(1);
+                    out.printExit("Could not allocate memory for string.", .{}, 1);
                 };
                 var first = true;
                 for (self.asMap().items.entries) |entry| {
@@ -215,33 +209,28 @@ pub const Object = struct {
                             first = false;
                         } else {
                             chars.appendSlice(", ") catch {
-                                std.debug.print("Could not allocate memory for string.", .{});
-                                std.process.exit(1);
+                                out.printExit("Could not allocate memory for string.", .{}, 1);
                             };
                         }
                         const key_str = value.toString(entry.key, vm);
                         vm.push(value.string(key_str));
                         chars.appendSlice(key_str.chars) catch {
-                            std.debug.print("Could not allocate memory for string.", .{});
-                            std.process.exit(1);
+                            out.printExit("Could not allocate memory for string.", .{}, 1);
                         };
                         _ = vm.pop();
                         chars.appendSlice(if (entry.value.constant) " :: " else " := ") catch {
-                            std.debug.print("Could not allocate memory for string.", .{});
-                            std.process.exit(1);
+                            out.printExit("Could not allocate memory for string.", .{}, 1);
                         };
                         const val_str = value.toString(entry.value.value, vm);
                         vm.push(value.string(val_str));
                         chars.appendSlice(val_str.chars) catch {
-                            std.debug.print("Could not allocate memory for string.", .{});
-                            std.process.exit(1);
+                            out.printExit("Could not allocate memory for string.", .{}, 1);
                         };
                         _ = vm.pop();
                     }
                 }
                 chars.append(']') catch {
-                    std.debug.print("Could not allocate memory for string.", .{});
-                    std.process.exit(1);
+                    out.printExit("Could not allocate memory for string.", .{}, 1);
                 };
                 return ObjString.take(vm, chars.items);
             },
@@ -253,16 +242,14 @@ pub const Object = struct {
                     std.fmt.allocPrint(vm.allocator, "{d}{s}{d}", .{ range.start, op, range.end })
                 else
                     std.fmt.allocPrint(vm.allocator, "{d}{s}{d} by {d}", .{ range.start, op, range.end, range.step })) catch {
-                    std.debug.print("Could not allocate memory for string.", .{});
-                    std.process.exit(1);
+                    out.printExit("Could not allocate memory for string.", .{}, 1);
                 };
                 return ObjString.take(vm, chars);
             },
             .set => {
                 var chars = std.ArrayList(u8).init(vm.allocator);
                 chars.append('[') catch {
-                    std.debug.print("Could not allocate memory for string.", .{});
-                    std.process.exit(1);
+                    out.printExit("Could not allocate memory for string.", .{}, 1);
                 };
                 var first = true;
                 for (self.asSet().items.entries) |entry| {
@@ -271,22 +258,19 @@ pub const Object = struct {
                             first = false;
                         } else {
                             chars.appendSlice(", ") catch {
-                                std.debug.print("Could not allocate memory for string.", .{});
-                                std.process.exit(1);
+                                out.printExit("Could not allocate memory for string.", .{}, 1);
                             };
                         }
                         const str = value.toString(entry.key, vm);
                         vm.push(value.string(str));
                         chars.appendSlice(str.chars) catch {
-                            std.debug.print("Could not allocate memory for string.", .{});
-                            std.process.exit(1);
+                            out.printExit("Could not allocate memory for string.", .{}, 1);
                         };
                         _ = vm.pop();
                     }
                 }
                 chars.append(']') catch {
-                    std.debug.print("Could not allocate memory for string.", .{});
-                    std.process.exit(1);
+                    out.printExit("Could not allocate memory for string.", .{}, 1);
                 };
                 return ObjString.take(vm, chars.items);
             },
@@ -298,8 +282,7 @@ pub const Object = struct {
     fn functionToString(func: *ObjFunction, vm: *Vm) *ObjString {
         if (func.name) |n| {
             const chars = std.fmt.allocPrint(vm.allocator, "{s}()", .{n.chars}) catch {
-                std.debug.print("Could not allocate memory for string.", .{});
-                std.process.exit(1);
+                out.printExit("Could not allocate memory for string.", .{}, 1);
             };
             return ObjString.take(vm, chars);
         }
@@ -310,9 +293,9 @@ pub const Object = struct {
         if (self.is_marked) return;
 
         if (debug.log_gc) {
-            std.debug.print("mark {any}: ", .{self.type});
+            out.print("mark {any}: ", .{self.type});
             self.debugPrint();
-            std.debug.print("\n", .{});
+            out.println("", .{});
         }
 
         self.is_marked = true;
@@ -322,8 +305,7 @@ pub const Object = struct {
         if (self.is(.string) or self.is(.range) or self.is(.native)) return;
 
         vm.gc.gray_stack.append(self) catch {
-            std.debug.print("Could not allocate memory for garbage collection.", .{});
-            std.process.exit(1);
+            out.printExit("Could not allocate memory for garbage collection.", .{}, 1);
         };
     }
 
@@ -333,9 +315,9 @@ pub const Object = struct {
 
     pub fn blacken(self: *Object, vm: *Vm) void {
         if (debug.log_gc) {
-            std.debug.print("blacken {any}: ", .{self.type});
+            out.print("blacken {any}: ", .{self.type});
             self.debugPrint();
-            std.debug.print("\n", .{});
+            out.println("", .{});
         }
 
         switch (self.type) {
@@ -379,11 +361,10 @@ pub const ObjClass = struct {
 
     pub fn init(vm: *Vm, class_name: *ObjString, super_class: ?*ObjClass, base: bool) *ObjClass {
         if (debug.log_gc) {
-            std.debug.print("allocate for class\n", .{});
+            out.println("allocate for class", .{});
         }
         const class = vm.allocator.create(ObjClass) catch {
-            std.debug.print("Could not allocate memory for class.", .{});
-            std.process.exit(1);
+            out.printExit("Could not allocate memory for class.", .{}, 1);
         };
         vm.registerObject(&class.obj);
 
@@ -415,11 +396,10 @@ pub const ObjClosure = struct {
 
     pub fn init(vm: *Vm, func: *ObjFunction) *ObjClosure {
         if (debug.log_gc) {
-            std.debug.print("allocate for closure\n", .{});
+            out.println("allocate for closure", .{});
         }
         const upvalues = vm.allocator.alloc(?*ObjUpvalue, func.upvalue_count) catch {
-            std.debug.print("Could not allocate memory for closure.", .{});
-            std.process.exit(1);
+            out.printExit("Could not allocate memory for closure.", .{}, 1);
         };
         var i: usize = 0;
         while (i < func.upvalue_count) : (i += 1) {
@@ -427,8 +407,7 @@ pub const ObjClosure = struct {
         }
 
         const closure = vm.allocator.create(ObjClosure) catch {
-            std.debug.print("Could not allocate memory for closure.", .{});
-            std.process.exit(1);
+            out.printExit("Could not allocate memory for closure.", .{}, 1);
         };
         vm.registerObject(&closure.obj);
 
@@ -449,11 +428,10 @@ pub const ObjFunction = struct {
 
     pub fn init(vm: *Vm) *ObjFunction {
         if (debug.log_gc) {
-            std.debug.print("allocate for function\n", .{});
+            out.println("allocate for function", .{});
         }
         const function = vm.allocator.create(ObjFunction) catch {
-            std.debug.print("Could not allocate memory for function.", .{});
-            std.process.exit(1);
+            out.printExit("Could not allocate memory for function.", .{}, 1);
         };
         vm.registerObject(&function.obj);
 
@@ -477,9 +455,9 @@ pub const ObjFunction = struct {
 
     pub fn print(self: *ObjFunction) void {
         if (self.name != null) {
-            std.debug.print("<fn {s}>", .{self.name.?.chars});
+            out.print("<fn {s}>", .{self.name.?.chars});
         } else {
-            std.debug.print("<script>", .{});
+            out.print("<script>", .{});
         }
     }
 };
@@ -491,11 +469,10 @@ pub const ObjInstance = struct {
 
     pub fn init(vm: *Vm, class: *ObjClass) *ObjInstance {
         if (debug.log_gc) {
-            std.debug.print("allocate for instance\n", .{});
+            out.println("allocate for instance", .{});
         }
         const instance = vm.allocator.create(ObjInstance) catch {
-            std.debug.print("Could not allocate memory for instance.", .{});
-            std.process.exit(1);
+            out.printExit("Could not allocate memory for instance.", .{}, 1);
         };
         vm.registerObject(&instance.obj);
 
@@ -523,20 +500,16 @@ pub const ObjList = struct {
 
     pub fn init(vm: *Vm) *ObjList {
         if (debug.log_gc) {
-            std.debug.print("allocate for list\n", .{});
+            out.println("allocate for list", .{});
         }
         const list = vm.allocator.create(ObjList) catch {
-            std.debug.print("Could not allocate memory for list.", .{});
-            std.process.exit(1);
+            out.printExit("Could not allocate memory for list.", .{}, 1);
         };
         vm.registerObject(&list.obj);
 
         vm.push(value.list(list));
-
         list.obj = .{ .type = .list };
-
         list.items = std.ArrayList(Value).init(vm.allocator);
-
         _ = vm.pop();
 
         return list;
@@ -553,11 +526,10 @@ pub const ObjMap = struct {
 
     pub fn init(vm: *Vm) *ObjMap {
         if (debug.log_gc) {
-            std.debug.print("allocate for map\n", .{});
+            out.println("allocate for map", .{});
         }
         const map = vm.allocator.create(ObjMap) catch {
-            std.debug.print("Could not allocate memory for map.", .{});
-            std.process.exit(1);
+            out.printExit("Could not allocate memory for map.", .{}, 1);
         };
         vm.registerObject(&map.obj);
 
@@ -585,11 +557,10 @@ pub const ObjNative = struct {
 
     pub fn init(vm: *Vm, native_fn: NativeFn) *ObjNative {
         if (debug.log_gc) {
-            std.debug.print("allocate for native fn\n", .{});
+            out.println("allocate for native fn", .{});
         }
         const func = vm.allocator.create(ObjNative) catch {
-            std.debug.print("Could not allocate memory for function.", .{});
-            std.process.exit(1);
+            out.printExit("Could not allocate memory for function.", .{}, 1);
         };
         vm.registerObject(&func.obj);
 
@@ -609,11 +580,10 @@ pub const ObjRange = struct {
 
     pub fn init(vm: *Vm, start_val: f64, end_val: f64, step_val: f64, inclusive_val: bool) *ObjRange {
         if (debug.log_gc) {
-            std.debug.print("allocate for range\n", .{});
+            out.println("allocate for range", .{});
         }
         const range = vm.allocator.create(ObjRange) catch {
-            std.debug.print("Could not allocate memory for range.", .{});
-            std.process.exit(1);
+            out.printExit("Could not allocate memory for range.", .{}, 1);
         };
         vm.registerObject(&range.obj);
 
@@ -633,20 +603,16 @@ pub const ObjSet = struct {
 
     pub fn init(vm: *Vm) *ObjSet {
         if (debug.log_gc) {
-            std.debug.print("allocate for set\n", .{});
+            out.println("allocate for set", .{});
         }
         const set = vm.allocator.create(ObjSet) catch {
-            std.debug.print("Could not allocate memory for set.", .{});
-            std.process.exit(1);
+            out.printExit("Could not allocate memory for set.", .{}, 1);
         };
         vm.registerObject(&set.obj);
 
         vm.push(value.set(set));
-
         set.obj = .{ .type = .set };
-
         set.items = Map.init(vm.allocator);
-
         _ = vm.pop();
 
         return set;
@@ -665,11 +631,10 @@ pub const ObjString = struct {
 
     fn init(vm: *Vm, chars: []const u8, hash: u32) *ObjString {
         if (debug.log_gc) {
-            std.debug.print("allocate for string\n", .{});
+            out.println("allocate for string", .{});
         }
         const string = vm.allocator.create(ObjString) catch {
-            std.debug.print("Could not allocate memory for string.", .{});
-            std.process.exit(1);
+            out.printExit("Could not allocate memory for string.", .{}, 1);
         };
         vm.registerObject(&string.obj);
 
@@ -681,8 +646,7 @@ pub const ObjString = struct {
         var i: usize = 0;
         while (i < chars.len) : (len += 1) {
             i += unicode.utf8ByteSequenceLength(chars[i]) catch {
-                std.debug.print("Invalid character encoding.", .{});
-                std.process.exit(1);
+                out.printExit("Invalid character encoding.", .{}, 1);
             };
         }
 
@@ -713,8 +677,7 @@ pub const ObjString = struct {
         while (br.start < self.chars.len) : (i += 1) {
             if (i == start) break;
             br.start += unicode.utf8ByteSequenceLength(self.chars[br.start]) catch {
-                std.debug.print("Invalid character encoding.", .{});
-                std.process.exit(1);
+                out.printExit("Invalid character encoding.", .{}, 1);
             };
         }
 
@@ -722,8 +685,7 @@ pub const ObjString = struct {
         while (br.end < self.chars.len) : (i += 1) {
             if (i == end) break;
             br.end += unicode.utf8ByteSequenceLength(self.chars[br.end]) catch {
-                std.debug.print("Invalid character encoding.", .{});
-                std.process.exit(1);
+                out.printExit("Invalid character encoding.", .{}, 1);
             };
         }
 
@@ -737,8 +699,7 @@ pub const ObjString = struct {
         while (i < self.chars.len) : (index += 1) {
             if (i == b_index) return index;
             i += unicode.utf8ByteSequenceLength(self.chars[i]) catch {
-                std.debug.print("Invalid character encoding.", .{});
-                std.process.exit(1);
+                out.printExit("Invalid character encoding.", .{}, 1);
             };
         }
         return null;
@@ -761,8 +722,7 @@ pub const ObjString = struct {
         if (interned) |intr| return intr;
 
         const heap_chars = vm.allocator.alloc(u8, chars.len) catch {
-            std.debug.print("Could not allocate memory for string.", .{});
-            std.process.exit(1);
+            out.printExit("Could not allocate memory for string.", .{}, 1);
         };
         std.mem.copy(u8, heap_chars, chars);
         return init(vm, heap_chars, hash);
@@ -782,8 +742,7 @@ pub const ObjString = struct {
 
         // allocate the actual length
         const heap_chars = vm.allocator.alloc(u8, escaped_len) catch {
-            std.debug.print("Could not allocate memory for string.", .{});
-            std.process.exit(1);
+            out.printExit("Could not allocate memory for string.", .{}, 1);
         };
         var index: usize = 0;
         i = 0;
@@ -813,11 +772,10 @@ pub const ObjUpvalue = struct {
 
     pub fn init(vm: *Vm, slot: *Value) *ObjUpvalue {
         if (debug.log_gc) {
-            std.debug.print("allocate for upvalue\n", .{});
+            out.println("allocate for upvalue", .{});
         }
         const upvalue = vm.allocator.create(ObjUpvalue) catch {
-            std.debug.print("Could not allocate memory for upvalue.", .{});
-            std.process.exit(1);
+            out.printExit("Could not allocate memory for upvalue.", .{}, 1);
         };
         vm.registerObject(&upvalue.obj);
 
