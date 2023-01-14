@@ -29,13 +29,10 @@ pub fn main() !void {
     } else if (argList.items.len == 2) {
         try runFile(allocator, &vm, argList.items[1]);
     } else {
-        out.println("Usage: whim [path]", .{});
-        out.flush();
-        std.process.exit(64);
+        out.printExit("Usage: whim [path]", .{}, 64);
     }
 
     out.flush();
-    std.process.exit(0);
 }
 
 fn repl(vm: *Vm) !void {
@@ -63,8 +60,7 @@ fn runFile(allocator: Allocator, vm: *Vm, path: []const u8) !void {
     defer allocator.free(source);
 
     const result = vm.interpret(source);
-    out.flush();
 
-    if (result == .compile_error) std.process.exit(65);
-    if (result == .runtime_error) std.process.exit(70);
+    if (result == .compile_error) out.printExit("", .{}, 65);
+    if (result == .runtime_error) out.printExit("", .{}, 70);
 }
