@@ -7,6 +7,7 @@ const Vm = @import("vm.zig").Vm;
 
 pub fn main() !void {
     out.init();
+    defer out.flush();
     out.println("{s}", .{version});
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -20,19 +21,33 @@ pub fn main() !void {
 
     while (args.next()) |arg| try argList.append(arg);
 
-    var vm: Vm = undefined;
-    vm.init(allocator);
-    defer vm.deinit();
-
-    if (argList.items.len == 1) {
+    var valid = false;
+    if (argList.items.len >= 2 and std.mem.eql(u8, argList.items[1], "repl")) {
+        var vm: Vm = undefined;
+        vm.init(allocator);
+        defer vm.deinit();
+        valid = true;
+        parseFlags(argList.items[2..]);
         try repl(&vm);
-    } else if (argList.items.len == 2) {
-        try runFile(allocator, &vm, argList.items[1]);
-    } else {
-        out.printExit("Usage: whim [path]", .{}, 64);
+    } else if (argList.items.len >= 3 and std.mem.eql(u8, argList.items[1], "run")) {
+        var vm: Vm = undefined;
+        vm.init(allocator);
+        defer vm.deinit();
+        valid = true;
+        parseFlags(argList.items[3..]);
+        try runFile(allocator, &vm, argList.items[2]);
     }
+    if (!valid) {
+        out.printExit("Usage: whim [command] [flags]\n  Commands: repl, run [file]\n  Flags: -no-style", .{}, 64);
+    }
+}
 
-    out.flush();
+fn parseFlags(flags: []const []const u8) void {
+    for (flags) |flag| {
+        if (std.mem.eql(u8, flag, "-no-style")) {
+            out.no_style = true;
+        }
+    }
 }
 
 fn repl(vm: *Vm) !void {

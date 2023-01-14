@@ -4,6 +4,8 @@ var stdout_file: std.fs.File.Writer = undefined;
 var buffered_writer: std.io.BufferedWriter(4096, std.fs.File.Writer) = undefined;
 var stdout: std.io.BufferedWriter(4096, std.fs.File.Writer).Writer = undefined;
 
+pub var no_style = false;
+
 const Color = enum {
     blue,
     dark_green,
@@ -65,7 +67,7 @@ pub fn printlnColor(comptime fmt: []const u8, args: anytype, c: Color) void {
 }
 
 pub fn printExit(comptime fmt: []const u8, args: anytype, status: u8) noreturn {
-    print(fmt, args);
+    println(fmt, args);
     flush();
     std.process.exit(status);
 }
@@ -78,10 +80,12 @@ pub fn flush() void {
 }
 
 pub fn color(c: Color) void {
+    if (no_style) return;
     print("\x1b[38;2;{d};{d};{d}m", c.val());
 }
 
 pub fn bgColor(c: Color) void {
+    if (no_style) return;
     print("\x1b[48;2;{d};{d};{d}m", c.val());
 }
 
@@ -106,5 +110,6 @@ pub fn strikethrough() void {
 }
 
 fn ansiCode(code: u8) void {
+    if (no_style) return;
     print("\x1b[{d}m", .{code});
 }
