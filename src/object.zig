@@ -77,7 +77,7 @@ pub const Object = struct {
         return @fieldParentPtr(ObjUpvalue, "obj", self);
     }
 
-    pub fn debugPrint(self: *Object) void {
+    pub fn print(self: *Object) void {
         switch (self.type) {
             .class => if (self.asClass().name) |name| {
                 out.print("class {s}", .{name.chars});
@@ -100,7 +100,7 @@ pub const Object = struct {
                     } else {
                         out.print(", ", .{});
                     }
-                    value.debugPrint(item);
+                    value.print(item);
                 }
                 out.print(")", .{});
             },
@@ -114,9 +114,9 @@ pub const Object = struct {
                         } else {
                             out.print(", ", .{});
                         }
-                        value.debugPrint(entry.key);
+                        value.print(entry.key);
                         out.print(" {s} ", .{if (entry.value.constant) "::" else ":="});
-                        value.debugPrint(entry.value.value);
+                        value.print(entry.value.value);
                     }
                 }
                 out.print("]", .{});
@@ -137,7 +137,7 @@ pub const Object = struct {
                         } else {
                             out.print(", ", .{});
                         }
-                        value.debugPrint(entry.key);
+                        value.print(entry.key);
                     }
                 }
                 out.print("]", .{});
@@ -294,7 +294,7 @@ pub const Object = struct {
 
         if (debug.log_gc) {
             out.print("mark {any}: ", .{self.type});
-            self.debugPrint();
+            self.print();
             out.println("", .{});
         }
 
@@ -316,7 +316,7 @@ pub const Object = struct {
     pub fn blacken(self: *Object, vm: *Vm) void {
         if (debug.log_gc) {
             out.print("blacken {any}: ", .{self.type});
-            self.debugPrint();
+            self.print();
             out.println("", .{});
         }
 

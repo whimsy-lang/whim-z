@@ -127,7 +127,7 @@ fn closureInstruction(name: []const u8, chunk: *Chunk, offset: usize) usize {
     const constant = vle.get(chunk.code.items.ptr + cur_offset);
     cur_offset += vle.valueLength(chunk.code.items.ptr + cur_offset);
     out.print("{s: <20} {d:4} ", .{ name, constant });
-    value.debugPrint(chunk.constants.items[constant]);
+    value.print(chunk.constants.items[constant]);
     out.println("", .{});
 
     const function = value.asFunction(chunk.constants.items[constant]);
@@ -146,7 +146,7 @@ fn closureInstruction(name: []const u8, chunk: *Chunk, offset: usize) usize {
 fn constantInstruction(name: []const u8, chunk: *Chunk, offset: usize) usize {
     const constant = vle.get(chunk.code.items.ptr + offset + 1);
     out.print("{s: <20} {d:4} '", .{ name, constant });
-    value.debugPrint(chunk.constants.items[constant]);
+    value.print(chunk.constants.items[constant]);
     out.println("'", .{});
     return offset + vle.valueLength(chunk.code.items.ptr + offset + 1) + 1;
 }
@@ -158,7 +158,7 @@ fn invokeInstruction(name: []const u8, chunk: *Chunk, offset: usize) usize {
     const arg_count = vle.get(chunk.code.items.ptr + cur_offset);
     cur_offset += vle.valueLength(chunk.code.items.ptr + cur_offset);
     out.print("{s: <20} {d:4} '", .{ name, constant });
-    value.debugPrint(chunk.constants.items[constant]);
+    value.print(chunk.constants.items[constant]);
     out.println("' ({d})", .{arg_count});
     return cur_offset;
 }

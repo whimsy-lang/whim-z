@@ -306,7 +306,7 @@ pub const Vm = struct {
     fn freeObject(self: *Vm, object: *Object) void {
         if (debug.log_gc) {
             out.print("free {any}: ", .{object.type});
-            object.debugPrint();
+            object.print();
             out.println("", .{});
         }
         switch (object.type) {
@@ -1006,7 +1006,7 @@ pub const Vm = struct {
                 var slot: [*]Value = &self.stack;
                 while (@ptrToInt(slot) < @ptrToInt(self.stack_top)) : (slot += 1) {
                     out.print("[ ", .{});
-                    value.debugPrint(slot[0]);
+                    value.print(slot[0]);
                     out.print(" ]", .{});
                 }
                 out.println("", .{});
