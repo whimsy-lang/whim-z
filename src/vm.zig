@@ -22,6 +22,7 @@ const ObjRange = @import("object.zig").ObjRange;
 const ObjSet = @import("object.zig").ObjSet;
 const ObjString = @import("object.zig").ObjString;
 const ObjUpvalue = @import("object.zig").ObjUpvalue;
+const out = @import("out.zig");
 const whimsy_std = @import("std.zig");
 const StringMap = @import("string_map.zig").StringMap;
 const value = @import("value.zig");
@@ -213,15 +214,14 @@ pub const Vm = struct {
 
     pub fn registerObject(self: *Vm, object: *Object) void {
         self.objects.append(object) catch {
-            std.debug.print("Could not allocate memory to track object.", .{});
-            std.process.exit(1);
+            out.printExit("Could not allocate memory to track object.", .{}, 1);
         };
     }
 
     pub fn collectGarbage(self: *Vm) void {
         const before = self.gc.bytes_allocated;
         if (debug.log_gc) {
-            std.debug.print("-- gc begin\n", .{});
+            out.printlnColor("-- gc begin", .{}, 0, 0xff, 0);
         }
 
         self.markRoots();
@@ -232,7 +232,7 @@ pub const Vm = struct {
         self.gc.next_gc = self.gc.bytes_allocated * GcAllocator.heap_grow_factor;
 
         if (debug.log_gc) {
-            std.debug.print("-- gc end | collected {d} bytes (from {d} to {d}) next at {d}\n", .{ before - self.gc.bytes_allocated, before, self.gc.bytes_allocated, self.gc.next_gc });
+            out.printlnColor("-- gc end | collected {d} bytes (from {d} to {d}) next at {d}", .{ before - self.gc.bytes_allocated, before, self.gc.bytes_allocated, self.gc.next_gc }, 0, 0xff, 0);
         }
     }
 
@@ -305,9 +305,9 @@ pub const Vm = struct {
 
     fn freeObject(self: *Vm, object: *Object) void {
         if (debug.log_gc) {
-            std.debug.print("free {any}: ", .{object.type});
+            out.print("free {any}: ", .{object.type});
             object.debugPrint();
-            std.debug.print("\n", .{});
+            out.println("", .{});
         }
         switch (object.type) {
             .class => {
@@ -363,19 +363,19 @@ pub const Vm = struct {
     }
 
     fn runtimeError(self: *Vm, comptime fmt: []const u8, args: anytype) void {
-        std.debug.print(fmt, args);
-        std.debug.print("\n", .{});
+        out.println(fmt, args);
 
         var i: isize = @intCast(isize, self.frame_count) - 1;
         while (i >= 0) : (i -= 1) {
             const frame = &self.frames[@intCast(usize, i)];
             const function = frame.closure.function;
             const instruction = @ptrToInt(frame.ip) - @ptrToInt(function.chunk.code.items.ptr) - 1;
-            std.debug.print("[line {d}] in ", .{function.chunk.getLine(instruction)});
+            out.printColor("[line {d}]", .{function.chunk.getLine(instruction)}, 0xff, 0, 0);
+            out.print(" in ", .{});
             if (function.name == null) {
-                std.debug.print("{s}\n", .{if (i == 0) "script" else "fn()"});
+                out.println("{s}", .{if (i == 0) "script" else "fn()"});
             } else {
-                std.debug.print("{s}()\n", .{function.name.?.chars});
+                out.println("{s}()", .{function.name.?.chars});
             }
         }
 
@@ -420,8 +420,7 @@ pub const Vm = struct {
     pub fn nativeError(self: *Vm, comptime fmt: []const u8, args: anytype) Value {
         self.has_native_error = true;
         const chars = std.fmt.allocPrint(self.allocator, fmt, args) catch {
-            std.debug.print("Could not allocate memory for error.", .{});
-            std.process.exit(1);
+            out.printExit("Could not allocate memory for error.", .{}, 1);
         };
         return value.string(ObjString.take(self, chars));
     }
@@ -463,8 +462,7 @@ pub const Vm = struct {
                         const list = ObjList.init(self);
                         (self.stack_top - (arg_count + 1))[0] = value.list(list);
                         list.items.appendSlice((self.stack_top - arg_count)[0..arg_count]) catch {
-                            std.debug.print("Could not allocate memory for list.", .{});
-                            std.process.exit(1);
+                            out.printExit("Could not allocate memory for list.", .{}, 1);
                         };
                         self.stack_top -= arg_count;
                         return true;
@@ -659,8 +657,7 @@ pub const Vm = struct {
         const strings = [_][]const u8{ a.chars, b.chars };
 
         const heap_chars = std.mem.concat(self.allocator, u8, &strings) catch {
-            std.debug.print("Could not allocate memory for string.", .{});
-            std.process.exit(1);
+            out.printExit("Could not allocate memory for string.", .{}, 1);
         };
 
         const result = ObjString.take(self, heap_chars);
@@ -825,8 +822,7 @@ pub const Vm = struct {
                 const new_list = ObjList.init(self);
                 self.push(value.list(new_list));
                 new_list.items.appendSlice(list.items.items[norm.start..norm.end]) catch {
-                    std.debug.print("Could not allocate memory for list.", .{});
-                    std.process.exit(1);
+                    out.printExit("Could not allocate memory for list.", .{}, 1);
                 };
 
                 self.stack_top -= (pop_count + 1);
@@ -974,8 +970,7 @@ pub const Vm = struct {
 
                 const new_items = if (value.isObjType(val, .list)) value.asList(val).items.items else &[_]Value{val};
                 list.items.replaceRange(norm.start, norm.end - norm.start, new_items) catch {
-                    std.debug.print("Could not allocate memory for list.", .{});
-                    std.process.exit(1);
+                    out.printExit("Could not allocate memory for list.", .{}, 1);
                 };
                 return true;
             }
@@ -1007,14 +1002,14 @@ pub const Vm = struct {
 
         while (true) {
             if (debug.trace_execution) {
-                std.debug.print("          ", .{});
+                out.print("          ", .{});
                 var slot: [*]Value = &self.stack;
                 while (@ptrToInt(slot) < @ptrToInt(self.stack_top)) : (slot += 1) {
-                    std.debug.print("[ ", .{});
+                    out.print("[ ", .{});
                     value.debugPrint(slot[0]);
-                    std.debug.print(" ]", .{});
+                    out.print(" ]", .{});
                 }
-                std.debug.print("\n", .{});
+                out.println("", .{});
                 _ = debug.disassembleInstruction(&frame.closure.function.chunk, @ptrToInt(frame.ip) - @ptrToInt(frame.closure.function.chunk.code.items.ptr));
             }
 
@@ -1409,15 +1404,13 @@ pub const Vm = struct {
                                 while (i < str.chars.len) : (length += 1) {
                                     if (length == uindex) byte_idx = i;
                                     i += unicode.utf8ByteSequenceLength(str.chars[i]) catch {
-                                        std.debug.print("Invalid character encoding.", .{});
-                                        std.process.exit(1);
+                                        out.printExit("Invalid character encoding.", .{}, 1);
                                     };
                                 }
 
                                 if (uindex < length) {
                                     const ch_len = unicode.utf8ByteSequenceLength(str.chars[byte_idx]) catch {
-                                        std.debug.print("Invalid character encoding.", .{});
-                                        std.process.exit(1);
+                                        out.printExit("Invalid character encoding.", .{}, 1);
                                     };
                                     self.push(value.string(ObjString.copy(self, str.chars[byte_idx .. byte_idx + ch_len])));
                                 } else {
@@ -1446,8 +1439,7 @@ pub const Vm = struct {
                     const list = ObjList.init(self);
                     self.push(value.list(list));
                     list.items.appendSlice((self.stack_top - (count + 1))[0..count]) catch {
-                        std.debug.print("Could not allocate memory for list.", .{});
-                        std.process.exit(1);
+                        out.printExit("Could not allocate memory for list.", .{}, 1);
                     };
                     self.stack_top -= (count + 1);
                     self.push(value.list(list));

@@ -7,7 +7,7 @@ const value = @import("value.zig");
 const vle = @import("vle.zig");
 
 pub const print_code = true;
-pub const trace_execution = false;
+pub const trace_execution = true;
 pub const stress_gc = false;
 pub const log_gc = false;
 
