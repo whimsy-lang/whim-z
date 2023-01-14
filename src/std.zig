@@ -7,6 +7,7 @@ const ObjList = @import("object.zig").ObjList;
 const ObjNative = @import("object.zig").ObjNative;
 const ObjSet = @import("object.zig").ObjSet;
 const ObjString = @import("object.zig").ObjString;
+const out = @import("out.zig");
 const value = @import("value.zig");
 const Value = value.Value;
 const version = @import("vm.zig").version;
@@ -189,8 +190,7 @@ fn n_std_list_add(vm: *Vm, values: []Value) Value {
         return vm.nativeError("std.list.add takes a list and at least one item to add", .{});
     }
     value.asList(values[0]).items.appendSlice(values[1..]) catch {
-        std.debug.print("Could not allocate memory for list.", .{});
-        std.process.exit(1);
+        out.printExit("Could not allocate memory for list.", .{}, 1);
     };
     return values[0];
 }
@@ -211,8 +211,7 @@ fn n_std_list_join(vm: *Vm, values: []Value) Value {
     const sep = value.asString(values[1]);
 
     const slices = vm.allocator.alloc([]const u8, list.items.items.len) catch {
-        std.debug.print("Could not allocate memory for slices.", .{});
-        std.process.exit(1);
+        out.printExit("Could not allocate memory for slices.", .{}, 1);
     };
     defer vm.allocator.free(slices);
 
@@ -226,8 +225,7 @@ fn n_std_list_join(vm: *Vm, values: []Value) Value {
     }
 
     const heap_chars = std.mem.join(vm.allocator, sep.chars, slices) catch {
-        std.debug.print("Could not allocate memory for string.", .{});
-        std.process.exit(1);
+        out.printExit("Could not allocate memory for string.", .{}, 1);
     };
 
     return value.string(ObjString.take(vm, heap_chars));
@@ -270,8 +268,7 @@ fn n_std_list_reverse(vm: *Vm, values: []Value) Value {
     const new_list = ObjList.init(vm);
     vm.push(value.list(new_list));
     new_list.items.appendSlice(list.items.items) catch {
-        std.debug.print("Could not allocate memory for list.", .{});
-        std.process.exit(1);
+        out.printExit("Could not allocate memory for list.", .{}, 1);
     };
     std.mem.reverse(Value, new_list.items.items);
     return vm.pop();
@@ -301,8 +298,7 @@ fn n_std_map_keys(vm: *Vm, values: []Value) Value {
     for (value.asMap(values[0]).items.entries) |entry| {
         if (!value.isEmpty(entry.key)) {
             list.items.append(entry.key) catch {
-                std.debug.print("Could not allocate memory for list.", .{});
-                std.process.exit(1);
+                out.printExit("Could not allocate memory for list.", .{}, 1);
             };
         }
     }
@@ -344,8 +340,7 @@ fn n_std_map_values(vm: *Vm, values: []Value) Value {
     for (value.asMap(values[0]).items.entries) |entry| {
         if (!value.isEmpty(entry.key)) {
             list.items.append(entry.value.value) catch {
-                std.debug.print("Could not allocate memory for list.", .{});
-                std.process.exit(1);
+                out.printExit("Could not allocate memory for list.", .{}, 1);
             };
         }
     }
@@ -474,8 +469,7 @@ fn n_std_number_to_char(vm: *Vm, values: []Value) Value {
     }
     var buf: [4]u8 = undefined;
     const len = unicode.utf8Encode(@floatToInt(u21, value.asNumber(values[0])), &buf) catch {
-        std.debug.print("Unable to encode character.", .{});
-        std.process.exit(1);
+        out.printExit("Unable to encode character.", .{}, 1);
     };
     return value.string(ObjString.copy(vm, buf[0..len]));
 }
@@ -496,9 +490,10 @@ fn n_std_number_to_radians(vm: *Vm, values: []Value) Value {
 
 fn n_std_print(vm: *Vm, values: []Value) Value {
     for (values) |val| {
-        std.debug.print("{s}", .{value.toString(val, vm).chars});
+        out.print("{s}", .{value.toString(val, vm).chars});
     }
-    std.debug.print("\n", .{});
+    out.println("", .{});
+    out.flush();
     return value.nil();
 }
 
@@ -519,8 +514,7 @@ fn n_std_range_values(vm: *Vm, values: []Value) Value {
             (range.inclusive and val == range.end))
         {
             list.items.append(value.number(val)) catch {
-                std.debug.print("Could not allocate memory for list.", .{});
-                std.process.exit(1);
+                out.printExit("Could not allocate memory for list.", .{}, 1);
             };
         } else {
             break;
@@ -575,8 +569,7 @@ fn n_std_set_values(vm: *Vm, values: []Value) Value {
     for (value.asSet(values[0]).items.entries) |entry| {
         if (!value.isEmpty(entry.key)) {
             list.items.append(entry.key) catch {
-                std.debug.print("Could not allocate memory for list.", .{});
-                std.process.exit(1);
+                out.printExit("Could not allocate memory for list.", .{}, 1);
             };
         }
     }
@@ -589,8 +582,7 @@ fn n_std_string_char_to_number(vm: *Vm, values: []Value) Value {
         return vm.nativeError("std.string.char_to_number takes a string with length 1", .{});
     }
     const val = unicode.utf8Decode(value.asString(values[0]).chars) catch {
-        std.debug.print("Invalid character encoding.", .{});
-        std.process.exit(1);
+        out.printExit("Invalid character encoding.", .{}, 1);
     };
     return value.number(@intToFloat(f64, val));
 }
@@ -606,13 +598,11 @@ fn n_std_string_chars(vm: *Vm, values: []Value) Value {
     var i: usize = 0;
     while (i < str.chars.len) {
         const len = unicode.utf8ByteSequenceLength(str.chars[i]) catch {
-            std.debug.print("Invalid character encoding.", .{});
-            std.process.exit(1);
+            out.printExit("Invalid character encoding.", .{}, 1);
         };
         vm.push(value.string(ObjString.copy(vm, str.chars[i .. i + len])));
         list.items.append(vm.peek(0)) catch {
-            std.debug.print("Could not allocate memory for list.", .{});
-            std.process.exit(1);
+            out.printExit("Could not allocate memory for list.", .{}, 1);
         };
         _ = vm.pop();
         i += len;
@@ -671,8 +661,7 @@ fn n_std_string_repeat(vm: *Vm, values: []Value) Value {
     const str = value.asString(values[0]);
     const count = @floatToInt(usize, value.asNumber(values[1]));
     const heap_chars = vm.allocator.alloc(u8, str.chars.len * count) catch {
-        std.debug.print("Could not allocate memory for string.", .{});
-        std.process.exit(1);
+        out.printExit("Could not allocate memory for string.", .{}, 1);
     };
     var i: usize = 0;
     while (i < count) : (i += 1) {
@@ -694,8 +683,7 @@ fn n_std_string_split(vm: *Vm, values: []Value) Value {
     while (iter.next()) |item| {
         vm.push(value.string(ObjString.copy(vm, item)));
         list.items.append(vm.peek(0)) catch {
-            std.debug.print("Could not allocate memory for list.", .{});
-            std.process.exit(1);
+            out.printExit("Could not allocate memory for list.", .{}, 1);
         };
         _ = vm.pop();
     }
@@ -716,8 +704,7 @@ fn n_std_string_to_lower(vm: *Vm, values: []Value) Value {
         return vm.nativeError("std.string.to_lower takes a string", .{});
     }
     const heap_chars = std.ascii.allocLowerString(vm.allocator, value.asString(values[0]).chars) catch {
-        std.debug.print("Could not allocate memory for string.", .{});
-        std.process.exit(1);
+        out.printExit("Could not allocate memory for string.", .{}, 1);
     };
     return value.string(ObjString.take(vm, heap_chars));
 }
@@ -727,8 +714,7 @@ fn n_std_string_to_upper(vm: *Vm, values: []Value) Value {
         return vm.nativeError("std.string.to_upper takes a string", .{});
     }
     const heap_chars = std.ascii.allocUpperString(vm.allocator, value.asString(values[0]).chars) catch {
-        std.debug.print("Could not allocate memory for string.", .{});
-        std.process.exit(1);
+        out.printExit("Could not allocate memory for string.", .{}, 1);
     };
     return value.string(ObjString.take(vm, heap_chars));
 }
@@ -745,8 +731,7 @@ fn n_std_string_trim(vm: *Vm, values: []Value) Value {
     }
     // custom trim
     var trims = vm.allocator.alloc([]const u8, values.len - 1) catch {
-        std.debug.print("Could not allocate memory for trim.", .{});
-        std.process.exit(1);
+        out.printExit("Could not allocate memory for trim.", .{}, 1);
     };
     defer vm.allocator.free(trims);
     for (values[1..]) |val, i| {
@@ -772,8 +757,7 @@ fn n_std_string_trim_end(vm: *Vm, values: []Value) Value {
     }
     // custom trim
     var trims = vm.allocator.alloc([]const u8, values.len - 1) catch {
-        std.debug.print("Could not allocate memory for trim.", .{});
-        std.process.exit(1);
+        out.printExit("Could not allocate memory for trim.", .{}, 1);
     };
     defer vm.allocator.free(trims);
     for (values[1..]) |val, i| {
@@ -798,8 +782,7 @@ fn n_std_string_trim_start(vm: *Vm, values: []Value) Value {
     }
     // custom trim
     var trims = vm.allocator.alloc([]const u8, values.len - 1) catch {
-        std.debug.print("Could not allocate memory for trim.", .{});
-        std.process.exit(1);
+        out.printExit("Could not allocate memory for trim.", .{}, 1);
     };
     defer vm.allocator.free(trims);
     for (values[1..]) |val, i| {
