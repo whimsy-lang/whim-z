@@ -3,6 +3,7 @@ const Allocator = std.mem.Allocator;
 
 const GcAllocator = @import("memory.zig").GcAllocater;
 const ObjString = @import("object.zig").ObjString;
+const out = @import("out.zig");
 const value = @import("value.zig");
 const Value = value.Value;
 const ValueContainer = value.ValueContainer;
@@ -41,8 +42,7 @@ pub const StringMap = struct {
 
     fn adjustCapacity(self: *StringMap, capacity: usize) void {
         const entries = self.allocator.alloc(Entry, capacity) catch {
-            std.debug.print("Could not allocate memory for string map.", .{});
-            std.process.exit(1);
+            out.printExit("Could not allocate memory for string map.", .{}, 1);
         };
         for (entries) |*entry| {
             entry.key = null;

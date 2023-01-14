@@ -14,6 +14,7 @@ const ObjRange = @import("object.zig").ObjRange;
 const ObjSet = @import("object.zig").ObjSet;
 const ObjString = @import("object.zig").ObjString;
 const ObjUpvalue = @import("object.zig").ObjUpvalue;
+const out = @import("out.zig");
 const Vm = @import("vm.zig").Vm;
 
 const quiet_nan: u64 = 0b01111111_11111100_00000000_00000000_00000000_00000000_00000000_00000000;
@@ -215,15 +216,19 @@ pub fn stdClass(val: Value, vm: *Vm) *ObjClass {
 
 pub fn debugPrint(val: Value) void {
     if (isBool(val)) {
-        std.debug.print("{s}", .{if (asBool(val)) "true" else "false"});
+        if (asBool(val)) {
+            out.print("true", .{});
+        } else {
+            out.print("false", .{});
+        }
     } else if (isNil(val)) {
-        std.debug.print("nil", .{});
+        out.print("nil", .{});
     } else if (isNumber(val)) {
-        std.debug.print("{d}", .{asNumber(val)});
+        out.print("{d}", .{asNumber(val)});
     } else if (isObject(val)) {
         asObject(val).debugPrint();
     } else {
-        std.debug.print("empty", .{});
+        out.print("empty", .{});
     }
 }
 
@@ -232,8 +237,7 @@ pub fn toString(val: Value, vm: *Vm) *ObjString {
     if (isNil(val)) return ObjString.copy(vm, "nil");
     if (isNumber(val)) {
         const chars = std.fmt.allocPrint(vm.allocator, "{d}", .{asNumber(val)}) catch {
-            std.debug.print("Could not allocate memory for string.", .{});
-            std.process.exit(1);
+            out.printExit("Could not allocate memory for string.", .{}, 1);
         };
         return ObjString.take(vm, chars);
     }
