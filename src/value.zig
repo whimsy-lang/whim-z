@@ -217,14 +217,14 @@ pub fn stdClass(val: Value, vm: *Vm) *ObjClass {
 pub fn print(val: Value) void {
     if (isBool(val)) {
         if (asBool(val)) {
-            out.print("true", .{});
+            out.printColor("true", .{}, .blue);
         } else {
-            out.print("false", .{});
+            out.printColor("false", .{}, .blue);
         }
     } else if (isNil(val)) {
-        out.print("nil", .{});
+        out.printColor("nil", .{}, .dark_red);
     } else if (isNumber(val)) {
-        out.print("{d}", .{asNumber(val)});
+        out.printColor("{d}", .{asNumber(val)}, .dark_green);
     } else if (isObject(val)) {
         asObject(val).print();
     } else {

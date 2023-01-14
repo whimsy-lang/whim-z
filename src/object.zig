@@ -80,16 +80,16 @@ pub const Object = struct {
     pub fn print(self: *Object) void {
         switch (self.type) {
             .class => if (self.asClass().name) |name| {
-                out.print("class {s}", .{name.chars});
+                out.printColor("class {s}", .{name.chars}, .purple);
             } else {
-                out.print("anon class", .{});
+                out.printColor("anon class", .{}, .purple);
             },
             .closure => self.asClosure().function.print(),
             .function => self.asFunction().print(),
             .instance => if (self.asInstance().type.name) |name| {
-                out.print("{s} inst", .{name.chars});
+                out.printColor("{s} inst", .{name.chars}, .pink);
             } else {
-                out.print("anon inst", .{});
+                out.printColor("anon inst", .{}, .pink);
             },
             .list => {
                 out.print("(", .{});
@@ -121,11 +121,13 @@ pub const Object = struct {
                 }
                 out.print("]", .{});
             },
-            .native => out.print("<native fn>", .{}),
+            .native => out.printColor("<native fn>", .{}, .yellow),
             .range => {
                 const r = self.asRange();
+                out.color(.teal);
                 out.print("{d}{s}{d}", .{ r.start, if (r.inclusive) "..=" else "..", r.end });
                 if (r.step != 1) out.print(" by {d}", .{r.step});
+                out.reset();
             },
             .set => {
                 out.print("[", .{});
@@ -142,7 +144,7 @@ pub const Object = struct {
                 }
                 out.print("]", .{});
             },
-            .string => out.print("{s}", .{self.asString().chars}),
+            .string => out.printColor("{s}", .{self.asString().chars}, .orange),
             .upvalue => out.print("upvalue", .{}),
         }
     }
@@ -454,10 +456,10 @@ pub const ObjFunction = struct {
     }
 
     pub fn print(self: *ObjFunction) void {
-        if (self.name != null) {
-            out.print("<fn {s}>", .{self.name.?.chars});
+        if (self.name) |n| {
+            out.printColor("<fn {s}>", .{n.chars}, .yellow);
         } else {
-            out.print("<script>", .{});
+            out.printColor("<script>", .{}, .yellow);
         }
     }
 };

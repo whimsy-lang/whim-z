@@ -4,9 +4,35 @@ var stdout_file: std.fs.File.Writer = undefined;
 var buffered_writer: std.io.BufferedWriter(4096, std.fs.File.Writer) = undefined;
 var stdout: std.io.BufferedWriter(4096, std.fs.File.Writer).Writer = undefined;
 
-const set_color_str = "\x1b[38;2;{d};{d};{d}m";
-const set_bg_color_str = "\x1b[48;2;{d};{d};{d}m";
-const reset_str = "\x1b[0m";
+const Color = enum {
+    blue,
+    dark_green,
+    dark_red,
+    gray,
+    green,
+    orange,
+    pink,
+    purple,
+    red,
+    teal,
+    yellow,
+
+    fn val(self: Color) struct { u8, u8, u8 } {
+        return switch (self) {
+            .blue => .{ 0, 0x80, 0xff },
+            .dark_green => .{ 0, 0x80, 0 },
+            .dark_red => .{ 0xa0, 0, 0 },
+            .gray => .{ 0x60, 0x60, 0x60 },
+            .green => .{ 0, 0xff, 0 },
+            .orange => .{ 0xff, 0x80, 0x40 },
+            .pink => .{ 0xff, 0x80, 0xff },
+            .purple => .{ 0x80, 0x40, 0xa0 },
+            .red => .{ 0xff, 0, 0 },
+            .teal => .{ 0, 0xa0, 0xa0 },
+            .yellow => .{ 0xff, 0xff, 0x80 },
+        };
+    }
+};
 
 pub fn init() void {
     stdout_file = std.io.getStdOut().writer();
@@ -25,12 +51,17 @@ pub fn println(comptime fmt: []const u8, args: anytype) void {
     print(fmt ++ "\n", args);
 }
 
-pub fn printColor(comptime fmt: []const u8, args: anytype, r: u8, g: u8, b: u8) void {
-    print(set_color_str ++ fmt ++ reset_str, .{ r, g, b } ++ args);
+pub fn printColor(comptime fmt: []const u8, args: anytype, c: Color) void {
+    color(c);
+    print(fmt, args);
+    reset();
 }
 
-pub fn printlnColor(comptime fmt: []const u8, args: anytype, r: u8, g: u8, b: u8) void {
-    print(set_color_str ++ fmt ++ reset_str ++ "\n", .{ r, g, b } ++ args);
+pub fn printlnColor(comptime fmt: []const u8, args: anytype, c: Color) void {
+    color(c);
+    print(fmt, args);
+    reset();
+    println("", .{});
 }
 
 pub fn printExit(comptime fmt: []const u8, args: anytype, status: u8) noreturn {
@@ -46,12 +77,12 @@ pub fn flush() void {
     };
 }
 
-pub fn color(r: u8, g: u8, b: u8) void {
-    print(set_color_str, .{ r, g, b });
+pub fn color(c: Color) void {
+    print("\x1b[38;2;{d};{d};{d}m", c.val());
 }
 
-pub fn bgColor(r: u8, g: u8, b: u8) void {
-    print(set_bg_color_str, .{ r, g, b });
+pub fn bgColor(c: Color) void {
+    print("\x1b[48;2;{d};{d};{d}m", c.val());
 }
 
 pub fn reset() void {

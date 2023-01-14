@@ -221,7 +221,7 @@ pub const Vm = struct {
     pub fn collectGarbage(self: *Vm) void {
         const before = self.gc.bytes_allocated;
         if (debug.log_gc) {
-            out.printlnColor("-- gc begin", .{}, 0, 0xff, 0);
+            out.printlnColor("-- gc begin", .{}, .green);
         }
 
         self.markRoots();
@@ -232,7 +232,7 @@ pub const Vm = struct {
         self.gc.next_gc = self.gc.bytes_allocated * GcAllocator.heap_grow_factor;
 
         if (debug.log_gc) {
-            out.printlnColor("-- gc end | collected {d} bytes (from {d} to {d}) next at {d}", .{ before - self.gc.bytes_allocated, before, self.gc.bytes_allocated, self.gc.next_gc }, 0, 0xff, 0);
+            out.printlnColor("-- gc end | collected {d} bytes (from {d} to {d}) next at {d}", .{ before - self.gc.bytes_allocated, before, self.gc.bytes_allocated, self.gc.next_gc }, .green);
         }
     }
 
@@ -370,7 +370,7 @@ pub const Vm = struct {
             const frame = &self.frames[@intCast(usize, i)];
             const function = frame.closure.function;
             const instruction = @ptrToInt(frame.ip) - @ptrToInt(function.chunk.code.items.ptr) - 1;
-            out.printColor("[line {d}]", .{function.chunk.getLine(instruction)}, 0xff, 0, 0);
+            out.printColor("[line {d}]", .{function.chunk.getLine(instruction)}, .red);
             out.print(" in ", .{});
             if (function.name == null) {
                 out.println("{s}", .{if (i == 0) "script" else "fn()"});

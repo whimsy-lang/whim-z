@@ -12,7 +12,7 @@ pub const stress_gc = false;
 pub const log_gc = false;
 
 pub fn disassembleChunk(chunk: *Chunk, name: []const u8) void {
-    out.printlnColor("== {s} ==", .{name}, 0, 0x80, 0xff);
+    out.printlnColor("== {s} ==", .{name}, .blue);
 
     var offset: usize = 0;
     while (offset < chunk.code.items.len) {
@@ -23,10 +23,10 @@ pub fn disassembleChunk(chunk: *Chunk, name: []const u8) void {
 }
 
 pub fn disassembleInstruction(chunk: *Chunk, offset: usize) usize {
-    out.printColor("{d:0>4} ", .{offset}, 0x60, 0x60, 0x60);
+    out.printColor("{d:0>4} ", .{offset}, .gray);
 
     if (offset > 0 and chunk.getLine(offset) == chunk.getLine(offset - 1)) {
-        out.printColor("   | ", .{}, 0x60, 0x60, 0x60);
+        out.printColor("   | ", .{}, .gray);
     } else {
         out.print("{d:4} ", .{chunk.getLine(offset)});
     }

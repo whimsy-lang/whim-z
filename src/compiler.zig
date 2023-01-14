@@ -113,14 +113,14 @@ pub const Compiler = struct {
         if (vm.parser.panic_mode) return;
         vm.parser.panic_mode = true;
 
-        out.printColor("[line {d}]", .{token.line}, 0xff, 0, 0);
+        out.printColor("[line {d}]", .{token.line}, .red);
         out.print(" Error", .{});
 
         if (token.type == .eof) {
             out.print(" at end", .{});
         } else if (token.type != .error_) {
             out.print(" at ", .{});
-            out.printColor("'{s}'", .{token.value}, 0xff, 0x80, 0x40);
+            out.printColor("'{s}'", .{token.value}, .orange);
         }
 
         out.println(": {s}", .{message});
