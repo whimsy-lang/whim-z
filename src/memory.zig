@@ -5,6 +5,7 @@ const Compiler = @import("compiler.zig").Compiler;
 const debug = @import("debug.zig");
 const Object = @import("object.zig").Object;
 const ObjString = @import("object.zig").ObjString;
+const out = @import("out.zig");
 const value = @import("value.zig");
 const Value = value.Value;
 const Vm = @import("vm.zig").Vm;
@@ -56,13 +57,12 @@ pub const GcAllocater = struct {
         }
         const result = self.vm.parent_allocator.rawAlloc(len, log2_ptr_align, ret_addr);
         if (result == null) {
-            std.debug.print("alloc failure\n", .{});
-            std.process.exit(1);
+            out.printExit("alloc failure", .{}, 1);
         } else {
             const before = self.bytes_allocated;
             self.bytes_allocated += len;
             if (debug.log_gc) {
-                std.debug.print("  {d} -> {d}\n", .{ before, self.bytes_allocated });
+                out.println("  {d} -> {d}", .{ before, self.bytes_allocated });
             }
         }
         return result;
@@ -85,7 +85,7 @@ pub const GcAllocater = struct {
                 self.bytes_allocated -= buf.len - new_len;
             }
             if (debug.log_gc) {
-                std.debug.print("  {d} -> {d}\n", .{ before, self.bytes_allocated });
+                out.println("  {d} -> {d}", .{ before, self.bytes_allocated });
             }
             return true;
         }
@@ -100,7 +100,7 @@ pub const GcAllocater = struct {
         const before = self.bytes_allocated;
         self.bytes_allocated -= buf.len;
         if (debug.log_gc) {
-            std.debug.print("  {d} -> {d}\n", .{ before, self.bytes_allocated });
+            out.println("  {d} -> {d}", .{ before, self.bytes_allocated });
         }
     }
 };
