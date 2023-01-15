@@ -1397,15 +1397,9 @@ pub const Compiler = struct {
         }
     }
 
-    fn compileItem(vm: *Vm, source: []const u8) void {
-        vm.lexer = Lexer.init(source);
-        advance(vm);
-        while (!match(vm, .eof)) {
-            statement(vm);
-        }
-    }
-
     pub fn compile(vm: *Vm, source: []const u8) ?*ObjFunction {
+        vm.lexer = Lexer.init(source);
+
         vm.parser.had_error = false;
         vm.parser.panic_mode = false;
 
@@ -1413,8 +1407,10 @@ pub const Compiler = struct {
         compiler.init(vm, .script);
         defer compiler.deinit();
 
-        compileItem(vm, whimsy_std.lib);
-        compileItem(vm, source);
+        advance(vm);
+        while (!match(vm, .eof)) {
+            statement(vm);
+        }
 
         const script_func = endCompiler(vm);
         return if (vm.parser.had_error) null else script_func;
