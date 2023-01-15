@@ -1,7 +1,4 @@
 # simple test file
 
-std.print('abc':starts_with('a'))
-std.print('abc':starts_with('c'))
-std.print()
-std.print('abc':ends_with('c'))
-std.print('abc':ends_with('a'))
+l :: (1, 2, 3)
+std.print(l:map(fn(x) return x + 2 /fn))

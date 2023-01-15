@@ -13,7 +13,7 @@ const Value = value.Value;
 const version = @import("vm.zig").version;
 const Vm = @import("vm.zig").Vm;
 
-pub const lib = @embedFile("std.whim");
+const lib = @embedFile("std.whim");
 
 pub fn register(vm: *Vm) void {
     // std
@@ -119,6 +119,11 @@ pub fn register(vm: *Vm) void {
     defineNative(vm, vm.string_class.?, "trim", n_std_string_trim);
     defineNative(vm, vm.string_class.?, "trim_end", n_std_string_trim_end);
     defineNative(vm, vm.string_class.?, "trim_start", n_std_string_trim_start);
+
+    // load the parts implemented in Whimsy
+    const result = vm.interpret(lib);
+    if (result == .compile_error) out.printExit("", .{}, 65);
+    if (result == .runtime_error) out.printExit("", .{}, 70);
 }
 
 fn defineClass(vm: *Vm, name: []const u8) *ObjClass {

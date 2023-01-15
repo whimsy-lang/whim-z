@@ -9,7 +9,6 @@ const TokenType = @import("lexer.zig").TokenType;
 const ObjFunction = @import("object.zig").ObjFunction;
 const ObjString = @import("object.zig").ObjString;
 const out = @import("out.zig");
-const whimsy_std = @import("std.zig");
 const value = @import("value.zig");
 const Value = value.Value;
 const Vm = @import("vm.zig").Vm;

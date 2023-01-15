@@ -58,7 +58,7 @@ fn repl(vm: *Vm) !void {
     var buffer: [1024]u8 = undefined;
 
     while (true) {
-        out.print("> ", .{});
+        out.printColor("> ", .{}, .yellow);
         out.flush();
 
         if (try stdin.readUntilDelimiterOrEof(&buffer, '\n')) |line| {
