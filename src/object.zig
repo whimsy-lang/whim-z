@@ -644,16 +644,12 @@ pub const ObjString = struct {
 
         string.obj = .{ .type = .string };
 
-        var len: isize = 0;
-        var i: usize = 0;
-        while (i < chars.len) : (len += 1) {
-            i += unicode.utf8ByteSequenceLength(chars[i]) catch {
-                out.printExit("Invalid character encoding.", .{}, 1);
-            };
-        }
+        const len = unicode.utf8CountCodepoints(chars) catch {
+            out.printExit("Invalid character encoding.", .{}, 1);
+        };
 
         string.chars = chars;
-        string.length = len;
+        string.length = @intCast(isize, len);
         string.hash = hash;
         _ = vm.strings.set(string, value.nil());
 
