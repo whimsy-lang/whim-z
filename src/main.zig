@@ -16,26 +16,26 @@ pub fn main() !void {
     var args = try std.process.argsWithAllocator(allocator);
     defer args.deinit();
 
-    var argList = std.ArrayList([]const u8).init(allocator);
-    defer argList.deinit();
+    var arg_list = std.ArrayList([]const u8).init(allocator);
+    defer arg_list.deinit();
 
-    while (args.next()) |arg| try argList.append(arg);
+    while (args.next()) |arg| try arg_list.append(arg);
 
     var valid = false;
-    if (argList.items.len >= 2 and std.mem.eql(u8, argList.items[1], "repl")) {
+    if (arg_list.items.len >= 2 and std.mem.eql(u8, arg_list.items[1], "repl")) {
         var vm: Vm = undefined;
         vm.init(allocator);
         defer vm.deinit();
         valid = true;
-        parseFlags(argList.items[2..]);
+        parseFlags(arg_list.items[2..]);
         try repl(&vm);
-    } else if (argList.items.len >= 3 and std.mem.eql(u8, argList.items[1], "run")) {
+    } else if (arg_list.items.len >= 3 and std.mem.eql(u8, arg_list.items[1], "run")) {
         var vm: Vm = undefined;
         vm.init(allocator);
         defer vm.deinit();
         valid = true;
-        parseFlags(argList.items[3..]);
-        try runFile(allocator, &vm, argList.items[2]);
+        parseFlags(arg_list.items[3..]);
+        try runFile(allocator, &vm, arg_list.items[2]);
     }
     if (!valid) {
         out.printExit("Usage: whim [command] [flags]\n  Commands: repl, run [file]\n  Flags: -no-style", .{}, 64);
