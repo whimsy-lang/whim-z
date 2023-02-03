@@ -1,0 +1,12 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "test.whim",
+            "type": "PowerShell",
+            "request": "launch",
+            "script": "zig build run -- run test/test.whim",
+            "args": []
+        }
+    ]
+}
