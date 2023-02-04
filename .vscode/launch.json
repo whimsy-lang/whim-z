@@ -2,6 +2,13 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "current file",
+            "type": "PowerShell",
+            "request": "launch",
+            "script": "zig build run -- run ${file}",
+            "args": []
+        },
+        {
             "name": "test.whim",
             "type": "PowerShell",
             "request": "launch",
