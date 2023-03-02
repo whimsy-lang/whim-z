@@ -220,8 +220,7 @@ fn n_std_list_join(vm: *Vm, values: []Value) Value {
     };
     defer vm.allocator.free(slices);
 
-    var i: usize = 0;
-    while (i < list.items.items.len) : (i += 1) {
+    for (0..list.items.items.len) |i| {
         const item = list.items.items[i];
         if (!value.isObjType(item, .string)) {
             return vm.nativeError("std.list.join can only join strings", .{});
@@ -668,8 +667,7 @@ fn n_std_string_repeat(vm: *Vm, values: []Value) Value {
     const heap_chars = vm.allocator.alloc(u8, str.chars.len * count) catch {
         out.printExit("Could not allocate memory for string.", .{}, 1);
     };
-    var i: usize = 0;
-    while (i < count) : (i += 1) {
+    for (0..count) |i| {
         std.mem.copy(u8, heap_chars[i * str.chars.len ..], str.chars);
     }
     return value.string(ObjString.take(vm, heap_chars));
@@ -739,7 +737,7 @@ fn n_std_string_trim(vm: *Vm, values: []Value) Value {
         out.printExit("Could not allocate memory for trim.", .{}, 1);
     };
     defer vm.allocator.free(trims);
-    for (values[1..]) |val, i| {
+    for (values[1..], 0..) |val, i| {
         if (!value.isObjType(val, .string)) {
             return vm.nativeError("std.string.trim takes a string and optional strings to trim", .{});
         }
@@ -765,7 +763,7 @@ fn n_std_string_trim_end(vm: *Vm, values: []Value) Value {
         out.printExit("Could not allocate memory for trim.", .{}, 1);
     };
     defer vm.allocator.free(trims);
-    for (values[1..]) |val, i| {
+    for (values[1..], 0..) |val, i| {
         if (!value.isObjType(val, .string)) {
             return vm.nativeError("std.string.trim_end takes a string and optional strings to trim", .{});
         }
@@ -790,7 +788,7 @@ fn n_std_string_trim_start(vm: *Vm, values: []Value) Value {
         out.printExit("Could not allocate memory for trim.", .{}, 1);
     };
     defer vm.allocator.free(trims);
-    for (values[1..]) |val, i| {
+    for (values[1..], 0..) |val, i| {
         if (!value.isObjType(val, .string)) {
             return vm.nativeError("std.string.trim_start takes a string and optional strings to trim", .{});
         }

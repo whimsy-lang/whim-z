@@ -424,8 +424,7 @@ pub const Compiler = struct {
     fn addUpvalue(self: *Compiler, vm: *Vm, index: u29, is_local: bool) usize {
         const upvalue_count = self.function.?.upvalue_count;
 
-        var i: usize = 0;
-        while (i < upvalue_count) : (i += 1) {
+        for (0..upvalue_count) |i| {
             const upvalue = &self.upvalues.items[i];
             if (upvalue.index == index and upvalue.is_local == is_local) {
                 return i;
@@ -802,8 +801,7 @@ pub const Compiler = struct {
         const new_func = endCompiler(vm);
         vm.emitOpNum(.closure, makeConstant(vm, value.function(new_func)));
 
-        var i: usize = 0;
-        while (i < new_func.upvalue_count) : (i += 1) {
+        for (0..new_func.upvalue_count) |i| {
             vm.emitByte(if (compiler.upvalues.items[i].is_local) 1 else 0);
             vm.emitNum(compiler.upvalues.items[i].index);
         }

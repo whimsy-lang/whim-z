@@ -145,7 +145,7 @@ pub const Chunk = struct {
     }
 
     pub fn getAddConstant(self: *Chunk, vm: *Vm, val: Value) usize {
-        for (self.constants.items) |v, i| {
+        for (self.constants.items, 0..) |v, i| {
             if (val == v) return i;
         }
 

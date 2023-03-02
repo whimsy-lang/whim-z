@@ -276,8 +276,7 @@ fn calcPtrHash(ptr: anytype) u32 {
 
 pub fn calcHash(bytes: []const u8) u32 {
     var result: u32 = 2166136261;
-    var i: usize = 0;
-    while (i < bytes.len) : (i += 1) {
+    for (0..bytes.len) |i| {
         result ^= bytes[i];
         result *%= 16777619;
     }

@@ -131,8 +131,7 @@ fn closureInstruction(name: []const u8, chunk: *Chunk, offset: usize) usize {
     out.println("", .{});
 
     const function = value.asFunction(chunk.constants.items[constant]);
-    var i: usize = 0;
-    while (i < function.upvalue_count) : (i += 1) {
+    for (0..function.upvalue_count) |_| {
         const is_local = chunk.code.items[cur_offset];
         cur_offset += 1;
         const index = vle.get(chunk.code.items.ptr + cur_offset);

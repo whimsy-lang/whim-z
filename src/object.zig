@@ -403,8 +403,7 @@ pub const ObjClosure = struct {
         const upvalues = vm.allocator.alloc(?*ObjUpvalue, func.upvalue_count) catch {
             out.printExit("Could not allocate memory for closure.", .{}, 1);
         };
-        var i: usize = 0;
-        while (i < func.upvalue_count) : (i += 1) {
+        for (0..func.upvalue_count) |i| {
             upvalues[i] = null;
         }
 

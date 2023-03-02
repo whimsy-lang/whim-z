@@ -1,3 +1,4 @@
+const builtin = @import("builtin");
 const std = @import("std");
 
 var stdout_file: std.fs.File.Writer = undefined;
@@ -37,6 +38,9 @@ const Color = enum {
 };
 
 pub fn init() void {
+    if (builtin.os.tag == .windows) {
+        _ = std.os.windows.kernel32.SetConsoleOutputCP(65001); // utf-8
+    }
     stdout_file = std.io.getStdOut().writer();
     buffered_writer = std.io.bufferedWriter(stdout_file);
     stdout = buffered_writer.writer();

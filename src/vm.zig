@@ -242,8 +242,7 @@ pub const Vm = struct {
             value.mark(slot[0], self);
         }
 
-        var i: usize = 0;
-        while (i < self.frame_count) : (i += 1) {
+        for (0..self.frame_count) |i| {
             self.frames[i].closure.obj.mark(self);
         }
 
@@ -1297,8 +1296,7 @@ pub const Vm = struct {
                     const closure = ObjClosure.init(self, function);
                     self.push(value.closure(closure));
 
-                    var i: usize = 0;
-                    while (i < closure.upvalues.len) : (i += 1) {
+                    for (0..closure.upvalues.len) |i| {
                         const is_local = frame.readByte();
                         const index = frame.readNum();
                         if (is_local == 1) {
